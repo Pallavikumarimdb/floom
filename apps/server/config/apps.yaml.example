@@ -1,0 +1,32 @@
+apps:
+  # Example 1: httpbin (public, simple, zero-auth)
+  - slug: httpbin
+    type: proxied
+    openapi_spec_url: https://httpbin.org/spec.json
+    base_url: https://httpbin.org
+    auth: none
+    display_name: HTTPBin
+    description: "Echo service for HTTP requests. Test any agent HTTP flow."
+    category: developer-tools
+
+  # Example 2: Plausible Analytics (bearer auth)
+  - slug: plausible-analytics
+    type: proxied
+    openapi_spec_url: https://plausible.io/api/docs/openapi.json
+    base_url: https://plausible.io
+    auth: bearer
+    secrets: [PLAUSIBLE_API_KEY]
+    display_name: Plausible Analytics
+    description: "Privacy-friendly analytics. Query stats for any site."
+    category: analytics
+
+  # Example 3: your own API (apikey auth)
+  # - slug: my-api
+  #   type: proxied
+  #   openapi_spec_url: https://api.example.com/openapi.json
+  #   base_url: https://api.example.com
+  #   auth: apikey
+  #   secrets: [MY_API_KEY]
+  #   display_name: My API
+  #   description: "Description of what this API does."
+  #   category: custom
