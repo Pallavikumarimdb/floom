@@ -8,14 +8,10 @@ export function AboutFloomResponse() {
           Floom — infra for agentic work.
         </p>
         <p style={{ margin: '0 0 14px', fontSize: 14, lineHeight: 1.7, color: 'var(--muted)' }}>
-          One manifest. Every agent surface. Any CLI, MCP server, or Python library becomes a chat, a tool call, and an HTTP endpoint in 10 seconds.
+          OpenAPI in, production product out.
         </p>
         <p style={{ margin: '0 0 14px', fontSize: 14, lineHeight: 1.7 }}>
-          Every Floom app exposes four surfaces from a single{' '}
-          <code style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 12, background: 'var(--bg)', padding: '1px 5px', borderRadius: 4, border: '1px solid var(--line)' }}>
-            floom.yaml
-          </code>
-          : a chat UI, an MCP server, an HTTP endpoint, and a CLI command. Built in Hamburg by Federico De Ponte and contributors.
+          Every Floom app gets an MCP server, a CLI, an HTTP endpoint, and a chat UI from a single OpenAPI spec — plus secrets, rate limits, access control, and the whole plumbing stack you'd otherwise build yourself. Open source on GitHub.
         </p>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
           <Link

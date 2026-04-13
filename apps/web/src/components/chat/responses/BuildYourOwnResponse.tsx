@@ -7,28 +7,14 @@ export function BuildYourOwnResponse() {
     <div className="assistant-turn">
       <div className="app-expanded-card">
         <p style={{ margin: '0 0 16px', fontSize: 15, lineHeight: 1.6 }}>
-          Floom turns any GitHub repo into a runnable agent-callable tool via a 5-line manifest.
-          Paste a GitHub URL below and Floom will auto-detect the runtime, generate a{' '}
-          <code
-            style={{
-              fontFamily: "'JetBrains Mono', monospace",
-              fontSize: 13,
-              background: 'var(--bg)',
-              padding: '1px 5px',
-              borderRadius: 4,
-              border: '1px solid var(--line)',
-            }}
-          >
-            floom.yaml
-          </code>
-          , and deploy it in 10 seconds.
+          Floom takes any OpenAPI spec and generates an MCP server, a CLI, an HTTP endpoint, and a chat UI automatically — plus secrets, rate limits, and all the production plumbing. Paste a spec URL below.
         </p>
         <div style={{ display: 'flex', gap: 8 }}>
           <input
             type="url"
             value={url}
             onChange={(e) => setUrl(e.target.value)}
-            placeholder="https://github.com/owner/repo"
+            placeholder="https://docs.stripe.com/api/openapi.json"
             style={{
               flex: 1,
               height: 40,

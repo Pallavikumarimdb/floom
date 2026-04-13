@@ -422,7 +422,7 @@ export function ProtocolPage() {
           >
             <div>
               <p style={{ margin: '0 0 4px', fontSize: 14, fontWeight: 600 }}>
-                The protocol is open. MIT licensed.
+                The protocol is open.
               </p>
               <p style={{ margin: 0, fontSize: 13, color: 'var(--muted)' }}>
                 Self-host, fork, or contribute. Runtime packages in the monorepo.
