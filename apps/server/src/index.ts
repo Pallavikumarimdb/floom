@@ -11,10 +11,11 @@ import { hubRouter } from './routes/hub.js';
 import { parseRouter } from './routes/parse.js';
 import { pickRouter } from './routes/pick.js';
 import { threadRouter } from './routes/thread.js';
-import { runRouter } from './routes/run.js';
+import { runRouter, slugRunRouter } from './routes/run.js';
 import { mcpRouter } from './routes/mcp.js';
 import { deployWaitlistRouter } from './routes/deploy-waitlist.js';
 import { seedFromFile } from './services/seed.js';
+import { ingestOpenApiApps } from './services/openapi-ingest.js';
 import { backfillAppEmbeddings } from './services/embeddings.js';
 
 const PORT = Number(process.env.PORT || 3051);
@@ -32,6 +33,9 @@ app.route('/api/pick', pickRouter);
 app.route('/api/thread', threadRouter);
 app.route('/api/run', runRouter);
 app.route('/mcp', mcpRouter);
+// Slug-based run endpoint: POST /api/:slug/run
+// Registered after /api/run to avoid prefix collision.
+app.route('/api/:slug/run', slugRunRouter);
 app.route('/api/deploy-waitlist', deployWaitlistRouter);
 
 // Static web — serve the built Vite bundle from apps/web/dist when it exists.
@@ -121,6 +125,21 @@ async function boot(): Promise<void> {
   } catch (err) {
     console.error('[seed] failed:', err);
   }
+
+  // OpenAPI ingest: if FLOOM_APPS_CONFIG is set, ingest apps from the config file.
+  const appsConfigPath = process.env.FLOOM_APPS_CONFIG;
+  if (appsConfigPath) {
+    ingestOpenApiApps(appsConfigPath)
+      .then((result) => {
+        console.log(
+          `[openapi-ingest] ${result.apps_ingested} apps ingested, ${result.apps_failed} failed`,
+        );
+      })
+      .catch((err) => {
+        console.error('[openapi-ingest] failed:', err);
+      });
+  }
+
   // Don't block boot on the network call.
   backfillAppEmbeddings().catch((err) => {
     console.error('[embeddings] backfill failed:', err);

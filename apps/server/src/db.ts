@@ -34,6 +34,26 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_apps_category ON apps(category);
 `);
 
+// Migrations: add proxied-app columns if they don't exist yet (idempotent).
+const appCols = (db.prepare(`PRAGMA table_info(apps)`).all() as { name: string }[]).map(
+  (r) => r.name,
+);
+if (!appCols.includes('app_type')) {
+  db.exec(`ALTER TABLE apps ADD COLUMN app_type TEXT NOT NULL DEFAULT 'docker'`);
+}
+if (!appCols.includes('base_url')) {
+  db.exec(`ALTER TABLE apps ADD COLUMN base_url TEXT`);
+}
+if (!appCols.includes('auth_type')) {
+  db.exec(`ALTER TABLE apps ADD COLUMN auth_type TEXT`);
+}
+if (!appCols.includes('openapi_spec_url')) {
+  db.exec(`ALTER TABLE apps ADD COLUMN openapi_spec_url TEXT`);
+}
+if (!appCols.includes('openapi_spec_cached')) {
+  db.exec(`ALTER TABLE apps ADD COLUMN openapi_spec_cached TEXT`);
+}
+
 // ---------- runs (one per app invocation, optionally bound to a chat turn) ----------
 db.exec(`
   CREATE TABLE IF NOT EXISTS runs (

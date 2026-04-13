@@ -72,6 +72,12 @@ export interface AppRecord {
   category: string | null;
   author: string | null;
   icon: string | null;
+  // proxied-mode fields (nullable for docker apps)
+  app_type: 'docker' | 'proxied';
+  base_url: string | null;
+  auth_type: 'bearer' | 'apikey' | 'none' | null;
+  openapi_spec_url: string | null;
+  openapi_spec_cached: string | null; // JSON-stringified OpenAPI spec
   created_at: string;
   updated_at: string;
 }
