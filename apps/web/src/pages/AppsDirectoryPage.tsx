@@ -19,6 +19,9 @@ const CATEGORY_LABELS: Record<string, string> = {
   'seo': 'SEO',
 };
 
+// Slugs that get featured cards at the top
+const FEATURED_SLUGS = ['flyfast', 'opendraft', 'openslides'];
+
 export function AppsDirectoryPage() {
   const [apps, setApps] = useState<HubApp[]>([]);
   const [loading, setLoading] = useState(true);
@@ -27,7 +30,7 @@ export function AppsDirectoryPage() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    document.title = 'Public apps — Floom';
+    document.title = 'Public apps | Floom';
     getHub()
       .then((a) => {
         setApps(a);
@@ -36,11 +39,10 @@ export function AppsDirectoryPage() {
       .catch(() => setLoading(false));
 
     return () => {
-      document.title = 'Floom — infra for agentic work';
+      document.title = 'Floom: infra for agentic work';
     };
   }, []);
 
-  // Derive categories that actually exist in data
   const categories = useMemo(() => {
     const found = new Set<string>();
     apps.forEach((a) => {
@@ -67,13 +69,22 @@ export function AppsDirectoryPage() {
     return list;
   }, [apps, activeCategory, search]);
 
+  // Split into featured + rest when not filtering
+  const isFiltering = activeCategory !== 'all' || search.trim().length > 0;
+  const featuredApps = useMemo(() => {
+    if (isFiltering) return [];
+    return FEATURED_SLUGS
+      .map((slug) => apps.find((a) => a.slug === slug))
+      .filter(Boolean) as HubApp[];
+  }, [apps, isFiltering]);
+
+  const gridApps = useMemo(() => {
+    if (isFiltering) return filtered;
+    return filtered.filter((a) => !FEATURED_SLUGS.includes(a.slug));
+  }, [filtered, isFiltering]);
+
   const handleSignIn = () => {
-    navigate('/chat');
-    setTimeout(() => {
-      window.dispatchEvent(
-        new CustomEvent('floom:pill', { detail: { pill: 'connect-github' } }),
-      );
-    }, 100);
+    navigate('/apps');
   };
 
   return (
@@ -88,7 +99,7 @@ export function AppsDirectoryPage() {
             style={{ maxWidth: 640, fontSize: 42, marginBottom: 12 }}
           >
             Public apps
-            <span className="headline-dim"> — agent-ready, right now.</span>
+            <span className="headline-dim">, agent-ready, right now.</span>
           </h1>
           <p className="subhead" style={{ maxWidth: 560 }}>
             {apps.length > 0 ? apps.length : '15'} tools with a <code style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 14 }}>floom.yaml</code> manifest. Each one exposes a chat interface, an MCP server, an HTTP API, and a CLI endpoint from the same source.
@@ -102,7 +113,7 @@ export function AppsDirectoryPage() {
             gap: 8,
             flexWrap: 'wrap',
             alignItems: 'center',
-            marginBottom: 24,
+            marginBottom: 32,
           }}
         >
           <div className="pills" style={{ margin: 0, flexWrap: 'wrap' }}>
@@ -127,7 +138,7 @@ export function AppsDirectoryPage() {
           <input
             type="search"
             className="input-field"
-            placeholder="Search apps…"
+            placeholder="Search apps..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             style={{ maxWidth: 220, marginLeft: 'auto' }}
@@ -135,26 +146,45 @@ export function AppsDirectoryPage() {
           />
         </div>
 
-        {/* Grid */}
         {loading ? (
           <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--muted)' }}>
-            Loading apps…
+            Loading apps...
           </div>
         ) : filtered.length === 0 ? (
           <EmptyState onClear={() => { setActiveCategory('all'); setSearch(''); }} />
         ) : (
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-              gap: 16,
-            }}
-            data-testid="apps-grid"
-          >
-            {filtered.map((app) => (
-              <AppCard key={app.slug} app={app} onClick={() => {}} />
-            ))}
-          </div>
+          <>
+            {/* Featured section */}
+            {featuredApps.length > 0 && (
+              <div style={{ marginBottom: 40 }}>
+                <p style={{ margin: '0 0 16px', fontSize: 12, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Featured</p>
+                <div className="featured-apps-grid">
+                  {featuredApps.map((app) => (
+                    <FeaturedAppCard key={app.slug} app={app} />
+                  ))}
+                </div>
+                {gridApps.length > 0 && (
+                  <p style={{ margin: '0 0 16px', fontSize: 12, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>All apps</p>
+                )}
+              </div>
+            )}
+
+            {/* Regular grid */}
+            {gridApps.length > 0 && (
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+                  gap: 16,
+                }}
+                data-testid="apps-grid"
+              >
+                {gridApps.map((app) => (
+                  <AppCard key={app.slug} app={app} />
+                ))}
+              </div>
+            )}
+          </>
         )}
 
         {/* Submit footer */}
@@ -203,13 +233,88 @@ export function AppsDirectoryPage() {
   );
 }
 
-function AppCard({ app, onClick }: { app: HubApp; onClick: () => void }) {
+function FeaturedAppCard({ app }: { app: HubApp }) {
+  return (
+    <Link
+      to={`/p/${app.slug}`}
+      className="featured-app-card"
+      data-testid={`featured-card-${app.slug}`}
+    >
+      {/* Featured badge */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div
+          style={{
+            width: 48,
+            height: 48,
+            borderRadius: 12,
+            border: '1px solid var(--line)',
+            background: 'var(--bg)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+          }}
+        >
+          <AppIcon slug={app.slug} size={28} />
+        </div>
+        <span
+          style={{
+            fontSize: 10,
+            fontWeight: 700,
+            padding: '3px 8px',
+            background: 'rgba(99,102,241,0.1)',
+            color: '#6366f1',
+            border: '1px solid rgba(99,102,241,0.2)',
+            borderRadius: 5,
+            textTransform: 'uppercase',
+            letterSpacing: '0.06em',
+          }}
+        >
+          Featured
+        </span>
+      </div>
+
+      <div>
+        <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--ink)', marginBottom: 4 }}>
+          {app.name}
+        </div>
+        {app.author && (
+          <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 8 }}>@{app.author}</div>
+        )}
+        <p
+          style={{
+            fontSize: 13,
+            color: 'var(--muted)',
+            margin: 0,
+            lineHeight: 1.55,
+            display: '-webkit-box',
+            WebkitLineClamp: 3,
+            WebkitBoxOrient: 'vertical',
+            overflow: 'hidden',
+          } as React.CSSProperties}
+        >
+          {app.description}
+        </p>
+      </div>
+
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'auto' }}>
+        {app.category && (
+          <span className="category-pill" style={{ fontSize: 10 }}>
+            {CATEGORY_LABELS[app.category] ?? app.category}
+          </span>
+        )}
+        <span style={{ fontSize: 12, color: 'var(--accent)', fontWeight: 600 }}>Run →</span>
+      </div>
+    </Link>
+  );
+}
+
+function AppCard({ app }: { app: HubApp }) {
   return (
     <Link
       to={`/p/${app.slug}`}
       className="app-tile"
       data-testid={`app-card-${app.slug}`}
-      onClick={onClick}
       style={{
         textAlign: 'left',
         width: '100%',
