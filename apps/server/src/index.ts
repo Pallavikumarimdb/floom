@@ -19,6 +19,7 @@ import { deployWaitlistRouter } from './routes/deploy-waitlist.js';
 import { memoryRouter, secretsRouter } from './routes/memory.js';
 import { connectionsRouter } from './routes/connections.js';
 import { workspacesRouter, sessionRouter } from './routes/workspaces.js';
+import { stripeRouter } from './routes/stripe.js';
 import { seedFromFile } from './services/seed.js';
 import { ingestOpenApiApps } from './services/openapi-ingest.js';
 import { backfillAppEmbeddings } from './services/embeddings.js';
@@ -68,6 +69,12 @@ app.route('/api/connections', connectionsRouter);
 // W3.1: workspaces + members + invites + session
 app.route('/api/workspaces', workspacesRouter);
 app.route('/api/session', sessionRouter);
+// W3.3: Stripe Connect partner app (creator monetization). The /webhook
+// endpoint inside this router is intentionally Stripe-authenticated (via
+// signature verification) rather than gated by FLOOM_AUTH_TOKEN — Stripe
+// can't send a Bearer token. The other routes flow through the normal
+// /api global auth gate registered above.
+app.route('/api/stripe', stripeRouter);
 
 // W3.1: when FLOOM_CLOUD_MODE=true, mount the Better Auth handler on /auth/*.
 // In OSS mode (the default), `getAuth()` returns null and this block is a
@@ -96,9 +103,9 @@ app.get('/openapi.json', (c) =>
     openapi: '3.0.0',
     info: {
       title: 'Floom self-host API',
-      version: '0.4.0-alpha.1',
+      version: '0.4.0-alpha.3',
       description:
-        'Floom exposes three admin endpoints plus per-app run and MCP surfaces. For per-app tool schemas, call /api/hub and inspect each app manifest, or use the MCP tools/list over /mcp/app/:slug. v0.3.1 adds per-user app memory (/api/memory) and an encrypted secrets vault (/api/secrets). v0.3.2 adds Composio-backed OAuth connections (/api/connections). v0.4.0-alpha.1 (W3.1) adds workspaces + members + invites (/api/workspaces) and the session API (/api/session) wired to Better Auth in cloud mode.',
+        'Floom exposes three admin endpoints plus per-app run and MCP surfaces. For per-app tool schemas, call /api/hub and inspect each app manifest, or use the MCP tools/list over /mcp/app/:slug. v0.3.1 adds per-user app memory (/api/memory) and an encrypted secrets vault (/api/secrets). v0.3.2 adds Composio-backed OAuth connections (/api/connections). v0.4.0-alpha.2 adds the Stripe Connect partner-app surface (/api/stripe/*) with Express onboarding, direct charges with a 5% application fee, refunds, subscriptions, and webhook receiver. v0.4.0-alpha.3 (W3.1) adds workspaces + members + invites (/api/workspaces) and the session API (/api/session) wired to Better Auth in cloud mode.',
     },
     paths: {
       '/api/health': {
@@ -196,6 +203,92 @@ app.get('/openapi.json', (c) =>
           responses: {
             '200': { description: '{ok: true, connection: serialized}' },
             '404': { description: 'No such connection' },
+          },
+        },
+      },
+      '/api/stripe/connect/onboard': {
+        post: {
+          summary: 'Create a Stripe Connect Express account and return an onboarding link',
+          responses: {
+            '200': {
+              description:
+                '{account_id, onboarding_url, expires_at, account: {...}}',
+            },
+            '400': { description: 'Stripe not configured or invalid body' },
+            '502': { description: 'Stripe upstream failure' },
+          },
+        },
+      },
+      '/api/stripe/connect/status': {
+        get: {
+          summary: 'Return the caller Stripe account capabilities (charges_enabled etc.)',
+          parameters: [
+            {
+              name: 'refresh',
+              in: 'query',
+              required: false,
+              schema: { type: 'boolean' },
+              description: 'When false, returns cached row without polling Stripe.',
+            },
+          ],
+          responses: {
+            '200': { description: '{account: {...}}' },
+            '404': { description: 'Caller has not onboarded yet' },
+          },
+        },
+      },
+      '/api/stripe/payments': {
+        post: {
+          summary:
+            'Create a direct charge on the caller connected account with a 5% application fee',
+          responses: {
+            '200': {
+              description:
+                '{payment_intent_id, client_secret, amount, currency, application_fee_amount, status, destination}',
+            },
+            '400': { description: 'Invalid body' },
+            '404': { description: 'Caller has not onboarded yet' },
+            '502': { description: 'Stripe upstream failure' },
+          },
+        },
+      },
+      '/api/stripe/refunds': {
+        post: {
+          summary:
+            'Refund a payment intent. Auto-refunds the 5% application fee if within 30 days.',
+          responses: {
+            '200': {
+              description:
+                '{refund_id, amount, currency, status, application_fee_refunded}',
+            },
+            '400': { description: 'Invalid body' },
+            '404': { description: 'Caller has not onboarded yet' },
+            '502': { description: 'Stripe upstream failure' },
+          },
+        },
+      },
+      '/api/stripe/subscriptions': {
+        post: {
+          summary:
+            'Create a subscription on the caller connected account with a 5% application_fee_percent',
+          responses: {
+            '200': {
+              description:
+                '{subscription_id, customer_id, status, application_fee_percent, destination, item_id}',
+            },
+            '400': { description: 'Invalid body' },
+            '404': { description: 'Caller has not onboarded yet' },
+            '502': { description: 'Stripe upstream failure' },
+          },
+        },
+      },
+      '/api/stripe/webhook': {
+        post: {
+          summary:
+            'Stripe webhook receiver. Verifies signature, dedupes by event id, dispatches to reducers.',
+          responses: {
+            '200': { description: '{ok: true, first_seen, event_id, event_type}' },
+            '400': { description: 'Missing or invalid Stripe-Signature header' },
           },
         },
       },
