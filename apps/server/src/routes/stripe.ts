@@ -138,7 +138,7 @@ function serializeAccount(
 // ---------- POST /connect/onboard ----------
 
 stripeRouter.post('/connect/onboard', async (c) => {
-  const ctx = resolveUserContext(c);
+  const ctx = await resolveUserContext(c);
   let body: unknown = {};
   // Body is optional — defaults pull country=US.
   try {
@@ -175,7 +175,7 @@ stripeRouter.post('/connect/onboard', async (c) => {
 // ---------- GET /connect/status ----------
 
 stripeRouter.get('/connect/status', async (c) => {
-  const ctx = resolveUserContext(c);
+  const ctx = await resolveUserContext(c);
   // Read the local row first so a caller without an onboarded account
   // gets a clean 404 instead of a Stripe round-trip.
   const local = getCallerAccount(ctx);
@@ -205,7 +205,7 @@ stripeRouter.get('/connect/status', async (c) => {
 // ---------- POST /payments ----------
 
 stripeRouter.post('/payments', async (c) => {
-  const ctx = resolveUserContext(c);
+  const ctx = await resolveUserContext(c);
   let body: unknown;
   try {
     body = await c.req.json();
@@ -235,7 +235,7 @@ stripeRouter.post('/payments', async (c) => {
 // ---------- POST /refunds ----------
 
 stripeRouter.post('/refunds', async (c) => {
-  const ctx = resolveUserContext(c);
+  const ctx = await resolveUserContext(c);
   let body: unknown;
   try {
     body = await c.req.json();
@@ -265,7 +265,7 @@ stripeRouter.post('/refunds', async (c) => {
 // ---------- POST /subscriptions ----------
 
 stripeRouter.post('/subscriptions', async (c) => {
-  const ctx = resolveUserContext(c);
+  const ctx = await resolveUserContext(c);
   let body: unknown;
   try {
     body = await c.req.json();

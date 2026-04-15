@@ -18,11 +18,13 @@ import { rendererRouter } from './routes/renderer.js';
 import { deployWaitlistRouter } from './routes/deploy-waitlist.js';
 import { memoryRouter, secretsRouter } from './routes/memory.js';
 import { connectionsRouter } from './routes/connections.js';
+import { workspacesRouter, sessionRouter } from './routes/workspaces.js';
 import { stripeRouter } from './routes/stripe.js';
 import { seedFromFile } from './services/seed.js';
 import { ingestOpenApiApps } from './services/openapi-ingest.js';
 import { backfillAppEmbeddings } from './services/embeddings.js';
 import { globalAuthMiddleware } from './lib/auth.js';
+import { getAuth, isCloudMode } from './lib/better-auth.js';
 import { startJobWorker } from './services/worker.js';
 
 const PORT = Number(process.env.PORT || 3051);
@@ -64,12 +66,34 @@ app.route('/api/memory', memoryRouter);
 app.route('/api/secrets', secretsRouter);
 // W2.3: Composio OAuth connections (for /build Connect-a-tool ramp)
 app.route('/api/connections', connectionsRouter);
+// W3.1: workspaces + members + invites + session
+app.route('/api/workspaces', workspacesRouter);
+app.route('/api/session', sessionRouter);
 // W3.3: Stripe Connect partner app (creator monetization). The /webhook
 // endpoint inside this router is intentionally Stripe-authenticated (via
 // signature verification) rather than gated by FLOOM_AUTH_TOKEN — Stripe
 // can't send a Bearer token. The other routes flow through the normal
 // /api global auth gate registered above.
 app.route('/api/stripe', stripeRouter);
+
+// W3.1: when FLOOM_CLOUD_MODE=true, mount the Better Auth handler on /auth/*.
+// In OSS mode (the default), `getAuth()` returns null and this block is a
+// no-op. The handler owns its own basePath ("/auth") so we mount under "/" with
+// a wildcard. Better Auth handles every method itself.
+if (isCloudMode()) {
+  const auth = getAuth();
+  if (auth) {
+    // Hono `app.on(...)` accepts a method list + path. Better Auth's
+    // `handler` consumes the raw `Request` and returns a `Response`, which
+    // is exactly what `c.req.raw` and `c.body()` provide.
+    app.on(
+      ['GET', 'POST', 'OPTIONS', 'PUT', 'PATCH', 'DELETE'],
+      '/auth/*',
+      (c) => auth.handler(c.req.raw),
+    );
+    console.log('[auth] FLOOM_CLOUD_MODE=true — Better Auth mounted at /auth/*');
+  }
+}
 
 // Tiny, hand-written OpenAPI 3 document describing Floom's own admin API.
 // Returned at /openapi.json so users hitting http://host/openapi.json get
@@ -79,9 +103,9 @@ app.get('/openapi.json', (c) =>
     openapi: '3.0.0',
     info: {
       title: 'Floom self-host API',
-      version: '0.4.0-alpha.2',
+      version: '0.4.0-alpha.3',
       description:
-        'Floom exposes three admin endpoints plus per-app run and MCP surfaces. For per-app tool schemas, call /api/hub and inspect each app manifest, or use the MCP tools/list over /mcp/app/:slug. v0.3.1 adds per-user app memory (/api/memory) and an encrypted secrets vault (/api/secrets). v0.3.2 adds Composio-backed OAuth connections (/api/connections). v0.4.0-alpha.2 adds the Stripe Connect partner-app surface (/api/stripe/*) with Express onboarding, direct charges with a 5% application fee, refunds, subscriptions, and webhook receiver.',
+        'Floom exposes three admin endpoints plus per-app run and MCP surfaces. For per-app tool schemas, call /api/hub and inspect each app manifest, or use the MCP tools/list over /mcp/app/:slug. v0.3.1 adds per-user app memory (/api/memory) and an encrypted secrets vault (/api/secrets). v0.3.2 adds Composio-backed OAuth connections (/api/connections). v0.4.0-alpha.2 adds the Stripe Connect partner-app surface (/api/stripe/*) with Express onboarding, direct charges with a 5% application fee, refunds, subscriptions, and webhook receiver. v0.4.0-alpha.3 (W3.1) adds workspaces + members + invites (/api/workspaces) and the session API (/api/session) wired to Better Auth in cloud mode.',
     },
     paths: {
       '/api/health': {
@@ -265,6 +289,112 @@ app.get('/openapi.json', (c) =>
           responses: {
             '200': { description: '{ok: true, first_seen, event_id, event_type}' },
             '400': { description: 'Missing or invalid Stripe-Signature header' },
+          },
+        },
+      },
+      '/api/workspaces': {
+        get: {
+          summary: 'List workspaces the caller is a member of',
+          responses: {
+            '200': { description: '{workspaces: [{id, slug, name, role, ...}]}' },
+          },
+        },
+        post: {
+          summary: 'Create a workspace; the caller becomes its admin',
+          responses: {
+            '201': { description: '{workspace: {...}}' },
+            '400': { description: 'Invalid body shape' },
+          },
+        },
+      },
+      '/api/workspaces/{id}': {
+        get: {
+          summary: 'Read a single workspace (member-only)',
+          parameters: [
+            { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          ],
+          responses: {
+            '200': { description: '{workspace: {...}}' },
+            '403': { description: 'not_a_member' },
+            '404': { description: 'workspace_not_found' },
+          },
+        },
+        patch: {
+          summary: 'Update workspace name/slug (admin-only)',
+          parameters: [
+            { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          ],
+          responses: {
+            '200': { description: '{workspace: {...}}' },
+            '403': { description: 'insufficient_role' },
+          },
+        },
+        delete: {
+          summary: 'Delete a workspace (admin-only). Refuses synthetic local.',
+          parameters: [
+            { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          ],
+          responses: {
+            '200': { description: '{ok: true}' },
+            '403': { description: 'insufficient_role' },
+          },
+        },
+      },
+      '/api/workspaces/{id}/members': {
+        get: {
+          summary: 'List members of a workspace',
+          parameters: [
+            { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          ],
+          responses: { '200': { description: '{members: [{user_id, role, email, ...}]}' } },
+        },
+      },
+      '/api/workspaces/{id}/members/invite': {
+        post: {
+          summary: 'Create a pending workspace invite (admin-only)',
+          parameters: [
+            { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          ],
+          responses: {
+            '201': { description: '{invite: {...}, accept_url: string}' },
+            '409': { description: 'duplicate_member' },
+          },
+        },
+      },
+      '/api/workspaces/{id}/members/accept-invite': {
+        post: {
+          summary: 'Accept a pending workspace invite using its token',
+          parameters: [
+            { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          ],
+          responses: {
+            '200': { description: '{member: {...}}' },
+            '404': { description: 'invite_not_found' },
+            '410': { description: 'invite_expired' },
+          },
+        },
+      },
+      '/api/workspaces/{id}/invites': {
+        get: {
+          summary: 'List invites for a workspace (admin-only)',
+          parameters: [
+            { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+          ],
+          responses: { '200': { description: '{invites: [{...}]}' } },
+        },
+      },
+      '/api/session/me': {
+        get: {
+          summary: 'Composed payload: user + active workspace + memberships',
+          responses: { '200': { description: '{user, active_workspace, workspaces, cloud_mode}' } },
+        },
+      },
+      '/api/session/switch-workspace': {
+        post: {
+          summary: 'Set the active workspace pointer (member-only)',
+          responses: {
+            '200': { description: '{ok: true, active_workspace_id: string}' },
+            '403': { description: 'not_a_member' },
           },
         },
       },
