@@ -11,7 +11,7 @@ import { hubRouter } from './routes/hub.js';
 import { parseRouter } from './routes/parse.js';
 import { pickRouter } from './routes/pick.js';
 import { threadRouter } from './routes/thread.js';
-import { runRouter, slugRunRouter } from './routes/run.js';
+import { runRouter, slugRunRouter, meRouter } from './routes/run.js';
 import { jobsRouter } from './routes/jobs.js';
 import { mcpRouter } from './routes/mcp.js';
 import { rendererRouter } from './routes/renderer.js';
@@ -20,6 +20,8 @@ import { memoryRouter, secretsRouter } from './routes/memory.js';
 import { connectionsRouter } from './routes/connections.js';
 import { workspacesRouter, sessionRouter } from './routes/workspaces.js';
 import { stripeRouter } from './routes/stripe.js';
+import { reviewsRouter } from './routes/reviews.js';
+import { feedbackRouter } from './routes/feedback.js';
 import { seedFromFile } from './services/seed.js';
 import { ingestOpenApiApps } from './services/openapi-ingest.js';
 import { backfillAppEmbeddings } from './services/embeddings.js';
@@ -75,6 +77,12 @@ app.route('/api/session', sessionRouter);
 // can't send a Bearer token. The other routes flow through the normal
 // /api global auth gate registered above.
 app.route('/api/stripe', stripeRouter);
+// W4-minimal: per-user run history, reviews, product feedback. /api/me
+// owns the scoped dashboard queries; /api/apps/:slug/reviews powers the
+// /p/:slug review surface; /api/feedback accepts in-app feedback.
+app.route('/api/me', meRouter);
+app.route('/api/apps', reviewsRouter);
+app.route('/api/feedback', feedbackRouter);
 
 // W3.1: when FLOOM_CLOUD_MODE=true, mount the Better Auth handler on /auth/*.
 // In OSS mode (the default), `getAuth()` returns null and this block is a
