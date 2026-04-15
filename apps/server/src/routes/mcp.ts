@@ -5,9 +5,10 @@ import { z } from 'zod';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
 import { db } from '../db.js';
-import { newRunId } from '../lib/ids.js';
+import { newRunId, newJobId } from '../lib/ids.js';
 import { validateInputs, ManifestError } from '../services/manifest.js';
 import { dispatchRun, getRun } from '../services/runner.js';
+import { createJob } from '../services/jobs.js';
 import { pickApps } from '../services/embeddings.js';
 import { checkAppVisibility } from '../lib/auth.js';
 import type {
@@ -212,6 +213,40 @@ function createPerAppMcpServer(app: AppRecord): McpServer {
               ],
             };
           }
+        }
+
+        // Async app (v0.3.0): enqueue a job and return immediately so the
+        // MCP client doesn't block on a 10-20 minute run. The client polls
+        // /api/:slug/jobs/:id or receives a webhook on completion.
+        if (fresh.is_async) {
+          const jobId = newJobId();
+          createJob(jobId, {
+            app: fresh,
+            action: actionName,
+            inputs: validated,
+            perCallSecrets,
+          });
+          const publicUrl =
+            process.env.PUBLIC_URL ||
+            `http://localhost:${process.env.PORT || 3051}`;
+          const pollUrl = `${publicUrl}/api/${fresh.slug}/jobs/${jobId}`;
+          const payload = {
+            job_id: jobId,
+            status: 'queued',
+            slug: fresh.slug,
+            action: actionName,
+            poll_url: pollUrl,
+            cancel_url: `${pollUrl}/cancel`,
+            message: `Job started: ${jobId}. Poll ${pollUrl} for status.`,
+          };
+          return {
+            content: [
+              {
+                type: 'text' as const,
+                text: JSON.stringify(payload, null, 2),
+              },
+            ],
+          };
         }
 
         db.prepare(
