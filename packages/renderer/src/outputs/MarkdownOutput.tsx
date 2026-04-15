@@ -18,7 +18,6 @@ export function MarkdownOutput({ data, loading }: RenderProps): React.ReactEleme
   // without pulling DOM-heavy deps.
   let ReactMarkdown: React.ComponentType<{ children: string }> | null = null;
   try {
-    // @ts-expect-error runtime optional dep
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     ReactMarkdown = require('react-markdown').default;
   } catch {

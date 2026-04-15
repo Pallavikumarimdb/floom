@@ -20,7 +20,6 @@ export function CodeOutput({ data, schema, loading }: RenderProps): React.ReactE
     (async () => {
       try {
         // Optional peer dep — safe to fail silently.
-        // @ts-expect-error runtime optional
         const shiki = await import('shiki');
         const highlighter = await shiki.createHighlighter({
           themes: ['github-light'],

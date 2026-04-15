@@ -14,6 +14,7 @@ import { threadRouter } from './routes/thread.js';
 import { runRouter, slugRunRouter } from './routes/run.js';
 import { jobsRouter } from './routes/jobs.js';
 import { mcpRouter } from './routes/mcp.js';
+import { rendererRouter } from './routes/renderer.js';
 import { deployWaitlistRouter } from './routes/deploy-waitlist.js';
 import { memoryRouter, secretsRouter } from './routes/memory.js';
 import { seedFromFile } from './services/seed.js';
@@ -51,6 +52,10 @@ app.route('/mcp', mcpRouter);
 app.route('/api/:slug/run', slugRunRouter);
 // Async job queue: POST/GET /api/:slug/jobs[/:job_id][/cancel]
 app.route('/api/:slug/jobs', jobsRouter);
+// Custom renderer bundles (W2.2): GET /renderer/:slug/bundle.js + /meta
+// Public by default; no auth gate because bundles contain no secrets (they
+// run in the user's browser and fetch data via the already-authed /api routes).
+app.route('/renderer', rendererRouter);
 app.route('/api/deploy-waitlist', deployWaitlistRouter);
 // W2.1: per-user state
 app.route('/api/memory', memoryRouter);
@@ -182,7 +187,7 @@ if (webDist) {
   // Paths that must never be swallowed by the SPA wildcard. These reach
   // Hono's other route handlers or return a real 404. The order matters:
   // prefix matches first, then exact matches.
-  const spaExcludedPrefixes = ['/api/', '/mcp'];
+  const spaExcludedPrefixes = ['/api/', '/mcp', '/renderer/'];
   const spaExcludedExact = new Set(['/openapi.json', '/metrics', '/docs']);
 
   app.use('/*', async (c, next) => {

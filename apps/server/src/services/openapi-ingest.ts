@@ -3,12 +3,18 @@
 // specs, generates a Floom manifest for each operation, and upserts into the
 // apps table. Idempotent: re-running with the same config does not duplicate.
 import { readFileSync } from 'node:fs';
+import { dirname, isAbsolute, resolve as resolvePath } from 'node:path';
 import { parse as parseYaml } from 'yaml';
 // @ts-expect-error — json-schema-merge-allof has no types on npm
 import mergeAllOf from 'json-schema-merge-allof';
 import $RefParser from '@apidevtools/json-schema-ref-parser';
+// Import from the contract subpath so we don't pull JSX into the server tsc.
+// The renderer package's main entry pulls .tsx files; the contract entry is
+// pure TypeScript and safe for any non-JSX tsconfig to consume.
+import { parseRendererManifest, type RendererManifest } from '@floom/renderer/contract';
 import { db } from '../db.js';
 import { newAppId, newSecretId } from '../lib/ids.js';
+import { bundleRendererFromManifest } from './renderer-bundler.js';
 import type { NormalizedManifest, InputSpec, OutputSpec } from '../types.js';
 
 // ---------- config schema ----------
@@ -82,6 +88,20 @@ interface OpenApiAppSpec {
    * hub; it just annotates it. See docs/APPS-STATUS.md for the roadmap.
    */
   blocked_reason?: string;
+  // ---------- custom renderer fields (v0.3.1 W2.2) ----------
+  /**
+   * Custom renderer declaration. When present, the server compiles the
+   * creator's TSX entry into an ESM bundle at ingest time and serves it
+   * at `GET /renderer/:slug/bundle.js`. The web client lazy-loads the
+   * bundle when the app is run and falls back to the default renderer
+   * if the component crashes.
+   *
+   *   renderer:
+   *     kind: component          # or "default" (skip compilation)
+   *     entry: ./renderer.tsx    # path relative to this manifest
+   *     output_shape: table      # optional pin — used as the crash fallback
+   */
+  renderer?: unknown;
 }
 
 interface AppsConfig {
@@ -704,6 +724,11 @@ export async function ingestOpenApiApps(configPath: string): Promise<IngestResul
 
   console.log(`[openapi-ingest] processing ${config.apps.length} apps from ${configPath}`);
 
+  // Custom renderers declare paths relative to the manifest file (apps.yaml).
+  // Resolve manifestDir once here so bundleRendererFromManifest can sandbox
+  // each creator's entry to files inside the same directory.
+  const manifestDir = dirname(isAbsolute(configPath) ? configPath : resolvePath(configPath));
+
   const existsBySlug = db.prepare('SELECT id FROM apps WHERE slug = ?');
   const insertApp = db.prepare(
     `INSERT INTO apps (id, slug, name, description, manifest, status, docker_image, code_path, category, author, icon, app_type, base_url, auth_type, auth_config, openapi_spec_url, openapi_spec_cached, visibility, is_async, webhook_url, timeout_ms, retries, async_mode)
@@ -792,6 +817,33 @@ export async function ingestOpenApiApps(configPath: string): Promise<IngestResul
           ? appSpec.retries
           : 0;
       const asyncMode = appSpec.async_mode || (isAsync ? 'poll' : null);
+
+      // Parse + compile custom renderer if declared. We parse first (pure,
+      // may throw with a clear error) and then bundle (side-effecting,
+      // catches errors internally and returns null). The bundle is not
+      // persisted in the DB because db.ts is locked this sprint; the
+      // in-memory bundle index + the on-disk sidecar files are the source
+      // of truth for the /renderer/:slug route.
+      let rendererManifest: RendererManifest = { kind: 'default' };
+      try {
+        rendererManifest = parseRendererManifest(appSpec.renderer);
+      } catch (err) {
+        console.warn(
+          `[openapi-ingest] ${appSpec.slug}: invalid renderer manifest: ${(err as Error).message}`,
+        );
+        rendererManifest = { kind: 'default' };
+      }
+      if (rendererManifest.kind === 'component' && rendererManifest.entry) {
+        // fire-and-forget: the bundler logs its own result. Ingest continues
+        // on failure so one broken renderer doesn't block the rest of the
+        // hub.
+        void bundleRendererFromManifest(
+          appSpec.slug,
+          manifestDir,
+          rendererManifest.entry,
+          rendererManifest.output_shape,
+        );
+      }
 
       if (existing) {
         updateApp.run(
