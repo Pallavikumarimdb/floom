@@ -186,6 +186,11 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         <Route path="/deploy" element={<Navigate to="/studio/build" replace />} />
         <Route path="/docs" element={<Navigate to="/protocol" replace />} />
         <Route path="/self-host" element={<Navigate to="/#self-host" replace />} />
+        {/* /onboarding advertised by v16/onboarding.html wireframe and
+            linked from post-signup flows. No standalone page yet — redirect
+            to /me?welcome=1 so the dashboard shows a one-shot welcome
+            banner ("Welcome to Floom — try an app ↓"). */}
+        <Route path="/onboarding" element={<Navigate to="/me?welcome=1" replace />} />
         <Route path="/pricing" element={<Navigate to="/" replace />} />
         <Route path="/store" element={<Navigate to="/apps" replace />} />
         <Route path="/p/:slug/dashboard" element={<PSlugDashboardRedirect />} />
