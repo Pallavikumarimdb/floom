@@ -92,6 +92,8 @@ export function TopBar(_props: Props = {}) {
   const isMe = location.pathname === '/me' || location.pathname.startsWith('/me/');
   // Legacy deploy/creator paths route to /studio/build now.
   const isDeploy = location.pathname.startsWith('/studio/build') || location.pathname.startsWith('/build');
+  const isLoginPage =
+    location.pathname === '/login' || location.pathname === '/signup';
   const ownedAppCount = myApps?.length ?? 0;
   const showStudioLink = isAuthenticated && ownedAppCount > 0;
   const deployHref = isAuthenticated ? '/studio/build' : '/signup?next=%2Fstudio%2Fbuild';
@@ -247,7 +249,7 @@ export function TopBar(_props: Props = {}) {
             marginLeft: 'auto',
           }}
         >
-          {!isAuthenticated && (
+          {!isAuthenticated && !isLoginPage && (
             <Link
               to="/login"
               data-testid="topbar-signin"
@@ -501,14 +503,16 @@ export function TopBar(_props: Props = {}) {
               </button>
             </>
           ) : (
-            <Link
-              to="/login"
-              className="topbar-mobile-link"
-              role="menuitem"
-              onClick={() => setMenuOpen(false)}
-            >
-              Sign in
-            </Link>
+            !isLoginPage && (
+              <Link
+                to="/login"
+                className="topbar-mobile-link"
+                role="menuitem"
+                onClick={() => setMenuOpen(false)}
+              >
+                Sign in
+              </Link>
+            )
           )}
         </div>
       )}
