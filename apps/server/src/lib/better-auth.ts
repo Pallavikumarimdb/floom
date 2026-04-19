@@ -171,7 +171,7 @@ function buildAuthOptions(): any {
       // `password` kwarg on the body verifies the caller owns the credentials.
       deleteUser: {
         enabled: true,
-        afterDelete: async (user) => {
+        afterDelete: async ({ user }: { user: { id: string } }) => {
           if (user?.id) {
             cleanupUserOrphans(user.id);
           }
