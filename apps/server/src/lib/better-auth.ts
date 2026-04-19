@@ -28,6 +28,7 @@ import { getMigrations } from 'better-auth/db/migration';
 import { organization } from 'better-auth/plugins';
 import { apiKey } from '@better-auth/api-key';
 import { db } from '../db.js';
+import { cleanupUserOrphans } from '../services/cleanup.js';
 
 // Better Auth's `Auth` type is generic over its options. Inferring the exact
 // concrete type would couple every consumer to the full plugin tuple shape,
@@ -106,6 +107,7 @@ function buildAuthOptions(): any {
     appName: 'Floom',
     secret,
     baseURL,
+    trustedOrigins: ['http://localhost:5173'],
     // Better Auth owns its own /auth/* prefix when mounted via Hono. The
     // `basePath` here matches the mount point in apps/server/src/index.ts.
     basePath: '/auth',
@@ -167,7 +169,14 @@ function buildAuthOptions(): any {
       // W4-minimal gap close: enable the POST /auth/delete-user endpoint so
       // /me/settings can delete an account without operator intervention.
       // `password` kwarg on the body verifies the caller owns the credentials.
-      deleteUser: { enabled: true },
+      deleteUser: {
+        enabled: true,
+        afterDelete: async (user) => {
+          if (user?.id) {
+            cleanupUserOrphans(user.id);
+          }
+        },
+      },
     },
   };
 }
