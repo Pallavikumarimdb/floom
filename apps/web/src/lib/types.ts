@@ -127,8 +127,30 @@ export interface HubApp {
   blocked_reason?: string;
 }
 
+export type VersionStatus = 'stable' | 'beta' | 'draft';
+
 export interface AppDetail extends HubApp {
   manifest: NormalizedManifest;
+  /**
+   * Release version for the hero meta row. Server derives this from
+   * `manifest.version` with a '0.1.0' fallback, so every app has one.
+   */
+  version?: string;
+  /**
+   * Publish track. 'stable' today; Studio publish flow will emit
+   * 'beta' / 'draft' in v1.1.
+   */
+  version_status?: VersionStatus;
+  /**
+   * ISO timestamp — when the app was first published (currently === created_at).
+   * Drives the "2d ago" relative-time chip next to the version.
+   */
+  published_at?: string;
+  /**
+   * Display handle shown after "by @" in the hero. Server strips a leading
+   * @ so the UI can render its own `@` prefix without doubling.
+   */
+  creator_handle?: string | null;
   /**
    * v15.2 polish: hub emits visibility so the web client can gate
    * private-only UI (e.g. /me/apps/:slug console) and render pills without
@@ -263,6 +285,12 @@ export interface MeRunSummary {
    * for back-compat with older servers.
    */
   inputs?: Record<string, unknown> | null;
+  /**
+   * Fix 3 (2026-04-19): surface outputs on the list response so the
+   * earlier-runs rail on /p/:slug can render input → output previews
+   * without a per-row detail fetch. Arbitrary JSON shape. Optional.
+   */
+  outputs?: unknown;
 }
 
 export interface MeRunDetail extends MeRunSummary {
