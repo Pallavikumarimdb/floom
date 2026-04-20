@@ -824,7 +824,7 @@ function InputCard({
               className="btn-primary"
               data-testid="run-surface-run-btn"
               aria-busy={running}
-              aria-disabled={running}
+              aria-disabled={running || preview}
               disabled={running || preview}
               style={{ height: 44, minHeight: 44, padding: '0 24px', fontSize: 15 }}
             >
@@ -866,7 +866,7 @@ function InputCard({
               className="btn-primary"
               data-testid="run-surface-run-btn"
               aria-busy={running}
-              aria-disabled={running}
+              aria-disabled={running || preview}
               onClick={onRun}
               disabled={running || preview}
               style={{ height: 44, minHeight: 44, padding: '0 28px', fontSize: 15 }}

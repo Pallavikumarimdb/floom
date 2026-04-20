@@ -1378,7 +1378,6 @@ export function BuildPage({
                     background: 'var(--card)',
                     borderRadius: 10,
                     border: '1px solid var(--line)',
-                    borderLeft: '4px solid var(--accent)',
                     boxShadow: '0 2px 8px rgba(0,0,0,0.03)'
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
@@ -1467,7 +1466,7 @@ export function BuildPage({
                         secrets_needed: detected.secrets_needed,
                         manifest_version: '2.0',
                       },
-                    } as AppDetail}
+                    } as AppDetail /* Deliberately omitting is_async, openapi_spec_url, auth_type, etc. Safe because preview=true short-circuits any run paths that would read these fields. */}
                     preview={true}
                   />
                 </div>

@@ -17,7 +17,7 @@ import type { RendererManifest } from '@floom/renderer/contract';
 import { db } from '../db.js';
 import { newAppId, newSecretId } from '../lib/ids.js';
 import { bundleRendererFromManifest } from './renderer-bundler.js';
-import type { NormalizedManifest, InputSpec, OutputSpec } from '../types.js';
+import type { NormalizedManifest, InputSpec, OutputSpec, ActionSpec } from '../types.js';
 
 // ---------- config schema ----------
 
@@ -1064,7 +1064,7 @@ export interface DetectedApp {
   slug: string;
   name: string;
   description: string;
-  actions: Array<{ name: string; label: string; description?: string }>;
+  actions: Array<ActionSpec & { name: string }>;
   auth_type: string | null;
   category: string | null;
   openapi_spec_url: string;
