@@ -23,6 +23,7 @@ process.env.DATA_DIR = tmp;
 const {
   bundleRenderer,
   bundleRendererFromManifest,
+  buildWrapperSource,
   resolveEntryPath,
   hashSource,
   clearBundleIndexForTests,
@@ -147,6 +148,20 @@ log(
 log(
   'bundleRenderer: wrapper installs postMessage listener',
   bundleBody.includes('postMessage'),
+);
+
+const wrapperSource = buildWrapperSource('./renderer.tsx', 'demo');
+log(
+  'buildWrapperSource: posts height immediately after mount',
+  wrapperSource.includes('postHeight();'),
+);
+log(
+  'buildWrapperSource: retries height with setTimeout(0)',
+  wrapperSource.includes('setTimeout(postHeight, 0);'),
+);
+log(
+  'buildWrapperSource: retries height with setTimeout(50)',
+  wrapperSource.includes('setTimeout(postHeight, 50);'),
 );
 
 // ---- bundleRenderer idempotent ----

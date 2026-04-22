@@ -21,7 +21,7 @@
 //   own React root; dual-React is fine since they're in separate documents)
 // - subresource integrity via SHA-256 hash of the source
 // - size cap (512 KB) so a rogue renderer can't blow up the container
-// - idempotent: re-bundling a hash we've seen before is a no-op
+// - idempotent: re-bundling the same source + wrapper runtime is a no-op
 
 import {
   readFileSync,
@@ -137,6 +137,14 @@ export const RENDERERS_DIR = join(DATA_DIR, 'renderers');
  * own copy, adding ~140 KB minified).
  */
 export const MAX_BUNDLE_BYTES = 512 * 1024;
+
+/**
+ * Bump whenever the wrapper runtime changes in a way that must invalidate
+ * same-source bundles. This keeps Studio "Recompile" honest: if the creator
+ * submits identical TSX after a runtime fix, we still rebuild instead of
+ * serving a stale bundle compiled with the old wrapper.
+ */
+export const WRAPPER_RUNTIME_VERSION = '2026-04-22-preview-height-v1';
 
 /**
  * In-memory index of slug → BundleResult. Populated at ingest time and read
@@ -401,8 +409,14 @@ function mount(payload) {
       app: { slug: app_slug || SLUG },
     }),
   );
-  // Defer so React commits before we measure.
-  requestAnimationFrame(postHeight);
+  // Don't rely on requestAnimationFrame for the first paint signal here.
+  // In the sandboxed iframe path we observed the renderer DOM commit while
+  // requestAnimationFrame never fired, which left the parent waiting forever
+  // for {type:'rendered'}. Fire an immediate measurement, then retry on the
+  // next macrotasks to catch async commits.
+  postHeight();
+  setTimeout(postHeight, 0);
+  setTimeout(postHeight, 50);
 }
 
 window.addEventListener('message', (ev) => {
@@ -449,7 +463,7 @@ parent.postMessage({ type: 'ready', slug: SLUG }, '*');
  */
 export async function bundleRenderer(opts: BundleOptions): Promise<BundleResult> {
   const source = readFileSync(opts.entryPath, 'utf-8');
-  const sourceHash = hashSource(source);
+  const sourceHash = hashSource(`${WRAPPER_RUNTIME_VERSION}\n${source}`);
   const outputDir = opts.outputDir || RENDERERS_DIR;
   ensureRenderersDir(outputDir);
   const bundlePath = join(outputDir, `${opts.slug}.js`);
