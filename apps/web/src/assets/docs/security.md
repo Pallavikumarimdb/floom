@@ -25,6 +25,12 @@ Floom's launch-week security story is **container isolation plus explicit secret
 - Floom sees the app manifest, run inputs, run outputs, and app stdout/stderr that are captured into run logs.
 - If an app prints a secret to stdout or stderr, Floom will capture that log line. App authors still need to avoid logging secrets.
 
+## Run and log retention
+
+- This repo does **not** implement an automatic run-retention or log-deletion sweeper today.
+- Retention is operator-controlled on the deployed instance.
+- Self-hosters own their own cleanup and deletion policy.
+
 ## What Floom does not claim
 
 - No public **SOC 2** claim is shipped in this repo.

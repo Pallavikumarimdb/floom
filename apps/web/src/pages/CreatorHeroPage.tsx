@@ -18,6 +18,7 @@ import { LayersGrid } from '../components/home/LayersGrid';
 import { McpSnippet } from '../components/home/McpSnippet';
 import { BuiltBy } from '../components/home/BuiltBy';
 import { HeroAppTiles } from '../components/home/HeroAppTiles';
+import { LaunchAnswers } from '../components/home/LaunchAnswers';
 import { ProofRow } from '../components/home/ProofRow';
 import { SectionEyebrow } from '../components/home/SectionEyebrow';
 import * as api from '../api/client';
@@ -729,6 +730,8 @@ export function CreatorHeroPage() {
             from the hero-stats inline chip into its own breathing-room
             section. */}
         <ProofRow hubCount={hubCount} />
+
+        <LaunchAnswers />
 
         {/* INLINE DEMO (promoted): the strongest section on the page, now
             the first proof a scrolling user hits after the ProofRow. */}
