@@ -95,6 +95,12 @@ rendererRouter.get('/:slug/bundle.js', (c) => {
     headers: {
       'content-type': 'application/javascript; charset=utf-8',
       'cache-control': 'public, max-age=60, must-revalidate',
+      // Pentest LOW #383 — middleware is the canonical source of truth
+      // for nosniff, but Hono's `c.res.headers.set()` in a post-`next()`
+      // hook does not reliably reach responses built via `new Response()`
+      // (the renderer routes return raw Response objects so they can
+      // emit binary bundle bytes). Emit explicitly here; the middleware's
+      // `if (!headers.get(...))` guard keeps this dedup-safe.
       'x-content-type-options': 'nosniff',
       'x-floom-renderer-hash': bundle.sourceHash,
       'x-floom-renderer-shape': bundle.outputShape,
@@ -118,7 +124,6 @@ rendererRouter.get('/:slug/frame.html', (c) => {
   if (!bundle) {
     return c.text('renderer_not_found', 404, {
       'content-security-policy': FRAME_CSP,
-      'x-content-type-options': 'nosniff',
     });
   }
   const safeSlug = encodeURIComponent(slug);
@@ -147,11 +152,23 @@ rendererRouter.get('/:slug/frame.html', (c) => {
       'content-type': 'text/html; charset=utf-8',
       'cache-control': 'no-cache',
       'content-security-policy': FRAME_CSP,
-      'x-content-type-options': 'nosniff',
-      // Redundant with sandbox `allow-scripts` (no allow-same-origin) but
-      // good defense in depth in case frame.html is opened directly.
-      'x-frame-options': 'SAMEORIGIN',
+      // Pentest LOW #384 — `X-Frame-Options: SAMEORIGIN` previously
+      // shipped here as belt-and-braces next to FRAME_CSP's
+      // `frame-ancestors 'self'`. On every browser still in support
+      // (Chrome 76+, Firefox 103+, Safari 17+) CSP supersedes XFO, the
+      // two directives conflict in the header inspector, and the
+      // pentest flagged it as confusing hygiene. We drop XFO and let
+      // the CSP directive be the sole clickjacking gate. The parent
+      // runner's sandbox (`allow-scripts` without `allow-same-origin`)
+      // still neutralises any direct framing attempt.
+      //
+      // `Referrer-Policy: no-referrer` is stricter than the top-level
+      // default; the middleware respects route-set values after pentest
+      // LOW #383. nosniff is emitted here too (not just the middleware)
+      // because responses built via `new Response()` don't reliably
+      // receive post-`next()` header mutations in Hono.
       'referrer-policy': 'no-referrer',
+      'x-content-type-options': 'nosniff',
     },
   });
 });
