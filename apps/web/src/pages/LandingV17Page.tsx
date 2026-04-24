@@ -37,7 +37,6 @@ import { DualAudiences } from '../components/home/DualAudiences';
 import { PricingTeaser } from '../components/home/PricingTeaser';
 import { HeroDemo } from '../components/home/HeroDemo';
 import { SectionEyebrow } from '../components/home/SectionEyebrow';
-import { LaunchWeekPill } from '../components/home/LaunchWeekPill';
 import { WorkedExample } from '../components/home/WorkedExample';
 import { ThreeSurfacesDiagram } from '../components/home/ThreeSurfacesDiagram';
 import { FitBand } from '../components/home/FitBand';
@@ -141,24 +140,23 @@ export function LandingV17Page() {
               textAlign: 'center',
             }}
           >
-            {/* Launch week pill — top of the hero, mirrors the
-                chip on /pricing (#544, Federico 2026-04-23). Small,
-                unambiguous date anchor so cold visitors know they're
-                landing during launch week, not a generic static page. */}
-            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}>
-              <LaunchWeekPill />
+            {/* Launch week pill removed from landing (#669) — remains on
+                /waitlist where it's route-scoped to the beta banner.
+                Landing keeps the hero calm with just the works-with belt
+                eyebrow + H1 + sub. The marginTop below restores the
+                vertical breathing room the pill wrapper used to provide
+                (Federico 2026-04-24 — "above ship ai apps fast we need
+                margin again"). */}
+            <div style={{ marginTop: 24 }}>
+              <WorksWithBelt />
             </div>
-
-            {/* Works-with belt as small eyebrow ABOVE the H1
-                (Federico 2026-04-23 — "like we had before"). */}
-            <WorksWithBelt />
 
             {/* H1 — locked copy. Wireframe ships 64px desktop, balance wrap. */}
             <h1
               className="hero-headline"
               style={{
-                fontFamily: "'DM Serif Display', Georgia, serif",
-                fontWeight: 400,
+                fontFamily: 'var(--font-display)',
+                fontWeight: 800,
                 fontSize: 64,
                 lineHeight: 1.02,
                 letterSpacing: '-0.025em',
@@ -269,11 +267,11 @@ export function LandingV17Page() {
           <SectionEyebrow>How it works</SectionEyebrow>
           <h2
             style={{
-              fontFamily: "'DM Serif Display', Georgia, serif",
-              fontWeight: 400,
+              fontFamily: 'var(--font-display)',
+              fontWeight: 800,
               fontSize: 34,
               lineHeight: 1.1,
-              letterSpacing: '-0.02em',
+              letterSpacing: '-0.025em',
               textAlign: 'center',
               margin: '0 auto 28px',
               maxWidth: 760,
@@ -376,11 +374,11 @@ export function LandingV17Page() {
           <SectionEyebrow>Showcase</SectionEyebrow>
           <h2
             style={{
-              fontFamily: "'DM Serif Display', Georgia, serif",
-              fontWeight: 400,
+              fontFamily: 'var(--font-display)',
+              fontWeight: 800,
               fontSize: 34,
               lineHeight: 1.1,
-              letterSpacing: '-0.02em',
+              letterSpacing: '-0.025em',
               textAlign: 'center',
               margin: '0 auto 10px',
               maxWidth: 760,
@@ -435,11 +433,11 @@ export function LandingV17Page() {
         >
           <h2
             style={{
-              fontFamily: "'DM Serif Display', Georgia, serif",
-              fontWeight: 400,
+              fontFamily: 'var(--font-display)',
+              fontWeight: 800,
               fontSize: 26,
               lineHeight: 1.1,
-              letterSpacing: '-0.02em',
+              letterSpacing: '-0.025em',
               margin: '0 0 8px',
             }}
           >
