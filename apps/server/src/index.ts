@@ -61,6 +61,7 @@ import { securityHeaders, noIndexPreview, isPreviewEnv } from './middleware/secu
 import { runBodyLimit } from './middleware/body-size.js';
 import { meTriggersRouter, hubTriggersRouter } from './routes/triggers.js';
 import { webhookRouter } from './routes/webhook.js';
+import { isDeployEnabled } from './services/workspaces.js';
 
 const PORT = Number(process.env.PORT || 3051);
 const PUBLIC_URL = process.env.PUBLIC_URL || `http://localhost:${PORT}`;
@@ -827,6 +828,28 @@ if (webDist) {
     }
   }
 
+  const deployBootstrapMarker = 'data-floom-bootstrap';
+  let deployBootstrapCache: string | null = null;
+
+  function injectDeployBootstrap(html: string, _deployEnabled: boolean): string {
+    if (html.includes(deployBootstrapMarker)) return html;
+    const scriptTagIndex = html.search(/<script\b[^>]*\btype=["']module["'][^>]*>/i);
+    if (scriptTagIndex === -1) return html;
+    // `defer` keeps the fetch off the critical parsing path so CSS + the
+    // module bundle can still be discovered immediately; execution is
+    // ordered so the bootstrap still runs before the (implicitly deferred)
+    // module bundle, priming window.__FLOOM__ before React mounts.
+    const bootstrap =
+      `<script defer src='/__floom/bootstrap.js' ${deployBootstrapMarker}></script>\n    `;
+    return `${html.slice(0, scriptTagIndex)}${bootstrap}${html.slice(scriptTagIndex)}`;
+  }
+
+  function getIndexHtmlForDeployFlag(deployEnabled: boolean): string {
+    if (deployBootstrapCache) return deployBootstrapCache;
+    deployBootstrapCache = injectDeployBootstrap(indexHtml, deployEnabled);
+    return deployBootstrapCache;
+  }
+
   // Paths that must never be swallowed by the SPA wildcard. These reach
   // Hono's other route handlers or return a real 404. The order matters:
   // prefix matches first, then exact matches.
@@ -836,7 +859,7 @@ if (webDist) {
   // which rendered a blank page instead of triggering the Google/GitHub
   // redirect. Fix for blank-page on social sign-in reported post-launch.
   const spaExcludedPrefixes = ['/api/', '/mcp', '/renderer/', '/og/', '/hook/', '/auth/'];
-  const spaExcludedExact = new Set(['/openapi.json', '/metrics']);
+  const spaExcludedExact = new Set(['/openapi.json', '/metrics', '/__floom/bootstrap.js']);
 
   // SEO #621: known-route table for proper 404 status on unknown SPA paths.
   //
@@ -1288,9 +1311,25 @@ if (webDist) {
     return out;
   }
 
+  // CSP-safe deploy flag bootstrap: external same-origin script so the
+  // top-level `script-src 'self'` policy still allows the flag setup.
+  app.get('/__floom/bootstrap.js', () => {
+    const body =
+      'window.__FLOOM__=window.__FLOOM__||{};' +
+      `window.__FLOOM__.deployEnabled=${isDeployEnabled()};`;
+    return new Response(body, {
+      status: 200,
+      headers: {
+        'content-type': 'application/javascript; charset=utf-8',
+        'cache-control': 'no-cache, no-store',
+      },
+    });
+  });
+
   app.use('/*', async (c, next) => {
     const url = new URL(c.req.url);
     const pathname = url.pathname;
+    const servedIndexHtml = getIndexHtmlForDeployFlag(true);
 
     // Skip API + MCP routes and named utility endpoints — let Hono handle them.
     if (
@@ -1301,7 +1340,7 @@ if (webDist) {
     }
 
     if (pathname === '/' || pathname === '/index.html') {
-      return new Response(rewriteHeadForLanding(indexHtml), {
+      return new Response(rewriteHeadForLanding(servedIndexHtml), {
         status: 200,
         headers: {
           'content-type': 'text/html; charset=utf-8',
@@ -1404,12 +1443,12 @@ if (webDist) {
     // (PRR #172).
     const slugMatch = pathname.match(pSlugPattern);
     if (slugMatch && slugMatch[1]) {
-      return c.html(rewriteHeadForSlug(indexHtml, slugMatch[1]));
+      return c.html(rewriteHeadForSlug(servedIndexHtml, slugMatch[1]));
     }
     // 2026-04-20 (PRR tail cleanup): explicit /404 path returns 404 status.
     if (pathname === '/404' || pathname === '/404.html') {
       return new Response(
-        rewriteTitle(rewriteCanonical(indexHtml, pathname), 'Page not found · Floom'),
+        rewriteTitle(rewriteCanonical(servedIndexHtml, pathname), 'Page not found · Floom'),
         {
           status: 404,
           headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-cache' },
@@ -1424,7 +1463,7 @@ if (webDist) {
     // dynamic patterns like /p/:slug) continue to return 200.
     if (!isKnownRoute(pathname)) {
       return new Response(
-        rewriteTitle(rewriteCanonical(indexHtml, pathname), 'Page not found · Floom'),
+        rewriteTitle(rewriteCanonical(servedIndexHtml, pathname), 'Page not found · Floom'),
         {
           status: 404,
           headers: {
@@ -1434,7 +1473,7 @@ if (webDist) {
         },
       );
     }
-    return c.html(rewriteHeadForPath(indexHtml, pathname));
+    return c.html(rewriteHeadForPath(servedIndexHtml, pathname));
   });
 } else {
   console.log('[web] no built web bundle found — backend-only mode');
