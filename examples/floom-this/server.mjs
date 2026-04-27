@@ -39,7 +39,7 @@ const spec = {
   },
   servers: [{ url: `${PUBLIC_BASE}${BASE_PATH}` }],
   paths: {
-    [`${BASE_PATH}/analyze`]: {
+    '/analyze': {
       post: {
         operationId: 'analyzeFloomThis',
         summary: 'Analyze a script or workflow for Floom app intake',
@@ -339,7 +339,10 @@ const server = createServer(async (req, res) => {
       return sendJson(res, 200, spec);
     }
 
-    if (req.method === 'POST' && url.pathname === `${BASE_PATH}/analyze`) {
+    if (
+      req.method === 'POST' &&
+      (url.pathname === '/analyze' || url.pathname === `${BASE_PATH}/analyze`)
+    ) {
       let body;
       try {
         body = await readJsonBody(req);
