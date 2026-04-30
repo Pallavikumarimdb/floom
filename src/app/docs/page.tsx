@@ -179,6 +179,27 @@ export default function DocsPage() {
           </p>
         </Section>
 
+        <Section title="v0.1 scope">
+          <p>
+            v0.1 adds dependencies and secrets without changing Floom into broad
+            app hosting.
+          </p>
+          <ul className="list-disc space-y-3 pl-5">
+            <li>
+              Constrained Python dependency installation from{" "}
+              <code>requirements.txt</code>.
+            </li>
+            <li>
+              Secret names in <code>floom.yaml</code>, never raw secret values.
+            </li>
+            <li>Secure secret storage and E2B runtime injection.</li>
+          </ul>
+          <p className="text-sm text-neutral-500">
+            FastAPI/OpenAPI, arbitrary HTTP servers, TypeScript apps,
+            background workers, and full repo hosting remain later milestones.
+          </p>
+        </Section>
+
         <Section title="Limits and exclusions">
           <ul className="list-disc space-y-3 pl-5">
             <li>v0 is optimized for short function-style apps.</li>
