@@ -3,7 +3,7 @@ import * as path from "path";
 import yaml from "js-yaml";
 import FormData from "form-data";
 import fetch from "node-fetch";
-import { parseManifest } from "../src/lib/floom/manifest";
+import { parseManifest, validatePythonSourceForManifest } from "../src/lib/floom/manifest";
 import { MAX_SCHEMA_BYTES, MAX_SOURCE_BYTES } from "../src/lib/floom/limits";
 import { parseAndValidateJsonSchemaText } from "../src/lib/floom/schema";
 
@@ -15,6 +15,7 @@ type DeployResponse = {
 };
 
 async function deploy(appDir: string, apiUrl: string, token: string) {
+  const rootDir = path.resolve(appDir);
   const manifestPath = path.join(appDir, "floom.yaml");
   if (!fs.existsSync(manifestPath)) {
     throw new Error("floom.yaml not found in " + appDir);
@@ -23,8 +24,8 @@ async function deploy(appDir: string, apiUrl: string, token: string) {
   const manifest = parseManifest(yaml.load(fs.readFileSync(manifestPath, "utf8")));
 
   // Validate schemas
-  const inputSchemaPath = path.join(appDir, manifest.input_schema || "input.schema.json");
-  const outputSchemaPath = path.join(appDir, manifest.output_schema || "output.schema.json");
+  const inputSchemaPath = resolveAppPath(rootDir, manifest.input_schema || "input.schema.json");
+  const outputSchemaPath = resolveAppPath(rootDir, manifest.output_schema || "output.schema.json");
 
   if (!fs.existsSync(inputSchemaPath)) throw new Error("Input schema not found");
   if (!fs.existsSync(outputSchemaPath)) throw new Error("Output schema not found");
@@ -41,12 +42,13 @@ async function deploy(appDir: string, apiUrl: string, token: string) {
   );
   if (!outputSchemaResult.ok) throw new Error(outputSchemaResult.error);
 
-  const entrypointPath = path.join(appDir, manifest.entrypoint);
+  const entrypointPath = resolveAppPath(rootDir, manifest.entrypoint);
   if (!fs.existsSync(entrypointPath)) throw new Error("Entrypoint not found");
   if (fs.statSync(entrypointPath).size > MAX_SOURCE_BYTES) throw new Error("Entrypoint is too large");
   if (fs.statSync(manifestPath).size > MAX_SCHEMA_BYTES) throw new Error("Manifest is too large");
   if (fs.statSync(inputSchemaPath).size > MAX_SCHEMA_BYTES) throw new Error("Input schema is too large");
   if (fs.statSync(outputSchemaPath).size > MAX_SCHEMA_BYTES) throw new Error("Output schema is too large");
+  validatePythonSourceForManifest(fs.readFileSync(entrypointPath, "utf8"), manifest);
 
   const form = new FormData();
   form.append("manifest", fs.createReadStream(manifestPath), { filename: "floom.yaml" });
@@ -71,9 +73,21 @@ async function deploy(appDir: string, apiUrl: string, token: string) {
   return data;
 }
 
-const [,, appDir, apiUrl, token] = process.argv;
+function resolveAppPath(rootDir: string, relativePath: string) {
+  const resolved = path.resolve(rootDir, relativePath);
+  if (resolved !== rootDir && !resolved.startsWith(rootDir + path.sep)) {
+    throw new Error(`${relativePath} must stay inside the app directory`);
+  }
+  return resolved;
+}
+
+const [,, appDirArg, apiUrlArg, tokenArg] = process.argv;
+const appDir = appDirArg;
+const apiUrl = apiUrlArg || process.env.FLOOM_API_URL || "https://floom-60sec.vercel.app";
+const token = tokenArg || process.env.FLOOM_TOKEN;
+
 if (!appDir || !apiUrl || !token) {
-  console.error("Usage: tsx cli/deploy.ts <app-dir> <api-url> <auth-token>");
+  console.error("Usage: FLOOM_TOKEN=<token> FLOOM_API_URL=<url> tsx cli/deploy.ts <app-dir>");
   process.exit(1);
 }
 

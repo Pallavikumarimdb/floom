@@ -21,19 +21,19 @@ export default function Home() {
         </p>
 
         <div className="mx-auto mt-8 flex max-w-xl items-center justify-between rounded-lg border border-[#ded8cc] bg-[#f3f0ea] p-3 text-left font-mono text-sm shadow-sm">
-          <span className="text-neutral-700">$ npx @floomhq/cli@latest setup</span>
-          <a
-            href="https://github.com/floomhq/floomit"
+          <span className="text-neutral-700">$ FLOOM_TOKEN=... npx tsx cli/deploy.ts ./app</span>
+          <Link
+            href="/tokens"
             className="rounded-md border border-emerald-200 bg-white px-3 py-2 font-sans text-xs font-bold text-emerald-700"
           >
-            Install skill
-          </a>
+            Create token
+          </Link>
         </div>
 
         <div className="mt-5 text-sm text-neutral-500">
           or{" "}
           <Link
-            href="/p/pitch-live-1777527051784"
+            href="/p/smoke-1777538613152"
             className="font-semibold text-emerald-700"
           >
             Run/test live app →

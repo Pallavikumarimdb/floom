@@ -4,7 +4,11 @@ import { readFileSync } from 'node:fs';
 import { Sandbox } from 'e2b';
 import { runInSandbox, runInSandboxContained } from '../src/lib/e2b/runner.ts';
 import { getPublicRunRateLimitKey } from '../src/lib/floom/rate-limit.ts';
-import { parseManifest, isSafePythonEntrypoint } from '../src/lib/floom/manifest.ts';
+import {
+  parseManifest,
+  isSafePythonEntrypoint,
+  validatePythonSourceForManifest,
+} from '../src/lib/floom/manifest.ts';
 import {
   REDACTED_OUTPUT_VALUE,
   redactSecretOutput,
@@ -54,6 +58,19 @@ async function test() {
   } catch (error) {
     if (!(error instanceof Error) || !error.message.includes('entrypoint')) throw error;
   }
+
+  const sourceManifest = parseManifest({
+    name: 'Source Test',
+    slug: 'source-test',
+    runtime: 'python',
+    entrypoint: 'app.py',
+    handler: 'run',
+  });
+  validatePythonSourceForManifest('def run(inputs):\n    return {"ok": True}\n', sourceManifest);
+  assert.throws(
+    () => validatePythonSourceForManifest('def other(inputs):\n    return {}\n', sourceManifest),
+    /handler function/
+  );
 
   const manifestText = readFileSync('fixtures/python-simple/floom.yaml', 'utf8');
   const inputSchemaText = readFileSync('fixtures/python-simple/input.schema.json', 'utf8');

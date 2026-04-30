@@ -86,14 +86,18 @@ export async function revokeAgentToken(
   ownerId: string,
   tokenId: string
 ) {
-  const { error } = await admin
+  const { data, error } = await admin
     .from("agent_tokens")
     .update({ revoked_at: new Date().toISOString() })
     .eq("id", tokenId)
     .eq("owner_id", ownerId)
-    .is("revoked_at", null);
+    .is("revoked_at", null)
+    .select("id")
+    .maybeSingle();
 
   if (error) {
     throw new Error("Failed to revoke agent token");
   }
+
+  return Boolean(data);
 }

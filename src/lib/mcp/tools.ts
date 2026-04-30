@@ -2,7 +2,11 @@ import yaml from "js-yaml";
 import type { NextRequest } from "next/server";
 import { hasSupabaseConfig } from "@/lib/demo-app";
 import { MAX_SCHEMA_BYTES, MAX_SOURCE_BYTES } from "@/lib/floom/limits";
-import { parseManifest, type FloomManifest } from "@/lib/floom/manifest";
+import {
+  parseManifest,
+  validatePythonSourceForManifest,
+  type FloomManifest,
+} from "@/lib/floom/manifest";
 import { validateJsonSchemaValue } from "@/lib/floom/schema";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { resolveAuthCaller } from "@/lib/supabase/auth";
@@ -400,6 +404,12 @@ async function publishApp(args: JsonObject, context: McpToolContext): Promise<Mc
 
   if (Buffer.byteLength(source, "utf8") > MAX_SOURCE_BYTES) {
     return errorResult("source is too large");
+  }
+
+  try {
+    validatePythonSourceForManifest(source, manifestResult.manifest);
+  } catch (sourceError) {
+    return errorResult(sourceError instanceof Error ? sourceError.message : "Invalid app source");
   }
 
   const inputSchemaResult = parseRequiredSchemaArgument(args.input_schema, "input_schema");

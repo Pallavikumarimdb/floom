@@ -63,3 +63,15 @@ export function isSafePythonEntrypoint(value: string) {
 export function isSafePythonIdentifier(value: string) {
   return IDENTIFIER_RE.test(value);
 }
+
+export function validatePythonSourceForManifest(source: string, manifest: FloomManifest) {
+  if (Buffer.byteLength(source, "utf8") === 0) {
+    throw new Error("Entrypoint source is empty");
+  }
+
+  const escapedHandler = manifest.handler.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const definitionPattern = new RegExp(`(^|\\n)\\s*def\\s+${escapedHandler}\\s*\\(`);
+  if (!definitionPattern.test(source)) {
+    throw new Error(`Entrypoint must define handler function: ${manifest.handler}`);
+  }
+}

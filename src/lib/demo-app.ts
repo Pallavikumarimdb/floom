@@ -31,6 +31,18 @@ export function hasSupabaseConfig() {
   return Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
 }
 
+export function hasBrowserAuthConfig() {
+  return Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+}
+
+export function hasAgentTokenConfig() {
+  return Boolean(
+    process.env.NEXT_PUBLIC_SUPABASE_URL &&
+      process.env.SUPABASE_SERVICE_ROLE_KEY &&
+      process.env.AGENT_TOKEN_PEPPER
+  );
+}
+
 export function runDemoApp(inputs: Record<string, unknown>) {
   const pitch = typeof inputs.pitch === "string" ? inputs.pitch : "";
   return {

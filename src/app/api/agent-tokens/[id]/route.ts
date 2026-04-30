@@ -2,15 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { resolveAuthCaller } from "@/lib/supabase/auth";
 import { revokeAgentToken } from "@/lib/supabase/agent-tokens";
-import { hasSupabaseConfig } from "@/lib/demo-app";
+import { hasAgentTokenConfig } from "@/lib/demo-app";
 
 export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  if (!hasSupabaseConfig()) {
+  if (!hasAgentTokenConfig()) {
     return NextResponse.json(
-      { error: "Supabase is not configured. Set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY." },
+      { error: "Agent tokens are not configured. Set Supabase service-role env and AGENT_TOKEN_PEPPER." },
       { status: 503 }
     );
   }
@@ -22,7 +22,10 @@ export async function DELETE(
   }
 
   const { id } = await params;
-  await revokeAgentToken(admin, caller.userId, id);
+  const revoked = await revokeAgentToken(admin, caller.userId, id);
+  if (!revoked) {
+    return NextResponse.json({ error: "Active token not found" }, { status: 404 });
+  }
 
   return NextResponse.json({ ok: true });
 }

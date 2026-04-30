@@ -4,7 +4,11 @@ import { callerHasScope, resolveAuthCaller } from "@/lib/supabase/auth";
 import yaml from "js-yaml";
 import { v4 as uuidv4 } from "uuid";
 import { hasSupabaseConfig } from "@/lib/demo-app";
-import { parseManifest, type FloomManifest } from "@/lib/floom/manifest";
+import {
+  parseManifest,
+  validatePythonSourceForManifest,
+  type FloomManifest,
+} from "@/lib/floom/manifest";
 import { MAX_REQUEST_BYTES, MAX_SCHEMA_BYTES, MAX_SOURCE_BYTES } from "@/lib/floom/limits";
 import { parseAndValidateJsonSchemaText } from "@/lib/floom/schema";
 
@@ -107,6 +111,16 @@ export async function POST(req: NextRequest) {
   }
 
   const bundleBuffer = Buffer.from(await bundleFile.arrayBuffer());
+  const bundleText = bundleBuffer.toString("utf8");
+  try {
+    validatePythonSourceForManifest(bundleText, manifest);
+  } catch (sourceError) {
+    return NextResponse.json(
+      { error: sourceError instanceof Error ? sourceError.message : "Invalid app source" },
+      { status: 400 }
+    );
+  }
+
   const bundlePath = `${ownerId}/${manifest.slug}/${uuidv4()}-${manifest.entrypoint}`;
   const { error: uploadError } = await admin.storage
     .from("app-bundles")

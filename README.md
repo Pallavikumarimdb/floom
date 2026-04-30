@@ -79,10 +79,16 @@ npm install
 npm run dev
 ```
 
-### 5. Register the fixture app with Supabase configured
+### 5. Create a Floom agent token
+
+Open `/login`, sign up or sign in, then open `/tokens`.
+
+Create a token and copy it. The raw token is shown once.
+
+### 6. Register the fixture app with Supabase configured
 
 ```bash
-npx tsx cli/deploy.ts ./fixtures/python-simple http://localhost:3000 YOUR_SUPABASE_AUTH_TOKEN
+FLOOM_TOKEN=YOUR_FLOOM_AGENT_TOKEN FLOOM_API_URL=http://localhost:3000 npx tsx cli/deploy.ts ./fixtures/python-simple
 ```
 
 Without Supabase env, visit `/p/demo-app` for the local demo. In the hosted v0, use the homepage CTA to open the retained live app.
@@ -114,14 +120,33 @@ def run(inputs: dict) -> dict:
 2. CLI validates `floom.yaml`, input JSON Schema, output JSON Schema.
 3. CLI sends the Python entrypoint to Floom API (`POST /api/apps`).
 4. With Supabase env configured, Floom API creates app/version records in Supabase.
-5. Floom runs through fake mode unless `E2B_API_KEY` is configured.
-6. In fake mode, the runner returns mock output for local testing.
+5. Floom runs through E2B when `E2B_API_KEY` is configured.
+6. In fake mode, the runner returns mock output for local development and tests only.
 7. With `E2B_API_KEY`, the runner uploads the entrypoint to E2B and invokes the handler.
 8. Floom validates inputs and outputs, stores execution records when Supabase is configured, and renders results.
 
+## MCP
+
+The v0 MCP endpoint is `/mcp`.
+
+Use an Authorization bearer token:
+
+```text
+Authorization: Bearer YOUR_FLOOM_AGENT_TOKEN
+```
+
+Launch tools:
+
+- `auth_status`
+- `validate_manifest`
+- `publish_app`
+- `run_app`
+- `get_app`
+- `create_agent_token`
+
 ## Fake Mode
 
-If `E2B_API_KEY` is not set, the runner operates in fake mode and returns mock output. This is useful for local development and testing without E2B credits.
+If `E2B_API_KEY` is not set, fake mode is available only outside production. This is useful for local development and testing without E2B credits.
 
 ## Quality Gates
 
@@ -143,7 +168,6 @@ If `E2B_API_KEY` is not set, the runner operates in fake mode and returns mock o
 - Custom renderers
 - File uploads
 - Cron
-- MCP
 - Per-app Vercel deploys
 - Arbitrary Docker repos
 - Full web app hosting
