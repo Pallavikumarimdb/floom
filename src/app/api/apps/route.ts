@@ -3,6 +3,35 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import yaml from "js-yaml";
 import { v4 as uuidv4 } from "uuid";
 
+type AppManifest = {
+  name: string;
+  slug: string;
+  runtime: "python" | "typescript";
+  entrypoint: string;
+  handler: string;
+  public?: boolean;
+  dependencies?: Record<string, string[]>;
+  secrets?: string[];
+};
+
+function parseManifest(value: unknown): AppManifest | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+
+  const manifest = value as Partial<AppManifest>;
+  const required: Array<keyof AppManifest> = ["name", "slug", "runtime", "entrypoint", "handler"];
+  if (required.some((key) => !manifest[key])) {
+    return null;
+  }
+
+  if (manifest.runtime !== "python" && manifest.runtime !== "typescript") {
+    return null;
+  }
+
+  return manifest as AppManifest;
+}
+
 export async function POST(req: NextRequest) {
   const form = await req.formData();
   const manifestFile = form.get("manifest") as File | null;
@@ -15,18 +44,15 @@ export async function POST(req: NextRequest) {
   }
 
   const manifestText = await manifestFile.text();
-  let manifest: any;
+  let manifest: AppManifest | null;
   try {
-    manifest = yaml.load(manifestText);
+    manifest = parseManifest(yaml.load(manifestText));
   } catch {
     return NextResponse.json({ error: "Invalid floom.yaml" }, { status: 400 });
   }
 
-  const required = ["name", "slug", "runtime", "entrypoint", "handler"];
-  for (const key of required) {
-    if (!manifest[key]) {
-      return NextResponse.json({ error: `Missing ${key} in manifest` }, { status: 400 });
-    }
+  if (!manifest) {
+    return NextResponse.json({ error: "Invalid or incomplete floom.yaml" }, { status: 400 });
   }
 
   const authHeader = req.headers.get("authorization");

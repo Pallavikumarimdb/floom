@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { demoApp, hasSupabaseConfig, runDemoApp } from "@/lib/demo-app";
 import { runInSandbox } from "@/lib/runner";
 import Ajv from "ajv";
 
@@ -12,6 +13,22 @@ export async function POST(
   const { slug } = await params;
   const body = await req.json().catch(() => ({}));
   const { inputs, share_token } = body as { inputs: Record<string, unknown>; share_token?: string };
+
+  if (!hasSupabaseConfig() && slug === demoApp.slug) {
+    const validateDemoInput = ajv.compile(demoApp.input_schema);
+    if (!validateDemoInput(inputs)) {
+      return NextResponse.json(
+        { error: "Invalid input", details: validateDemoInput.errors },
+        { status: 400 }
+      );
+    }
+
+    return NextResponse.json({
+      execution_id: "demo-local",
+      status: "success",
+      output: runDemoApp(inputs),
+    });
+  }
 
   const admin = createAdminClient();
 

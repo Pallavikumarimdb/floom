@@ -61,6 +61,24 @@ CREATE TABLE IF NOT EXISTS app_share_links (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Private bucket for uploaded app bundles. API routes access it with service role.
+INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+VALUES (
+  'app-bundles',
+  'app-bundles',
+  FALSE,
+  52428800,
+  ARRAY['application/zip', 'application/octet-stream']
+)
+ON CONFLICT (id) DO UPDATE
+SET
+  public = EXCLUDED.public,
+  file_size_limit = EXCLUDED.file_size_limit,
+  allowed_mime_types = EXCLUDED.allowed_mime_types;
+
+CREATE UNIQUE INDEX IF NOT EXISTS app_share_links_token_hash_key
+  ON app_share_links (token_hash);
+
 -- RLS Policies
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE apps ENABLE ROW LEVEL SECURITY;

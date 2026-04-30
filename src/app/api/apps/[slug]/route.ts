@@ -1,11 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { demoApp, hasSupabaseConfig } from "@/lib/demo-app";
 
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ slug: string }> }
 ) {
   const { slug } = await params;
+  if (!hasSupabaseConfig() && slug === demoApp.slug) {
+    return NextResponse.json(demoApp);
+  }
+
   const admin = createAdminClient();
 
   const { data: app, error } = await admin

@@ -16,6 +16,16 @@ interface AppData {
   public: boolean;
 }
 
+type RunResult = Record<string, unknown> | null;
+type FormData = Record<string, unknown>;
+
+function hasBrowserSupabaseConfig() {
+  return Boolean(
+    process.env.NEXT_PUBLIC_SUPABASE_URL &&
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  );
+}
+
 export default function AppPage() {
   const params = useParams();
   const slug = params.slug as string;
@@ -23,11 +33,9 @@ export default function AppPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [runLoading, setRunLoading] = useState(false);
-  const [runResult, setRunResult] = useState<any>(null);
+  const [runResult, setRunResult] = useState<RunResult>(null);
   const [runError, setRunError] = useState<string | null>(null);
-  const [formData, setFormData] = useState<any>({});
-
-  const supabase = createClient();
+  const [formData, setFormData] = useState<FormData>({});
 
   const fetchApp = useCallback(async () => {
     setLoading(true);
@@ -37,14 +45,16 @@ export default function AppPage() {
       if (!res.ok) throw new Error("App not found");
       const data = await res.json();
       setApp(data);
-    } catch (e: any) {
-      setError(e.message);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Failed to load app");
     } finally {
       setLoading(false);
     }
   }, [slug]);
 
   useEffect(() => {
+    // Initial app fetch is the only client-side data load in this minimal page.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchApp();
   }, [fetchApp]);
 
@@ -53,8 +63,12 @@ export default function AppPage() {
     setRunResult(null);
     setRunError(null);
 
-    const session = await supabase.auth.getSession();
-    const token = session.data.session?.access_token;
+    let token: string | undefined;
+    if (hasBrowserSupabaseConfig()) {
+      const supabase = createClient();
+      const session = await supabase.auth.getSession();
+      token = session.data.session?.access_token;
+    }
 
     try {
       const res = await fetch(`/api/apps/${slug}/run`, {
@@ -69,8 +83,8 @@ export default function AppPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Run failed");
       setRunResult(data.output);
-    } catch (e: any) {
-      setRunError(e.message);
+    } catch (e: unknown) {
+      setRunError(e instanceof Error ? e.message : "Run failed");
     } finally {
       setRunLoading(false);
     }
@@ -107,7 +121,7 @@ export default function AppPage() {
           schema={app.input_schema}
           validator={validator}
           formData={formData}
-          onChange={(e) => setFormData(e.formData)}
+          onChange={(e) => setFormData((e.formData ?? {}) as FormData)}
           onSubmit={handleRun}
         >
           <button

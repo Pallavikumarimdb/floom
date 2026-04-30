@@ -7,6 +7,11 @@ export interface RunnerResult {
 
 const FAKE_MODE = !process.env.E2B_API_KEY;
 
+function errorMessage(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  return String(err);
+}
+
 export async function runInSandbox(
   codeBundle: string,
   inputs: Record<string, unknown>,
@@ -62,10 +67,11 @@ ${handler}(inputs).then((result: any) => {
     const result = await sbx.commands.run(cmd);
     const output = JSON.parse(result.stdout);
     return { output };
-  } catch (err: any) {
-    let errorMsg = err.message || String(err);
-    if (err.stdout) errorMsg += `\nSTDOUT: ${err.stdout}`;
-    if (err.stderr) errorMsg += `\nSTDERR: ${err.stderr}`;
+  } catch (err: unknown) {
+    const commandError = err as { stdout?: unknown; stderr?: unknown };
+    let errorMsg = errorMessage(err);
+    if (commandError.stdout) errorMsg += `\nSTDOUT: ${String(commandError.stdout)}`;
+    if (commandError.stderr) errorMsg += `\nSTDERR: ${String(commandError.stderr)}`;
     return { output: {}, error: errorMsg };
   } finally {
     await sbx.kill();

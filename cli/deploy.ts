@@ -4,19 +4,48 @@ import yaml from "js-yaml";
 import FormData from "form-data";
 import fetch from "node-fetch";
 
+type FloomManifest = {
+  name: string;
+  slug: string;
+  runtime: "python" | "typescript";
+  entrypoint: string;
+  handler: string;
+  input_schema?: string;
+  output_schema?: string;
+};
+
+type DeployResponse = {
+  app?: {
+    url?: string;
+  };
+  error?: string;
+};
+
+function parseManifest(value: unknown): FloomManifest {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("floom.yaml must contain an object");
+  }
+
+  const manifest = value as Partial<FloomManifest>;
+  const required: Array<keyof FloomManifest> = ["name", "slug", "runtime", "entrypoint", "handler"];
+  for (const key of required) {
+    if (!manifest[key]) throw new Error(`Missing ${key} in floom.yaml`);
+  }
+
+  if (manifest.runtime !== "python" && manifest.runtime !== "typescript") {
+    throw new Error("runtime must be python or typescript");
+  }
+
+  return manifest as FloomManifest;
+}
+
 async function deploy(appDir: string, apiUrl: string, token: string) {
   const manifestPath = path.join(appDir, "floom.yaml");
   if (!fs.existsSync(manifestPath)) {
     throw new Error("floom.yaml not found in " + appDir);
   }
 
-  const manifest = yaml.load(fs.readFileSync(manifestPath, "utf8")) as any;
-
-  // Validate required fields
-  const required = ["name", "slug", "runtime", "entrypoint", "handler"];
-  for (const key of required) {
-    if (!manifest[key]) throw new Error(`Missing ${key} in floom.yaml`);
-  }
+  const manifest = parseManifest(yaml.load(fs.readFileSync(manifestPath, "utf8")));
 
   // Validate schemas
   const inputSchemaPath = path.join(appDir, manifest.input_schema || "input.schema.json");
@@ -48,11 +77,11 @@ async function deploy(appDir: string, apiUrl: string, token: string) {
     body: form,
   });
 
-  const data = await res.json();
+  const data = (await res.json()) as DeployResponse;
   if (!res.ok) throw new Error(data.error || "Deploy failed");
 
   console.log("Deployed successfully!");
-  console.log("URL:", data.app.url);
+  console.log("URL:", data.app?.url);
   return data;
 }
 
