@@ -101,9 +101,23 @@ function MvpHeroInstall({ appsCount, runs7dSum }: MvpHeroInstallProps) {
 
   return (
     <div style={{ maxWidth: 540, margin: '20px auto 0', textAlign: 'left' }}>
-      {/* R7.6 (2026-04-28): caption "One command. Sets up MCP, mints a token,
-          you're live." removed — redundant with the npx command beneath it.
-          Federico's brief: cut hero to 4 elements (eyebrow, H1, sub, command). */}
+      {/* v6 (2026-05-01): added explicit "Run this in your terminal" framing —
+          Federico's feedback was that the bare $ npx box doesn't feel
+          straightforward as a CTA. Now: small lead label above + outcome
+          line below ("Mints your agent token, sets up MCP, you're live"). */}
+      <div
+        style={{
+          fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+          fontSize: 11,
+          letterSpacing: '0.1em',
+          textTransform: 'uppercase',
+          fontWeight: 600,
+          color: 'var(--muted)',
+          marginBottom: 8,
+        }}
+      >
+        Paste in your terminal — or any AI agent
+      </div>
       <div style={{ position: 'relative' }}>
         <pre
           data-testid="hero-npx-command"
@@ -150,6 +164,19 @@ function MvpHeroInstall({ appsCount, runs7dSum }: MvpHeroInstallProps) {
         >
           {copied ? 'Copied' : 'Copy'}
         </button>
+      </div>
+      <div
+        style={{
+          marginTop: 8,
+          fontSize: 12.5,
+          color: 'var(--muted)',
+          lineHeight: 1.5,
+        }}
+      >
+        <span aria-hidden="true" style={{ color: 'var(--accent)', marginRight: 6 }}>
+          →
+        </span>
+        Mints your agent token, sets up MCP, your first app is live in 60 seconds.
       </div>
       {/* R10 (2026-04-28): complementary "Try a live app" CTA. Gemini
           baseline scored landing 6/10 partly because the only first-
@@ -558,16 +585,20 @@ export default function LandingV17PageMvp() {
           style={{ padding: '72px 28px', maxWidth: 1240, margin: '0 auto' }}
         >
           <SectionEyebrow>How it works</SectionEyebrow>
+          {/* v6 (2026-05-01): "How it works" H2 changed per Federico — was
+              Inter display 800/34. Now lighter sans 600/28 with neutral tracking
+              so the section feels narrative, not marketing-loud. */}
           <h2
             style={{
-              fontFamily: 'var(--font-display)',
-              fontWeight: 800,
-              fontSize: 34,
-              lineHeight: 1.1,
-              letterSpacing: '-0.025em',
+              fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
+              fontWeight: 600,
+              fontSize: 28,
+              lineHeight: 1.2,
+              letterSpacing: '-0.015em',
               textAlign: 'center',
               margin: '0 auto 28px',
               maxWidth: 760,
+              color: 'var(--ink)',
             }}
           >
             From idea to shipped app in 3 steps.

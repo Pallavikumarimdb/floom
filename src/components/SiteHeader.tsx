@@ -221,51 +221,8 @@ export function SiteHeader({ compact = false, onStudioMenuOpen }: Props = {}) {
             </button>
           )}
 
-          {/* Centre nav — anonymous only */}
-          {showAuthedChrome ? null : (
-            <nav
-              className="topbar-links topbar-links-desktop topbar-centre-nav"
-              aria-label="Primary"
-              style={{
-                marginLeft: 32,
-                pointerEvents: 'auto',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 2,
-              }}
-            >
-              <Link
-                href="/apps"
-                data-testid="topbar-apps"
-                aria-current={isApps ? 'page' : undefined}
-                style={navLinkStyle(isApps ?? false)}
-              >
-                Apps
-              </Link>
-              <Link
-                href="/docs"
-                data-testid="topbar-docs"
-                aria-current={isDocs ? 'page' : undefined}
-                style={navLinkStyle(isDocs ?? false)}
-              >
-                Docs
-              </Link>
-              <Link
-                href="/pricing"
-                data-testid="topbar-pricing"
-                style={navLinkStyle(false)}
-              >
-                Pricing
-              </Link>
-              <Link
-                href="/changelog"
-                data-testid="topbar-changelog"
-                style={navLinkStyle(false)}
-              >
-                Changelog
-              </Link>
-            </nav>
-          )}
+          {/* Centre nav — floom-minimal v0 strips dead links until pages exist.
+              floom.dev's Apps/Docs/Pricing/Changelog routes don't exist here. */}
 
           {/* Right side */}
           <div

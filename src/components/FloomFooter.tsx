@@ -1,14 +1,6 @@
 'use client';
 import Link from 'next/link';
-import type { CSSProperties, ReactNode } from 'react';
-
-function IconDiscordFooter() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-      <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057c.001.022.015.043.033.055a19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z" />
-    </svg>
-  );
-}
+import type { CSSProperties } from 'react';
 
 function IconGitHubFooter() {
   return (
@@ -18,69 +10,24 @@ function IconGitHubFooter() {
   );
 }
 
-function IconXFooter() {
+function IconDiscordFooter() {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.744l7.737-8.835L1.254 2.25H8.08l4.259 5.63 5.905-5.63zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057c.001.022.015.043.033.055a19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z" />
     </svg>
   );
 }
 
-const SOCIAL_ICON_STYLE: CSSProperties = {
+const ICON_LINK: CSSProperties = {
   display: 'inline-flex',
   alignItems: 'center',
-  justifyContent: 'center',
-  width: 40,
-  height: 40,
-  borderRadius: 10,
-  border: '1px solid var(--line)',
-  background: 'var(--bg)',
+  gap: 6,
   color: 'var(--muted)',
   textDecoration: 'none',
-  transition: 'color 0.15s, border-color 0.15s, background 0.15s',
+  fontSize: 12.5,
+  fontWeight: 500,
+  transition: 'color 0.15s',
 };
-
-const COL_STYLE: CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 10,
-  alignItems: 'flex-start',
-  minWidth: 120,
-};
-
-const COL_LABEL_STYLE: CSSProperties = {
-  fontFamily: "'JetBrains Mono', ui-monospace, monospace",
-  fontSize: 10.5,
-  letterSpacing: '0.12em',
-  textTransform: 'uppercase',
-  fontWeight: 600,
-  color: 'var(--ink)',
-  marginBottom: 4,
-};
-
-const LINK_STYLE: CSSProperties = {
-  color: 'var(--muted)',
-  textDecoration: 'none',
-  fontSize: 13,
-  lineHeight: 1.4,
-};
-
-function FootLink({ children, to, href }: { children: ReactNode; to?: string; href?: string }) {
-  const common = {
-    style: LINK_STYLE,
-    onMouseEnter: (e: React.MouseEvent<HTMLAnchorElement>) => {
-      (e.currentTarget as HTMLAnchorElement).style.color = 'var(--ink)';
-    },
-    onMouseLeave: (e: React.MouseEvent<HTMLAnchorElement>) => {
-      (e.currentTarget as HTMLAnchorElement).style.color = 'var(--muted)';
-    },
-  };
-  return href ? (
-    <a href={href} target="_blank" rel="noreferrer" {...common}>{children}</a>
-  ) : (
-    <Link href={to!} {...common}>{children}</Link>
-  );
-}
 
 export function FloomFooter() {
   return (
@@ -88,33 +35,29 @@ export function FloomFooter() {
       data-testid="public-footer"
       className="public-footer"
       style={{
-        padding: '56px 24px 28px',
+        padding: '24px 28px',
         background: 'var(--card)',
         borderTop: '1px solid var(--line)',
       }}
     >
       <div
-        data-testid="footer-columns"
-        className="public-footer-columns"
         style={{
-          display: 'grid',
-          gridTemplateColumns: 'minmax(0, 1.4fr) repeat(3, minmax(140px, 1fr))',
-          gap: 40,
+          display: 'flex',
+          flexWrap: 'wrap',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          gap: 16,
           maxWidth: 1180,
-          margin: '0 auto 32px',
-          padding: '0 32px',
-          textAlign: 'left',
+          margin: '0 auto',
         }}
       >
-        {/* Brand column */}
-        <div className="public-footer-brand" style={{ display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0 }}>
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 12 }}>
           <Link
             href="/"
-            data-testid="footer-brand"
             style={{
               fontFamily: 'var(--font-display, Inter), system-ui, sans-serif',
-              fontWeight: 800,
-              fontSize: 19,
+              fontWeight: 900,
+              fontSize: 16,
               color: 'var(--ink)',
               textDecoration: 'none',
               letterSpacing: '-0.02em',
@@ -127,165 +70,41 @@ export function FloomFooter() {
               src="/floom-mark-glow.svg"
               alt=""
               aria-hidden="true"
-              width={22}
-              height={22}
+              width={20}
+              height={20}
               style={{ display: 'inline-block' }}
             />
-            <span style={{ fontWeight: 900 }}>
+            <span>
               floom<span aria-hidden="true" style={{ color: '#10b981' }}>.</span>
             </span>
           </Link>
-          <p
-            data-testid="footer-tagline"
-            style={{
-              fontSize: 13,
-              color: 'var(--muted)',
-              lineHeight: 1.5,
-              margin: 0,
-              maxWidth: 280,
-            }}
+          <span style={{ fontSize: 12.5, color: 'var(--muted)' }}>
+            Localhost to live in 60 seconds.
+          </span>
+        </div>
+
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 16 }}>
+          <a
+            href="https://github.com/floomhq/floom-minimal"
+            target="_blank"
+            rel="noreferrer"
+            aria-label="GitHub"
+            style={ICON_LINK}
           >
-            The protocol + runtime for agentic work.
-          </p>
-          <p
-            className="public-footer-sf"
-            style={{
-              fontSize: 12,
-              color: 'var(--muted)',
-              lineHeight: 1.5,
-              margin: 0,
-              maxWidth: 280,
-            }}
+            <IconGitHubFooter />
+            GitHub
+          </a>
+          <a
+            href="https://discord.gg/8fXGXjxcRz"
+            target="_blank"
+            rel="noreferrer"
+            aria-label="Discord"
+            style={ICON_LINK}
           >
-            Built in SF ·{' '}
-            <a
-              href="https://f.inc"
-              target="_blank"
-              rel="noreferrer"
-              style={{ color: 'var(--ink)', fontWeight: 600, textDecoration: 'none', borderBottom: '1px solid var(--line)' }}
-            >
-              Founders Inc cohort
-            </a>
-          </p>
-        </div>
-
-        <div style={COL_STYLE}>
-          <div className="public-footer-col-label" style={COL_LABEL_STYLE}>Product</div>
-          <FootLink to="/apps">Apps</FootLink>
-          <FootLink to="/docs">Docs</FootLink>
-          <FootLink to="/help">Help</FootLink>
-          <FootLink to="/pricing">Pricing</FootLink>
-          <FootLink to="/changelog">Changelog</FootLink>
-          <FootLink to="/status">Status</FootLink>
-        </div>
-
-        <div style={COL_STYLE}>
-          <div className="public-footer-col-label" style={COL_LABEL_STYLE}>Company</div>
-          <FootLink to="/about">About</FootLink>
-          <FootLink href="https://github.com/floomhq/floom">GitHub</FootLink>
-          <FootLink href="https://discord.gg/8fXGXjxcRz">Discord</FootLink>
-          <FootLink href="https://x.com/floomhq">X / Twitter</FootLink>
-        </div>
-
-        <div style={COL_STYLE}>
-          <div className="public-footer-col-label" style={COL_LABEL_STYLE}>Legal</div>
-          <FootLink to="/terms">Terms</FootLink>
-          <FootLink to="/privacy">Privacy</FootLink>
-          <FootLink to="/imprint">Imprint</FootLink>
-        </div>
-      </div>
-
-      <div
-        style={{
-          maxWidth: 1180,
-          margin: '0 auto',
-          padding: '0 32px',
-        }}
-      >
-        <div
-          className="public-footer-bottom"
-          style={{
-            borderTop: '1px solid var(--line)',
-            paddingTop: 20,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: 16,
-            flexWrap: 'wrap',
-          }}
-        >
-          <div
-            data-testid="footer-copyright"
-            style={{ fontSize: 12, color: 'var(--muted)' }}
-          >
-            © 2026 Floom
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <a
-              href="https://discord.gg/8fXGXjxcRz"
-              target="_blank"
-              rel="noreferrer"
-              aria-label="Discord"
-              style={SOCIAL_ICON_STYLE}
-              onMouseEnter={(e) => {
-                const el = e.currentTarget as HTMLAnchorElement;
-                el.style.color = '#5865F2';
-                el.style.borderColor = '#5865F2';
-                el.style.background = 'rgba(88,101,242,0.06)';
-              }}
-              onMouseLeave={(e) => {
-                const el = e.currentTarget as HTMLAnchorElement;
-                el.style.color = 'var(--muted)';
-                el.style.borderColor = 'var(--line)';
-                el.style.background = 'var(--bg)';
-              }}
-            >
-              <IconDiscordFooter />
-            </a>
-            <a
-              href="https://github.com/floomhq/floom"
-              target="_blank"
-              rel="noreferrer"
-              aria-label="GitHub"
-              style={SOCIAL_ICON_STYLE}
-              onMouseEnter={(e) => {
-                const el = e.currentTarget as HTMLAnchorElement;
-                el.style.color = '#181717';
-                el.style.borderColor = '#181717';
-                el.style.background = 'rgba(24,23,23,0.06)';
-              }}
-              onMouseLeave={(e) => {
-                const el = e.currentTarget as HTMLAnchorElement;
-                el.style.color = 'var(--muted)';
-                el.style.borderColor = 'var(--line)';
-                el.style.background = 'var(--bg)';
-              }}
-            >
-              <IconGitHubFooter />
-            </a>
-            <a
-              href="https://x.com/floomhq"
-              target="_blank"
-              rel="noreferrer"
-              aria-label="X / Twitter"
-              style={SOCIAL_ICON_STYLE}
-              onMouseEnter={(e) => {
-                const el = e.currentTarget as HTMLAnchorElement;
-                el.style.color = '#000000';
-                el.style.borderColor = '#000000';
-                el.style.background = 'rgba(0,0,0,0.06)';
-              }}
-              onMouseLeave={(e) => {
-                const el = e.currentTarget as HTMLAnchorElement;
-                el.style.color = 'var(--muted)';
-                el.style.borderColor = 'var(--line)';
-                el.style.background = 'var(--bg)';
-              }}
-            >
-              <IconXFooter />
-            </a>
-          </div>
+            <IconDiscordFooter />
+            Discord
+          </a>
+          <span style={{ fontSize: 12.5, color: 'var(--muted)', opacity: 0.7 }}>© 2026 Floom</span>
         </div>
       </div>
     </footer>
