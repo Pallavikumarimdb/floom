@@ -33,10 +33,17 @@ export default function LoginPage() {
     setMessage(null);
 
     const supabase = createClient();
+    const emailRedirectTo = `${window.location.origin}/auth/callback?next=/tokens`;
     const result =
       mode === "signin"
         ? await supabase.auth.signInWithPassword({ email, password })
-        : await supabase.auth.signUp({ email, password });
+        : await supabase.auth.signUp({
+            email,
+            password,
+            options: {
+              emailRedirectTo,
+            },
+          });
 
     setLoading(false);
 

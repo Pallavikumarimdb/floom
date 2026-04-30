@@ -21,12 +21,12 @@ export function SiteHeader({ showProductLinks = false }: SiteHeaderProps) {
             <a href="https://floom.dev/changelog">Changelog</a>
           </div>
         )}
-        <a
-          href="https://floom.dev"
+        <Link
+          href="/tokens"
           className="rounded-md bg-black px-4 py-2 text-sm font-semibold text-white"
         >
-          Join waitlist
-        </a>
+          Create token
+        </Link>
       </nav>
     </header>
   );
