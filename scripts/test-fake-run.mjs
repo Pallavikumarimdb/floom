@@ -405,10 +405,15 @@ function testPublicRunRateLimitHardening() {
   assertSqlContains(migrationText, 'create or replace function public.floom_set_updated_at()');
   assertSqlContains(migrationText, 'create or replace function public.floom_handle_new_user()');
   assertSqlContains(migrationText, 'create trigger floom_on_auth_user_created');
+  assertSqlContains(migrationText, 'drop trigger if exists on_auth_user_created on auth.users');
+  const triggerRetirementText = readFileSync(
+    'supabase/migrations/20260430100000_retire_legacy_auth_trigger.sql',
+    'utf8'
+  );
+  assertSqlContains(triggerRetirementText, 'drop trigger if exists on_auth_user_created on auth.users');
   assertSqlContains(migrationText, 'values (\'app-bundles\', \'app-bundles\', false, 1048576) on conflict (id) do nothing');
   assert.doesNotMatch(migrationText, /create or replace function public\.set_updated_at\(\)/);
   assert.doesNotMatch(migrationText, /create or replace function public\.handle_new_user\(\)/);
-  assert.doesNotMatch(migrationText, /drop trigger if exists on_auth_user_created on auth\.users/);
   assert.doesNotMatch(migrationText, /on conflict \(id\) do update\s+set public = excluded\.public/);
 }
 

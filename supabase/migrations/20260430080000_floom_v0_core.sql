@@ -698,6 +698,9 @@ create trigger floom_on_auth_user_created
   after insert on auth.users
   for each row execute function public.floom_handle_new_user();
 
+-- Retire legacy profile bootstrap triggers that insert without ON CONFLICT.
+drop trigger if exists on_auth_user_created on auth.users;
+
 create or replace function public.check_public_run_rate_limit(
   p_rate_key text,
   p_limit integer default 20,
