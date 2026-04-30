@@ -139,10 +139,13 @@ Launch tools:
 
 - `auth_status`
 - `validate_manifest`
+- `find_candidate_apps`
 - `publish_app`
 - `run_app`
 - `get_app`
 - `create_agent_token`
+
+`create_agent_token` requires a Supabase user JWT from the web login flow. The other publish/run tools accept a Floom agent token when the token has the required scope.
 
 ## Fake Mode
 
