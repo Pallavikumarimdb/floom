@@ -352,7 +352,10 @@ function testSecretOutputRedaction() {
 
 function testPublicRunRateLimitHardening() {
   const routeText = readFileSync('src/app/api/apps/[slug]/run/route.ts', 'utf8');
-  const migrationText = readFileSync('supabase/migrations/0001_core.sql', 'utf8');
+  const migrationText = readFileSync(
+    'supabase/migrations/20260430080000_floom_v0_core.sql',
+    'utf8'
+  );
 
   assert.equal(getPublicRunRateLimitKey('app_123'), 'public-run:app_123:anonymous');
   assert.match(routeText, /check_public_run_rate_limit/);

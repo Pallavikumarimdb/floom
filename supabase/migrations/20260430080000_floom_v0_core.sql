@@ -265,7 +265,7 @@ begin
   if not exists (
     select 1 from pg_constraint
     where conrelid = 'public.apps'::regclass
-      and conname = 'apps_runtime_supported'
+      and conname in ('apps_runtime_supported', 'apps_runtime_check')
   ) then
     if exists (
       select 1 from public.apps
@@ -349,7 +349,7 @@ begin
   if not exists (
     select 1 from pg_constraint
     where conrelid = 'public.app_versions'::regclass
-      and conname = 'app_versions_app_version_unique'
+      and conname in ('app_versions_app_version_unique', 'app_versions_app_id_version_key')
   ) then
     if exists (
       select 1 from public.app_versions
@@ -580,7 +580,7 @@ begin
   if not exists (
     select 1 from pg_constraint
     where conrelid = 'public.executions'::regclass
-      and conname = 'executions_status_valid'
+      and conname in ('executions_status_valid', 'executions_status_check')
   ) then
     if exists (
       select 1 from public.executions
@@ -767,6 +767,7 @@ create policy "profiles are owned by user"
   with check (id = auth.uid());
 
 drop policy if exists "apps are readable when public or owned" on public.apps;
+drop policy if exists "Public apps are readable" on public.apps;
 drop policy if exists "apps are readable by owner" on public.apps;
 create policy "apps are readable by owner"
   on public.apps
@@ -793,6 +794,7 @@ create policy "owners can delete apps"
   using (owner_id = auth.uid());
 
 drop policy if exists "versions are readable when app public or owned" on public.app_versions;
+drop policy if exists "Public app versions readable" on public.app_versions;
 drop policy if exists "versions are readable by owner" on public.app_versions;
 create policy "versions are readable by owner"
   on public.app_versions

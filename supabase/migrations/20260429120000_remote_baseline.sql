@@ -1,0 +1,3 @@
+-- Remote baseline already applied on Supabase project bdlzxpgsmlmijopdhqdf.
+-- Kept in-repo so Supabase CLI migration history matches the existing project.
+-- The next migration contains the additive Floom v0 schema hardening.
