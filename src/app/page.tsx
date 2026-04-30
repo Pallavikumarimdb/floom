@@ -101,23 +101,10 @@ function MvpHeroInstall({ appsCount, runs7dSum }: MvpHeroInstallProps) {
 
   return (
     <div style={{ maxWidth: 540, margin: '20px auto 0', textAlign: 'left' }}>
-      {/* v6 (2026-05-01): added explicit "Run this in your terminal" framing —
-          Federico's feedback was that the bare $ npx box doesn't feel
-          straightforward as a CTA. Now: small lead label above + outcome
-          line below ("Mints your agent token, sets up MCP, you're live"). */}
-      <div
-        style={{
-          fontFamily: "'JetBrains Mono', ui-monospace, monospace",
-          fontSize: 11,
-          letterSpacing: '0.1em',
-          textTransform: 'uppercase',
-          fontWeight: 600,
-          color: 'var(--muted)',
-          marginBottom: 8,
-        }}
-      >
-        Paste in your terminal — or any AI agent
-      </div>
+      {/* v8 (2026-05-01): collapsed dense hero per Federico's feedback.
+          Removed: "PASTE IN YOUR TERMINAL — OR ANY AI AGENT" label
+          (redundant with the $ prefix), outcome line "→ Mints your agent
+          token..." (visual noise). Result: 7 stacked elements → 4. */}
       <div style={{ position: 'relative' }}>
         <pre
           data-testid="hero-npx-command"
@@ -164,19 +151,6 @@ function MvpHeroInstall({ appsCount, runs7dSum }: MvpHeroInstallProps) {
         >
           {copied ? 'Copied' : 'Copy'}
         </button>
-      </div>
-      <div
-        style={{
-          marginTop: 8,
-          fontSize: 12.5,
-          color: 'var(--muted)',
-          lineHeight: 1.5,
-        }}
-      >
-        <span aria-hidden="true" style={{ color: 'var(--accent)', marginRight: 6 }}>
-          →
-        </span>
-        Mints your agent token, sets up MCP, your first app is live in 60 seconds.
       </div>
       {/* R10 (2026-04-28): complementary "Try a live app" CTA. Gemini
           baseline scored landing 6/10 partly because the only first-
@@ -533,6 +507,10 @@ export default function LandingV17PageMvp() {
                 the LinkedIn/HN launch post, plus the waitlist context
                 so visitors landing via the post know what to expect.
                 Both variants (mvp + full) get this line. */}
+            {/* v8: dropped "Beta access via waitlist." — floom-minimal is a
+                real product, not a waitlist. Subhead is now a single calm
+                tagline; sign-up CTA already covered by the Sign up button
+                in the SiteHeader. */}
             <p
               data-testid="hero-waitlist-qualifier"
               style={{
@@ -544,19 +522,7 @@ export default function LandingV17PageMvp() {
                 margin: '-4px 0 20px',
               }}
             >
-              Localhost to live in 60 seconds.{' '}
-              <Link
-                href="/login?mode=signup"
-                data-testid="hero-waitlist-qualifier-link"
-                style={{
-                  color: 'var(--muted)',
-                  textDecoration: 'underline',
-                  textUnderlineOffset: 3,
-                  fontWeight: 500,
-                }}
-              >
-                Beta access via waitlist.
-              </Link>
+              Localhost to live in 60 seconds.
             </p>
 
             {/* CTA — MVP variant: inline MCP setup snippet. */}

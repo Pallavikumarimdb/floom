@@ -1184,13 +1184,7 @@ export default function AppPermalinkPage() {
                     <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
                   </svg>
                   <span>
-                    Your inputs are sent to {app.manifest?.name ?? app.name} to produce a result. Floom doesn&apos;t sell or share run data.{' '}
-                    <a
-                      href="/privacy"
-                      style={{ color: 'var(--accent)', textDecoration: 'underline' }}
-                    >
-                      Privacy →
-                    </a>
+                    Your inputs are sent to {app.manifest?.name ?? app.name} to produce a result. Floom doesn&apos;t sell or share run data.
                   </span>
                 </div>
                 {celebrate && (
@@ -1927,7 +1921,7 @@ function CelebrationCard({
           {copied ? 'Copied!' : 'Copy share link'}
         </button>
         <Link
-          href="/studio/build"
+          href="/"
           data-testid="celebration-make-another"
           style={{
             padding: '8px 14px',
@@ -1940,7 +1934,7 @@ function CelebrationCard({
             textDecoration: 'none',
           }}
         >
-          Make another
+          Back to home
         </Link>
         <button
           type="button"

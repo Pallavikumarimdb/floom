@@ -947,7 +947,7 @@ function RunSurfaceDemo({
         <div style={RUN_CONTEXT}>
           <span style={RUN_CONTEXT_DOT} aria-hidden="true" />
           <span>
-            Beta preview from <code style={RUN_CONTEXT_CODE}>publisher access</code>
+            Live preview · <code style={RUN_CONTEXT_CODE}>demo-app</code>
           </span>
           <span style={RUN_CONTEXT_SEP} aria-hidden="true">·</span>
           <span style={RUN_CONTEXT_URL}>/p/demo-app</span>
