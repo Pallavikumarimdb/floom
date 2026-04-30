@@ -36,7 +36,7 @@ function Section({
 
 function CodeBlock({ children }: { children: string }) {
   return (
-    <pre className="max-w-full overflow-x-auto rounded-xl border border-[#ded8cc] bg-[#11110f] p-4 text-sm leading-7 text-[#f6f1e7]">
+    <pre className="max-w-full whitespace-pre-wrap break-words rounded-xl border border-[#ded8cc] bg-[#11110f] p-4 text-sm leading-7 text-[#f6f1e7]">
       <code>{children}</code>
     </pre>
   );

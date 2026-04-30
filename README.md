@@ -86,12 +86,13 @@ Open `/login`, sign up or sign in, then open `/tokens`.
 
 Create a token and copy it. The raw token is shown once.
 
-### 5. Register the fixture app with Supabase configured
+### 5. Publish the fixture app
 
 ```bash
-FLOOM_TOKEN=YOUR_FLOOM_AGENT_TOKEN FLOOM_API_URL=http://localhost:3000 npx tsx cli/deploy.ts ./fixtures/python-simple
+FLOOM_TOKEN=YOUR_FLOOM_AGENT_TOKEN FLOOM_API_URL=https://floom-60sec.vercel.app npx tsx cli/deploy.ts ./fixtures/python-simple
 ```
 
+For local development, set `FLOOM_API_URL=http://localhost:3000` after `npm run dev`.
 Without Supabase env, visit `/p/demo-app` for the local demo. In the hosted v0, use the homepage CTA to open the retained live app.
 
 ## App Contract
