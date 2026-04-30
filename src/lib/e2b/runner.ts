@@ -1,5 +1,7 @@
 import { Sandbox } from "e2b";
 import { isSafePythonEntrypoint, isSafePythonIdentifier } from "../floom/manifest";
+import type { RuntimeDependencies } from "../floom/requirements";
+import type { RuntimeSecrets } from "../floom/runtime-secrets";
 import {
   COMMAND_TIMEOUT_MS,
   MAX_OUTPUT_BYTES,
@@ -20,7 +22,9 @@ export async function runInSandbox(
   inputs: Record<string, unknown>,
   runtime: "python",
   entrypoint: string,
-  handler: string
+  handler: string,
+  dependencies: RuntimeDependencies = {},
+  secrets: RuntimeSecrets = {}
 ): Promise<RunnerResult> {
   if (!process.env.E2B_API_KEY) {
     if (!isExplicitFakeMode()) {
@@ -43,11 +47,12 @@ export async function runInSandbox(
   }
 
   let sbx: Awaited<ReturnType<typeof Sandbox.create>> | null = null;
+  const hasPythonRequirements = Boolean(dependencies.python_requirements?.trim());
 
   try {
     sbx = await Sandbox.create("base", {
       apiKey: process.env.E2B_API_KEY,
-      allowInternetAccess: false,
+      allowInternetAccess: hasPythonRequirements,
       secure: true,
       timeoutMs: SANDBOX_TIMEOUT_MS,
       requestTimeoutMs: REQUEST_TIMEOUT_MS,
@@ -55,12 +60,23 @@ export async function runInSandbox(
     });
 
     await sbx.files.write(`/home/user/${entrypoint}`, source);
+    if (hasPythonRequirements && dependencies.python_requirements) {
+      await sbx.files.write("/home/user/requirements.txt", dependencies.python_requirements);
+      await sbx.commands.run(
+        "python3 -m pip install --disable-pip-version-check --no-input --target /home/user/.deps -r /home/user/requirements.txt",
+        {
+          timeoutMs: COMMAND_TIMEOUT_MS,
+          requestTimeoutMs: REQUEST_TIMEOUT_MS,
+        }
+      );
+    }
 
     const moduleName = entrypoint.replace(".py", "");
     const wrapper = `
 import json
 import sys
 sys.path.insert(0, "/home/user")
+sys.path.insert(0, "/home/user/.deps")
 from ${moduleName} import ${handler}
 
 inputs = json.loads(open("/home/user/inputs.json").read())
@@ -75,6 +91,7 @@ with open("/home/user/output.json", "w") as handle:
     await sbx.commands.run("python3 /home/user/runner.py", {
       timeoutMs: COMMAND_TIMEOUT_MS,
       requestTimeoutMs: REQUEST_TIMEOUT_MS,
+      envs: secrets,
     });
     const outputText = await sbx.files.read("/home/user/output.json", {
       requestTimeoutMs: REQUEST_TIMEOUT_MS,
@@ -100,10 +117,12 @@ export async function runInSandboxContained(
   runtime: "python",
   entrypoint: string,
   handler: string,
+  dependencies: RuntimeDependencies = {},
+  secrets: RuntimeSecrets = {},
   runner: SandboxRunner = runInSandbox
 ): Promise<RunnerResult> {
   try {
-    return await runner(source, inputs, runtime, entrypoint, handler);
+    return await runner(source, inputs, runtime, entrypoint, handler, dependencies, secrets);
   } catch {
     return { output: {}, error: "App execution failed" };
   }

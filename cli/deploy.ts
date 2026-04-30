@@ -4,7 +4,8 @@ import yaml from "js-yaml";
 import FormData from "form-data";
 import fetch from "node-fetch";
 import { parseManifest, validatePythonSourceForManifest } from "../src/lib/floom/manifest";
-import { MAX_SCHEMA_BYTES, MAX_SOURCE_BYTES } from "../src/lib/floom/limits";
+import { MAX_REQUIREMENTS_BYTES, MAX_SCHEMA_BYTES, MAX_SOURCE_BYTES } from "../src/lib/floom/limits";
+import { validatePythonRequirementsText } from "../src/lib/floom/requirements";
 import { parseAndValidateJsonSchemaText } from "../src/lib/floom/schema";
 
 type DeployResponse = {
@@ -16,13 +17,13 @@ type DeployResponse = {
 
 async function deploy(appDir: string, apiUrl: string, token: string) {
   const rootDir = path.resolve(appDir);
-  validateV0AppDirectory(rootDir);
   const manifestPath = path.join(appDir, "floom.yaml");
   if (!fs.existsSync(manifestPath)) {
     throw new Error("floom.yaml not found in " + appDir);
   }
 
   const manifest = parseManifest(yaml.load(fs.readFileSync(manifestPath, "utf8")));
+  validateAppDirectory(rootDir, Boolean(manifest.dependencies?.python));
 
   // Validate schemas
   const inputSchemaPath = resolveAppPath(rootDir, manifest.input_schema || "input.schema.json");
@@ -44,18 +45,31 @@ async function deploy(appDir: string, apiUrl: string, token: string) {
   if (!outputSchemaResult.ok) throw new Error(outputSchemaResult.error);
 
   const entrypointPath = resolveAppPath(rootDir, manifest.entrypoint);
+  const requirementsPath = manifest.dependencies?.python
+    ? resolveAppPath(rootDir, manifest.dependencies.python)
+    : null;
   if (!fs.existsSync(entrypointPath)) throw new Error("Entrypoint not found");
+  if (requirementsPath && !fs.existsSync(requirementsPath)) throw new Error("requirements.txt not found");
   if (fs.statSync(entrypointPath).size > MAX_SOURCE_BYTES) throw new Error("Entrypoint is too large");
+  if (requirementsPath && fs.statSync(requirementsPath).size > MAX_REQUIREMENTS_BYTES) {
+    throw new Error("requirements.txt is too large");
+  }
   if (fs.statSync(manifestPath).size > MAX_SCHEMA_BYTES) throw new Error("Manifest is too large");
   if (fs.statSync(inputSchemaPath).size > MAX_SCHEMA_BYTES) throw new Error("Input schema is too large");
   if (fs.statSync(outputSchemaPath).size > MAX_SCHEMA_BYTES) throw new Error("Output schema is too large");
   validatePythonSourceForManifest(fs.readFileSync(entrypointPath, "utf8"), manifest);
+  if (requirementsPath) {
+    validatePythonRequirementsText(fs.readFileSync(requirementsPath, "utf8"));
+  }
 
   const form = new FormData();
   form.append("manifest", fs.createReadStream(manifestPath), { filename: "floom.yaml" });
   form.append("bundle", fs.createReadStream(entrypointPath), { filename: manifest.entrypoint });
   form.append("input_schema", fs.createReadStream(inputSchemaPath), { filename: "input.schema.json" });
   form.append("output_schema", fs.createReadStream(outputSchemaPath), { filename: "output.schema.json" });
+  if (requirementsPath) {
+    form.append("requirements", fs.createReadStream(requirementsPath), { filename: "requirements.txt" });
+  }
 
   const res = await fetch(`${apiUrl}/api/apps`, {
     method: "POST",
@@ -74,12 +88,16 @@ async function deploy(appDir: string, apiUrl: string, token: string) {
   return data;
 }
 
-function validateV0AppDirectory(rootDir: string) {
-  const unsupportedFiles = ["requirements.txt", "pyproject.toml", "package.json", "openapi.json"];
+function validateAppDirectory(rootDir: string, allowRequirements: boolean) {
+  const unsupportedFiles = ["pyproject.toml", "package.json", "openapi.json"];
   for (const fileName of unsupportedFiles) {
     if (fs.existsSync(path.join(rootDir, fileName))) {
-      throw new Error(`${fileName} is not supported in v0; use a stdlib single-file Python app`);
+      throw new Error(`${fileName} is not supported in this runtime; use a Python function app`);
     }
+  }
+
+  if (!allowRequirements && fs.existsSync(path.join(rootDir, "requirements.txt"))) {
+    throw new Error("requirements.txt requires dependencies.python: ./requirements.txt in floom.yaml");
   }
 
   const pythonFiles = fs

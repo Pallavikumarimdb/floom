@@ -7,6 +7,7 @@ import {
   validatePythonSourceForManifest,
   type FloomManifest,
 } from "@/lib/floom/manifest";
+import { validatePythonRequirementsText } from "@/lib/floom/requirements";
 import { validateJsonSchemaValue } from "@/lib/floom/schema";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { resolveAuthCaller } from "@/lib/supabase/auth";
@@ -135,6 +136,10 @@ export const floomTools: McpToolDefinition[] = [
         output_schema: {
           oneOf: [{ type: "string" }, { type: "object", additionalProperties: true }],
           description: "Output JSON Schema as JSON text or an object.",
+        },
+        requirements: {
+          type: "string",
+          description: "requirements.txt content, required only when floom.yaml declares dependencies.python.",
         },
       },
       required: ["manifest", "source", "input_schema", "output_schema"],
@@ -422,7 +427,7 @@ function getAppContract(): McpToolResult {
     unsupported: [
       {
         case: "requirements.txt or pyproject.toml",
-        reason: "Dependency installation is post-v0. v0 runs one stdlib Python file without an install step.",
+        reason: "v0.1 supports a constrained requirements.txt only when floom.yaml declares dependencies.python.",
       },
       {
         case: "openapi.json, FastAPI, Flask, or HTTP servers",
@@ -437,8 +442,8 @@ function getAppContract(): McpToolResult {
         reason: "Multi-file bundles are post-v0. v0 packaging accepts one top-level Python entrypoint file.",
       },
       {
-        case: "manifest fields actions, dependencies, or secrets",
-        reason: "Multiple actions, dependency installs, and app secrets are post-v0 features.",
+        case: "manifest field actions",
+        reason: "Multiple actions are post-v0. v0.1 still exposes one handler.",
       },
       {
         case: "OpenBlog/OpenAPI apps",
@@ -455,6 +460,11 @@ function getAppContract(): McpToolResult {
         "public: true",
         "input_schema: ./input.schema.json",
         "output_schema: ./output.schema.json",
+        "# Optional v0.1:",
+        "# dependencies:",
+        "#   python: ./requirements.txt",
+        "# secrets:",
+        "#   - OPENAI_API_KEY",
       ].join("\n"),
       "app.py": [
         "def run(inputs: dict) -> dict:",
@@ -994,11 +1004,31 @@ async function publishApp(args: JsonObject, context: McpToolContext): Promise<Mc
     return errorResult(outputSchemaResult.error);
   }
 
+  const requirements = args.requirements;
+  if (manifestResult.manifest.dependencies?.python) {
+    if (typeof requirements !== "string") {
+      return errorResult("requirements must be provided when dependencies.python is declared");
+    }
+
+    try {
+      validatePythonRequirementsText(requirements);
+    } catch (requirementsError) {
+      return errorResult(
+        requirementsError instanceof Error ? requirementsError.message : "Invalid requirements.txt"
+      );
+    }
+  } else if (requirements !== undefined) {
+    return errorResult("requirements requires dependencies.python in floom.yaml");
+  }
+
   const form = new FormData();
   form.append("manifest", textBlob(manifestToYaml(manifestResult.manifest), "application/x-yaml"), "floom.yaml");
   form.append("bundle", textBlob(source, "text/x-python"), manifestResult.manifest.entrypoint);
   form.append("input_schema", textBlob(JSON.stringify(inputSchemaResult.schema), "application/json"), "input.schema.json");
   form.append("output_schema", textBlob(JSON.stringify(outputSchemaResult.schema), "application/json"), "output.schema.json");
+  if (typeof requirements === "string") {
+    form.append("requirements", textBlob(validatePythonRequirementsText(requirements), "text/plain"), "requirements.txt");
+  }
 
   return proxyJson(`${context.baseUrl}/api/apps`, {
     method: "POST",
@@ -1049,8 +1079,25 @@ function findCandidateApps(args: JsonObject): McpToolResult {
           errors.push(`Missing entrypoint: ${entrypointPath}`);
         }
 
-        for (const unsupportedPath of unsupportedV0Files(appDir, files)) {
+        for (const unsupportedPath of unsupportedV0Files(appDir, files, manifest)) {
           errors.push(unsupportedFileReason(unsupportedPath));
+        }
+
+        if (manifest.dependencies?.python) {
+          const requirementsPath = joinPath(appDir, manifest.dependencies.python);
+          if (!(requirementsPath in files)) {
+            errors.push(`Missing requirements.txt: ${requirementsPath}`);
+          } else {
+            try {
+              validatePythonRequirementsText(files[requirementsPath]);
+            } catch (requirementsError) {
+              errors.push(
+                requirementsError instanceof Error
+                  ? requirementsError.message
+                  : "Invalid requirements.txt"
+              );
+            }
+          }
         }
 
         const pythonFiles = pythonFilesInAppDir(appDir, files);
@@ -1090,8 +1137,13 @@ function findCandidateApps(args: JsonObject): McpToolResult {
   });
 }
 
-function unsupportedV0Files(appDir: string, files: Record<string, string>) {
-  return ["requirements.txt", "pyproject.toml", "package.json", "openapi.json"]
+function unsupportedV0Files(appDir: string, files: Record<string, string>, manifest?: FloomManifest) {
+  const unsupported = ["pyproject.toml", "package.json", "openapi.json"];
+  if (!manifest?.dependencies?.python) {
+    unsupported.push("requirements.txt");
+  }
+
+  return unsupported
     .map((fileName) => joinPath(appDir, fileName))
     .filter((filePath) => filePath in files);
 }
@@ -1101,22 +1153,16 @@ function unsupportedManifestFields(manifest: JsonObject) {
   if (manifest.actions !== undefined) {
     reasons.push("floom.yaml field actions is not supported in v0; multiple actions are post-v0.");
   }
-  if (manifest.dependencies !== undefined) {
-    reasons.push("floom.yaml field dependencies is not supported in v0; dependency installation is post-v0.");
-  }
-  if (manifest.secrets !== undefined) {
-    reasons.push("floom.yaml field secrets is not supported in v0; app secret injection is post-v0.");
-  }
   return reasons;
 }
 
 function unsupportedFileReason(filePath: string) {
   const fileName = basename(filePath);
   if (fileName === "requirements.txt") {
-    return `${filePath} is not supported in v0; Python dependencies require the post-v0 dependency installer.`;
+    return `${filePath} requires floom.yaml dependencies.python: ./requirements.txt.`;
   }
   if (fileName === "pyproject.toml") {
-    return `${filePath} is not supported in v0; Python packaging/dependencies require the post-v0 dependency installer.`;
+    return `${filePath} is not supported in v0.1; use requirements.txt with dependencies.python.`;
   }
   if (fileName === "package.json") {
     return `${filePath} is not supported in v0; TypeScript/Node apps require the post-v0 TypeScript runner.`;
@@ -1148,7 +1194,7 @@ function unsupportedRepositoryCandidates(files: Record<string, string>) {
   }
 
   if (fileNames.has("requirements.txt") || fileNames.has("pyproject.toml")) {
-    candidates.push(unsupportedCandidate("Python dependencies require the post-v0 dependency installer"));
+    candidates.push(unsupportedCandidate("Python dependencies require a floom.yaml manifest with dependencies.python: ./requirements.txt"));
   }
 
   if (fileNames.has("package.json")) {

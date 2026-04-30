@@ -22,16 +22,17 @@ before generating an app.
 Accept:
 
 - Single-file Python.
-- Standard library only.
+- Standard library only, or a constrained `requirements.txt` when `floom.yaml` declares `dependencies.python: ./requirements.txt`.
 - One handler function, usually `run(inputs: dict) -> dict`.
 - `floom.yaml`, `input.schema.json`, and `output.schema.json`.
 - `public: true` for public apps; omitted or `false` for private apps.
+- Secret names only, never raw secret values, via `secrets: ["OPENAI_API_KEY"]`.
 
 Reject:
 
-- `requirements.txt`, `pyproject.toml`, `package.json`, or `openapi.json`.
-- FastAPI, OpenAPI, TypeScript, Node, multi-file Python, secrets, dependencies, long-running servers, CLIs, workers, queues, cron, browser automation, OAuth callbacks, and local databases.
-- `floom.yaml` fields named `actions`, `dependencies`, or `secrets`.
+- Undeclared `requirements.txt`, `pyproject.toml`, `package.json`, or `openapi.json`.
+- FastAPI, OpenAPI, TypeScript, Node, multi-file Python, raw secret values, long-running servers, CLIs, workers, queues, cron, browser automation, OAuth callbacks, and local databases.
+- `floom.yaml` field named `actions`.
 
 ## v0.1 Boundary
 
@@ -42,7 +43,7 @@ Add in v0.1:
 
 - A constrained `requirements.txt` install path for Python packages.
 - `floom.yaml` secret names only, never raw secret values.
-- Secure storage for secret values and E2B runtime injection.
+- Owner-scoped server-side secret env lookup and E2B runtime injection.
 
 Still reject until later: FastAPI/OpenAPI apps, arbitrary HTTP servers,
 TypeScript/Node apps, background workers, multi-service repos, and long-running
