@@ -3,8 +3,9 @@ import * as path from "path";
 import yaml from "js-yaml";
 import FormData from "form-data";
 import fetch from "node-fetch";
-import { parseManifest } from "../src/lib/manifest";
-import { MAX_SCHEMA_BYTES, MAX_SOURCE_BYTES } from "../src/lib/limits";
+import { parseManifest } from "../src/lib/floom/manifest";
+import { MAX_SCHEMA_BYTES, MAX_SOURCE_BYTES } from "../src/lib/floom/limits";
+import { parseAndValidateJsonSchemaText } from "../src/lib/floom/schema";
 
 type DeployResponse = {
   app?: {
@@ -28,8 +29,17 @@ async function deploy(appDir: string, apiUrl: string, token: string) {
   if (!fs.existsSync(inputSchemaPath)) throw new Error("Input schema not found");
   if (!fs.existsSync(outputSchemaPath)) throw new Error("Output schema not found");
 
-  JSON.parse(fs.readFileSync(inputSchemaPath, "utf8"));
-  JSON.parse(fs.readFileSync(outputSchemaPath, "utf8"));
+  const inputSchemaResult = parseAndValidateJsonSchemaText(
+    fs.readFileSync(inputSchemaPath, "utf8"),
+    "input_schema"
+  );
+  if (!inputSchemaResult.ok) throw new Error(inputSchemaResult.error);
+
+  const outputSchemaResult = parseAndValidateJsonSchemaText(
+    fs.readFileSync(outputSchemaPath, "utf8"),
+    "output_schema"
+  );
+  if (!outputSchemaResult.ok) throw new Error(outputSchemaResult.error);
 
   const entrypointPath = path.join(appDir, manifest.entrypoint);
   if (!fs.existsSync(entrypointPath)) throw new Error("Entrypoint not found");

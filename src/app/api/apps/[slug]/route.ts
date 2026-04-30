@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { callerHasScope, resolveAuthCaller } from "@/lib/supabase/auth";
 import { demoApp, hasSupabaseConfig } from "@/lib/demo-app";
 
 export async function GET(
@@ -19,14 +20,8 @@ export async function GET(
   }
 
   const admin = createAdminClient();
-  const authHeader = req.headers.get("authorization");
-  let userId: string | null = null;
-
-  if (authHeader?.startsWith("Bearer ")) {
-    const token = authHeader.replace("Bearer ", "");
-    const { data: userData } = await admin.auth.getUser(token);
-    userId = userData.user?.id ?? null;
-  }
+  const caller = await resolveAuthCaller(req, admin);
+  const userId = caller?.userId ?? null;
 
   const { data: app, error } = await admin
     .from("apps")
@@ -40,7 +35,7 @@ export async function GET(
     return NextResponse.json({ error: "App not found" }, { status: 404 });
   }
 
-  if (!app.public && app.owner_id !== userId) {
+  if (!app.public && (app.owner_id !== userId || !callerHasScope(caller, "read"))) {
     return NextResponse.json({ error: "App not found" }, { status: 404 });
   }
 

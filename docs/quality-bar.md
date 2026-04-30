@@ -69,8 +69,32 @@ Required:
 - A builder can create/revoke an agent token.
 - Agent token permits app publish/update through MCP/CLI.
 - Agent token is stored hashed in Supabase.
+- Agent token scopes are explicit: `read`, `run`, `publish`, `revoke`.
+- Agent tokens expire by default.
+- Token prefix is stored for display; raw token is shown once.
+- Token hashing uses a server-only pepper outside the database.
 - Raw access tokens are never committed, printed, or stored in app source.
 - Public users can run public apps without a builder token.
+- Private apps require owner auth or an authorized agent token.
+
+## Abuse And Safety Bar
+
+Required:
+
+- Service-role API routes have black-box authorization tests; do not rely only on Supabase RLS tests.
+- Publish is atomic across storage upload, `apps`, and `app_versions`, or leaves a clean rollback state.
+- Uploaded JSON Schemas pass metaschema validation and complexity limits before storage.
+- Per-app and per-IP run limits exist before public sharing.
+- Source bundle size, file count, input size, output size, stdout size, timeout, and concurrency limits are enforced.
+- Public run endpoint blocks private apps and disabled apps.
+- Production execution fails closed if E2B, Supabase service-role, anon key, or agent-token pepper env is missing.
+- User code never receives Floom service-role credentials.
+- User code sees only explicit secret names that the builder configured.
+- Error messages sent to browsers never include provider tokens, Supabase service-role keys, raw stack traces with env values, or E2B URLs.
+- Sandboxes are killed or allowed to expire after each run.
+- Run cleanup covers stale queued/running executions.
+- App deletion or disable stops new public runs.
+- Every publish and run writes an audit record with caller type, app id, version id, execution id, and sanitized error code.
 
 ## MCP Bar
 
@@ -85,6 +109,28 @@ Required tools:
 - `floom.get_app`
 
 The MCP must be tested by another agent from token creation through publish and live run.
+
+MCP safety requirements:
+
+- Authorization forwarding uses a pinned/allowlisted Floom origin, not an arbitrary request-derived host.
+- Tool failures always become JSON-RPC errors or tool `isError` results.
+- Network/provider failures do not crash the MCP route or leak tokens.
+
+## Skill And CLI Bar
+
+Required:
+
+- The Floom skill explains how to find deployable candidate apps in a repo.
+- The skill validates app shape before publishing.
+- The skill refuses broad claims for unsupported app types.
+- The CLI and MCP share the same manifest validation code.
+- The happy path is one command after first auth:
+  - validate
+  - package
+  - publish
+  - run smoke input
+  - return `/p/:slug`
+- First-run guidance detects missing auth, missing Supabase token, missing Floom agent token, and missing manifest.
 
 ## E2B Bar
 
@@ -114,6 +160,8 @@ Required:
 - Output rendering is clear.
 - Browser screenshots verify home and app pages.
 - Live public app page works in browser with no console errors.
+- Empty, loading, running, success, validation-error, runtime-error, and private-app states are visible and tested.
+- The app page shows enough provenance for trust: app name, owner/publisher where safe, latest version time, and run status.
 
 ## App Coverage Bar
 
@@ -159,3 +207,34 @@ Do not call this 100/100 until all are verified:
 - at least two independent agents run the token-to-publish flow
 - comparison against `floom-minimal`
 
+## Claim Measurement Bar
+
+Required:
+
+- The 60-second timer starts from a repo with:
+  - Floom auth already completed.
+  - Agent token available to the local agent.
+  - Valid `floom.yaml`.
+  - Small Python function app with no dependency install.
+- The timer ends when:
+  - `/p/:slug` is live.
+  - A smoke run has executed in E2B.
+  - The run row is present in Supabase.
+- Record timings for:
+  - validate
+  - package
+  - publish
+  - E2B run
+  - live page load
+- Keep separate timings for first-run setup, warm publish, and broader app modes.
+
+## Operations Bar
+
+Required:
+
+- Minimal runbook documents how to rotate Floom service keys, E2B key, token pepper, and Supabase anon/service-role keys.
+- Minimal rollback path exists for a bad app version.
+- Database migrations are reproducible from a clean Supabase project and additive against the current live project.
+- Production env vars are listed by name only.
+- Monitoring is minimal but real: health endpoint, failed-run count, and failed-publish count.
+- Retention policy exists for source bundles, execution rows, logs, and future output files.

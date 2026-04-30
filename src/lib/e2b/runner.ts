@@ -1,19 +1,19 @@
 import { Sandbox } from "e2b";
-import { isSafePythonEntrypoint, isSafePythonIdentifier } from "./manifest";
+import { isSafePythonEntrypoint, isSafePythonIdentifier } from "../floom/manifest";
 import {
   COMMAND_TIMEOUT_MS,
   MAX_OUTPUT_BYTES,
   MAX_SOURCE_BYTES,
   REQUEST_TIMEOUT_MS,
   SANDBOX_TIMEOUT_MS,
-} from "./limits";
+} from "../floom/limits";
 
 export interface RunnerResult {
   output: Record<string, unknown>;
   error?: string;
 }
 
-const FAKE_MODE = !process.env.E2B_API_KEY;
+type SandboxRunner = typeof runInSandbox;
 
 export async function runInSandbox(
   source: string,
@@ -22,8 +22,11 @@ export async function runInSandbox(
   entrypoint: string,
   handler: string
 ): Promise<RunnerResult> {
-  if (FAKE_MODE) {
-    console.log("[FAKE MODE] No E2B_API_KEY set. Returning mock output.");
+  if (!process.env.E2B_API_KEY) {
+    if (!isExplicitFakeMode()) {
+      return { output: {}, error: "E2B execution is not configured" };
+    }
+
     return { output: { result: "hello from fake mode", inputs } };
   }
 
@@ -39,16 +42,18 @@ export async function runInSandbox(
     return { output: {}, error: "App source is too large" };
   }
 
-  const sbx = await Sandbox.create("base", {
-    apiKey: process.env.E2B_API_KEY,
-    allowInternetAccess: false,
-    secure: true,
-    timeoutMs: SANDBOX_TIMEOUT_MS,
-    requestTimeoutMs: REQUEST_TIMEOUT_MS,
-    lifecycle: { onTimeout: "kill" },
-  });
+  let sbx: Awaited<ReturnType<typeof Sandbox.create>> | null = null;
 
   try {
+    sbx = await Sandbox.create("base", {
+      apiKey: process.env.E2B_API_KEY,
+      allowInternetAccess: false,
+      secure: true,
+      timeoutMs: SANDBOX_TIMEOUT_MS,
+      requestTimeoutMs: REQUEST_TIMEOUT_MS,
+      lifecycle: { onTimeout: "kill" },
+    });
+
     await sbx.files.write(`/home/user/${entrypoint}`, source);
 
     const moduleName = entrypoint.replace(".py", "");
@@ -85,6 +90,29 @@ with open("/home/user/output.json", "w") as handle:
   } catch {
     return { output: {}, error: "App execution failed" };
   } finally {
-    await sbx.kill().catch(() => undefined);
+    await sbx?.kill().catch(() => undefined);
   }
+}
+
+export async function runInSandboxContained(
+  source: string,
+  inputs: Record<string, unknown>,
+  runtime: "python",
+  entrypoint: string,
+  handler: string,
+  runner: SandboxRunner = runInSandbox
+): Promise<RunnerResult> {
+  try {
+    return await runner(source, inputs, runtime, entrypoint, handler);
+  } catch {
+    return { output: {}, error: "App execution failed" };
+  }
+}
+
+function isExplicitFakeMode() {
+  return (
+    process.env.FLOOM_EXECUTION_MODE === "fake" ||
+    process.env.FLOOM_FAKE_E2B === "1" ||
+    process.env.NODE_ENV === "test"
+  );
 }

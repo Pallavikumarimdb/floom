@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { callerHasScope, resolveAuthCaller } from "@/lib/supabase/auth";
 import yaml from "js-yaml";
 import { v4 as uuidv4 } from "uuid";
 import { hasSupabaseConfig } from "@/lib/demo-app";
-import { parseManifest, type FloomManifest } from "@/lib/manifest";
-import { MAX_REQUEST_BYTES, MAX_SCHEMA_BYTES, MAX_SOURCE_BYTES } from "@/lib/limits";
+import { parseManifest, type FloomManifest } from "@/lib/floom/manifest";
+import { MAX_REQUEST_BYTES, MAX_SCHEMA_BYTES, MAX_SOURCE_BYTES } from "@/lib/floom/limits";
+import { parseAndValidateJsonSchemaText } from "@/lib/floom/schema";
 
 export async function POST(req: NextRequest) {
   if (!hasSupabaseConfig()) {
@@ -55,40 +57,53 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const authHeader = req.headers.get("authorization");
-  if (!authHeader?.startsWith("Bearer ")) {
+  const admin = createAdminClient();
+  const caller = await resolveAuthCaller(req, admin);
+
+  if (!caller) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const token = authHeader.replace("Bearer ", "");
-  const admin = createAdminClient();
-  const { data: userData, error: userError } = await admin.auth.getUser(token);
-
-  if (userError || !userData.user) {
-    return NextResponse.json({ error: "Invalid token" }, { status: 401 });
+  if (!callerHasScope(caller, "publish")) {
+    return NextResponse.json({ error: "Missing publish scope" }, { status: 403 });
   }
 
-  const ownerId = userData.user.id;
+  const ownerId = caller.userId;
 
-  // Check slug uniqueness
+  // Fetch existing app so owners can publish updates to their slug.
   const { data: existing } = await admin
     .from("apps")
-    .select("id")
+    .select("id, owner_id, name, runtime, entrypoint, handler, public")
     .eq("slug", manifest.slug)
     .maybeSingle();
 
-  if (existing) {
+  if (existing && existing.owner_id !== ownerId) {
     return NextResponse.json({ error: "Slug already exists" }, { status: 409 });
   }
 
-  // Parse schemas
   let inputSchema = {};
   let outputSchema = {};
-  try {
-    if (inputSchemaFile) inputSchema = JSON.parse(await inputSchemaFile.text());
-    if (outputSchemaFile) outputSchema = JSON.parse(await outputSchemaFile.text());
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON schema" }, { status: 400 });
+
+  if (inputSchemaFile) {
+    const inputResult = parseAndValidateJsonSchemaText(
+      await inputSchemaFile.text(),
+      "input_schema"
+    );
+    if (!inputResult.ok) {
+      return NextResponse.json({ error: inputResult.error }, { status: 400 });
+    }
+    inputSchema = inputResult.schema;
+  }
+
+  if (outputSchemaFile) {
+    const outputResult = parseAndValidateJsonSchemaText(
+      await outputSchemaFile.text(),
+      "output_schema"
+    );
+    if (!outputResult.ok) {
+      return NextResponse.json({ error: outputResult.error }, { status: 400 });
+    }
+    outputSchema = outputResult.schema;
   }
 
   const bundleBuffer = Buffer.from(await bundleFile.arrayBuffer());
@@ -101,29 +116,54 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Upload failed" }, { status: 500 });
   }
 
-  // Create app
-  const { data: app, error: appError } = await admin
-    .from("apps")
-    .insert({
-      slug: manifest.slug,
-      name: manifest.name,
-      owner_id: ownerId,
-      runtime: manifest.runtime,
-      entrypoint: manifest.entrypoint,
-      handler: manifest.handler,
-      public: manifest.public ?? false,
-    })
-    .select()
-    .single();
+  const appMutation = {
+    name: manifest.name,
+    runtime: manifest.runtime,
+    entrypoint: manifest.entrypoint,
+    handler: manifest.handler,
+    public: manifest.public ?? false,
+  };
+
+  const { data: app, error: appError } = existing
+    ? await admin
+        .from("apps")
+        .update(appMutation)
+        .eq("id", existing.id)
+        .select()
+        .single()
+    : await admin
+        .from("apps")
+        .insert({
+          ...appMutation,
+          slug: manifest.slug,
+          owner_id: ownerId,
+        })
+        .select()
+        .single();
 
   if (appError || !app) {
+    await admin.storage.from("app-bundles").remove([bundlePath]);
     return NextResponse.json({ error: "Failed to create app" }, { status: 500 });
   }
 
-  // Create version
+  const { data: latestVersion, error: latestVersionError } = await admin
+    .from("app_versions")
+    .select("version")
+    .eq("app_id", app.id)
+    .order("version", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (latestVersionError) {
+    await rollbackPublish(admin, existing, app.id, bundlePath);
+    return NextResponse.json({ error: "Failed to create app version" }, { status: 500 });
+  }
+
+  const version = (latestVersion?.version ?? 0) + 1;
+
   const { error: versionError } = await admin.from("app_versions").insert({
     app_id: app.id,
-    version: 1,
+    version,
     bundle_path: bundlePath,
     input_schema: inputSchema,
     output_schema: outputSchema,
@@ -132,8 +172,7 @@ export async function POST(req: NextRequest) {
   });
 
   if (versionError) {
-    await admin.from("apps").delete().eq("id", app.id);
-    await admin.storage.from("app-bundles").remove([bundlePath]);
+    await rollbackPublish(admin, existing, app.id, bundlePath);
     return NextResponse.json({ error: "Failed to create app version" }, { status: 500 });
   }
 
@@ -145,4 +184,37 @@ export async function POST(req: NextRequest) {
       url: new URL(`/p/${app.slug}`, req.url).toString(),
     },
   });
+}
+
+async function rollbackPublish(
+  admin: ReturnType<typeof createAdminClient>,
+  existing:
+    | {
+        id: string;
+        name: string;
+        runtime: string;
+        entrypoint: string;
+        handler: string;
+        public: boolean;
+      }
+    | null,
+  appId: string,
+  bundlePath: string
+) {
+  if (existing) {
+    await admin
+      .from("apps")
+      .update({
+        name: existing.name,
+        runtime: existing.runtime,
+        entrypoint: existing.entrypoint,
+        handler: existing.handler,
+        public: existing.public,
+      })
+      .eq("id", existing.id);
+  } else {
+    await admin.from("apps").delete().eq("id", appId);
+  }
+
+  await admin.storage.from("app-bundles").remove([bundlePath]);
 }

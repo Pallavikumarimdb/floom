@@ -33,12 +33,17 @@ src/
       page.tsx             # Generated UI for running apps
     page.tsx               # Homepage
   lib/
-    runner.ts              # Runner with E2B integration and fake mode
+    e2b/
+      runner.ts            # Runner with E2B integration and fake mode
+    floom/
+      limits.ts            # Request/source/schema/runtime limits
+      manifest.ts          # Floom manifest validation
     supabase/
       client.ts            # Browser Supabase client
       server.ts            # Server Supabase client
       admin.ts             # Service-role Supabase client
-fixture-app/                # Example Python app for testing
+fixtures/
+  python-simple/            # Example Python app for testing
 cli/
   deploy.ts                # CLI deploy script
 ```
@@ -77,7 +82,7 @@ npm run dev
 ### 5. Register the fixture app with Supabase configured
 
 ```bash
-npx tsx cli/deploy.ts ./fixture-app http://localhost:3000 YOUR_SUPABASE_AUTH_TOKEN
+npx tsx cli/deploy.ts ./fixtures/python-simple http://localhost:3000 YOUR_SUPABASE_AUTH_TOKEN
 ```
 
 Without Supabase env, visit `/p/demo-app` for the local demo. In the hosted v0, use the homepage CTA to open the retained live app.

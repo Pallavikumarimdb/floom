@@ -1,6 +1,8 @@
 export const MAX_REQUEST_BYTES = 128 * 1024;
 export const MAX_SOURCE_BYTES = 64 * 1024;
 export const MAX_SCHEMA_BYTES = 32 * 1024;
+export const MAX_SCHEMA_DEPTH = 12;
+export const MAX_SCHEMA_NODES = 500;
 export const MAX_INPUT_BYTES = 16 * 1024;
 export const MAX_OUTPUT_BYTES = 64 * 1024;
 export const SANDBOX_TIMEOUT_MS = 60_000;
