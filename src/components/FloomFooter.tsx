@@ -1,148 +1,39 @@
-"use client";
-
 import Link from "next/link";
-
-function IconDiscord() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-      <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057c.001.022.015.043.033.055a19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z" />
-    </svg>
-  );
-}
-
-function IconGitHub() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-      <path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12" />
-    </svg>
-  );
-}
-
-function IconX() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.744l7.737-8.835L1.254 2.25H8.08l4.259 5.63 5.905-5.63zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-    </svg>
-  );
-}
+import Image from "next/image";
 
 export function FloomFooter() {
   return (
     <footer className="border-t border-[#e4ded3] bg-white" data-testid="public-footer">
-      <div className="mx-auto max-w-6xl px-6 pt-14 pb-7">
-        {/* 4-column grid: brand + 3 link columns */}
-        <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-[1.4fr_repeat(3,1fr)]">
-          {/* Brand column */}
-          <div className="flex flex-col gap-3">
-            <Link
-              href="/"
-              className="inline-flex items-center gap-2 text-[17px] font-black tracking-tight text-[#0e0e0c] no-underline"
-            >
-              <span className="h-[18px] w-[18px] rounded-[4px] bg-emerald-500" aria-hidden="true" />
-              floom<span className="text-emerald-500" aria-hidden="true">.</span>
-            </Link>
-            <p className="text-[13px] leading-relaxed text-neutral-500 max-w-[280px]">
-              The protocol + runtime for agentic work.
-            </p>
-            <p className="text-[12px] text-neutral-400">
-              Built in SF ·{" "}
-              <a
-                href="https://f.inc"
-                target="_blank"
-                rel="noreferrer"
-                className="font-semibold text-[#0e0e0c] no-underline border-b border-[#e4ded3]"
-              >
-                Founders Inc cohort
-              </a>
-            </p>
-          </div>
-
-          {/* Product column */}
-          <div className="flex flex-col gap-2.5">
-            <div className="mb-1 font-mono text-[10.5px] font-semibold uppercase tracking-widest text-[#0e0e0c]">
-              Product
-            </div>
-            <FooterLink href="https://floom.dev/apps">Apps</FooterLink>
-            <FooterLink href="https://floom.dev/docs">Docs</FooterLink>
-            <FooterLink href="https://floom.dev/help">Help</FooterLink>
-            <FooterLink href="https://floom.dev/pricing">Pricing</FooterLink>
-            <FooterLink href="https://floom.dev/changelog">Changelog</FooterLink>
-            <FooterLink href="https://floom.dev/status">Status</FooterLink>
-          </div>
-
-          {/* Company column */}
-          <div className="flex flex-col gap-2.5">
-            <div className="mb-1 font-mono text-[10.5px] font-semibold uppercase tracking-widest text-[#0e0e0c]">
-              Company
-            </div>
-            <FooterLink href="https://floom.dev/about">About</FooterLink>
-            <FooterLink href="https://github.com/floomhq/floom">GitHub</FooterLink>
-            <FooterLink href="https://discord.gg/8fXGXjxcRz">Discord</FooterLink>
-            <FooterLink href="https://x.com/floomhq">X / Twitter</FooterLink>
-          </div>
-
-          {/* Legal column */}
-          <div className="flex flex-col gap-2.5">
-            <div className="mb-1 font-mono text-[10.5px] font-semibold uppercase tracking-widest text-[#0e0e0c]">
-              Legal
-            </div>
-            <FooterLink href="https://floom.dev/terms">Terms</FooterLink>
-            <FooterLink href="https://floom.dev/privacy">Privacy</FooterLink>
-            <FooterLink href="https://floom.dev/imprint">Imprint</FooterLink>
-          </div>
+      <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-6 py-6">
+        <div className="flex items-center gap-3">
+          <Link
+            href="/"
+            className="inline-flex items-center gap-2 text-[15px] font-black tracking-tight text-[#0e0e0c] no-underline"
+          >
+            <Image src="/floom-mark.svg" alt="" width={18} height={18} />
+            floom<span className="text-emerald-500" aria-hidden="true">.</span>
+          </Link>
+          <span className="text-[12.5px] text-neutral-500">
+            Localhost to live in 60 seconds.
+          </span>
         </div>
 
-        {/* Bottom row */}
-        <div className="mt-10 flex flex-wrap items-center justify-between gap-4 border-t border-[#e4ded3] pt-5">
-          <p className="text-[12px] text-neutral-400">© 2026 Floom</p>
-          <div className="flex items-center gap-2">
-            <SocialIconLink href="https://discord.gg/8fXGXjxcRz" label="Discord">
-              <IconDiscord />
-            </SocialIconLink>
-            <SocialIconLink href="https://github.com/floomhq/floom" label="GitHub">
-              <IconGitHub />
-            </SocialIconLink>
-            <SocialIconLink href="https://x.com/floomhq" label="X / Twitter">
-              <IconX />
-            </SocialIconLink>
-          </div>
+        <div className="flex items-center gap-4">
+          <a
+            href="https://github.com/floomhq/floom-minimal"
+            target="_blank"
+            rel="noreferrer"
+            aria-label="GitHub"
+            className="inline-flex items-center gap-1.5 text-[12.5px] font-medium text-neutral-500 no-underline transition-colors hover:text-[#0e0e0c]"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12" />
+            </svg>
+            GitHub
+          </a>
+          <span className="text-[12.5px] text-neutral-400">© 2026 Floom</span>
         </div>
       </div>
     </footer>
-  );
-}
-
-function FooterLink({ href, children }: { href: string; children: React.ReactNode }) {
-  return (
-    <a
-      href={href}
-      target={href.startsWith("http") ? "_blank" : undefined}
-      rel={href.startsWith("http") ? "noreferrer" : undefined}
-      className="text-[13px] leading-snug text-neutral-500 no-underline transition-colors hover:text-[#0e0e0c]"
-    >
-      {children}
-    </a>
-  );
-}
-
-function SocialIconLink({
-  href,
-  label,
-  children,
-}: {
-  href: string;
-  label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <a
-      href={href}
-      target="_blank"
-      rel="noreferrer"
-      aria-label={label}
-      className="inline-flex h-10 w-10 items-center justify-center rounded-[10px] border border-[#e4ded3] bg-[#faf9f5] text-neutral-400 no-underline transition-colors hover:border-neutral-400 hover:text-[#0e0e0c]"
-    >
-      {children}
-    </a>
   );
 }
