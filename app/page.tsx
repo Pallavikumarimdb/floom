@@ -5,14 +5,23 @@ export default function HomePage() {
     <main className="shell">
       <section className="intro">
         <p className="eyebrow">Floom v0</p>
-        <h1>Run generated apps from JSON Schema.</h1>
+        <h1>Localhost to live apps.</h1>
         <p>
-          This scaffold keeps the surface to two routes: a tiny index and a
-          generated app form.
+          Ship a tiny function app as a generated UI backed by JSON Schema,
+          Supabase records, and sandbox execution.
         </p>
-        <Link className="button" href="/p/demo">
-          Open demo app
-        </Link>
+        <div className="ctaGrid">
+          <a className="ctaPanel" href="https://github.com/floomhq/floomit">
+            <span className="ctaLabel">Install</span>
+            <strong>floomit skill</strong>
+            <span>Floom MCP next</span>
+          </a>
+          <Link className="ctaPanel ctaPanelPrimary" href="/p/demo">
+            <span className="ctaLabel">Run</span>
+            <strong>Test live app</strong>
+            <span>Generated UI</span>
+          </Link>
+        </div>
       </section>
     </main>
   );

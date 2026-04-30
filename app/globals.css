@@ -45,6 +45,61 @@ a {
   max-width: 640px;
 }
 
+.ctaGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.ctaPanel {
+  display: grid;
+  min-height: 112px;
+  align-content: space-between;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fbfaf7;
+  color: var(--foreground);
+  padding: 16px;
+  text-decoration: none;
+}
+
+.ctaPanel:hover {
+  border-color: var(--accent);
+}
+
+.ctaPanelPrimary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #ffffff;
+}
+
+.ctaPanelPrimary span,
+.ctaPanelPrimary .ctaLabel {
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.ctaLabel {
+  color: var(--accent-dark);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.ctaPanel strong {
+  font-size: 1.35rem;
+  line-height: 1.1;
+}
+
+.ctaPanel span:last-child {
+  color: var(--muted);
+}
+
+.ctaPanelPrimary span:last-child {
+  color: rgba(255, 255, 255, 0.82);
+}
+
 .header {
   margin-bottom: 24px;
 }
@@ -169,4 +224,10 @@ textarea {
   font-size: 0.9rem;
   line-height: 1.5;
   padding: 16px;
+}
+
+@media (max-width: 640px) {
+  .ctaGrid {
+    grid-template-columns: 1fr;
+  }
 }
