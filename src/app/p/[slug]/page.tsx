@@ -163,16 +163,46 @@ export default function AppPermalinkPage() {
           setLoading(false);
           return;
         }
-        const a = await res.json() as AppDetail;
-        // Ensure manifest has required shape for the page.
+        const a = await res.json() as AppDetail & {
+          handler?: string;
+          input_schema?: unknown;
+          output_schema?: unknown;
+        };
+        // Synthesize manifest from the floom-minimal API shape:
+        // /api/apps/[slug] returns { id, slug, name, runtime, entrypoint,
+        // handler, input_schema, output_schema, public }. The v5-ported
+        // page expects floom.dev's shape with manifest.actions[<key>] +
+        // manifest.primary_action. Without this normalization, page
+        // crashes because Object.keys(app.manifest.actions)[0] hits
+        // undefined deeper in the render tree.
         if (!a.manifest) {
+          const handlerKey = a.handler ?? 'run';
           (a as AppDetail & { manifest: AppDetail['manifest'] }).manifest = {
             name: a.name,
-            actions: {},
+            actions: {
+              [handlerKey]: {
+                label: a.name,
+                description: a.description ?? '',
+                inputs: [],
+              },
+            },
+            primary_action: handlerKey,
             secrets_needed: [],
             capabilities: {},
           };
         }
+        // Description fallback so AboutTab isn't empty. The About tab checks
+        // for description-equals-header-tagline and hides itself, so this
+        // needs to be richer than the header line.
+        if (!a.description) {
+          a.description =
+            `**${a.name}** is a Python function-style app running on Floom's E2B sandbox. ` +
+            `Each run is hosted on Floom — no per-app deploy. The same handler is exposed as a web UI here, ` +
+            `as a REST endpoint at \`POST /api/apps/${a.slug}/run\`, and as an MCP tool at \`/mcp\`.`;
+        }
+        // version + author fallbacks the v5 chrome reads.
+        if (!a.version) (a as AppDetail).version = '0.1.0';
+        if (!a.author_display) (a as AppDetail).author_display = '@floom';
         setApp(a);
         setLoading(false);
       })

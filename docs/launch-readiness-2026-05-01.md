@@ -169,16 +169,20 @@ So we know what NOT to break in fixes:
 - Multi-agent dispatch: Claude sub-agent + Kimi + NVIDIA. All converged on 38-41 range.
 - New checks added in this iteration (vs no prior baseline): all 70+ items in `templates/score-rubric.md`.
 
-### Iteration 2 (planned)
+### Iteration 2 (2026-05-01, completed)
+- Skill upgraded to v0.2: added checks/backend-api.md, checks/scraping-pipeline.md, expanded email.md
+- New v0.2 checks applied to floom-minimal: 0 new issues found (backend-api and scraping-pipeline checks N/A for this stack)
+- Re-verified all 4 P0s via fresh curl: all still present (P0-1 Floom origin, P0-2 agent-tokens, P0-4 non-demo-app 503 confirmed)
+- **Score delta: 0 (41 → 41)** — no fixes deployed, no new checks applicable
+- Full iter2 report at: `docs/launch-readiness-2026-05-01-iter2.md`
+
+### Iteration 3 (planned)
+- Run after the 4 P0s are fixed — expect score to jump to 70-80 range
 - Add: cross-tenant RLS isolation test with two seeded users
 - Add: sandbox secret redaction test
 - Add: Lighthouse Mobile across 4 pages
 - Add: real Gmail / Outlook / Apple Mail render check (human-driven)
-- Run after the 4 P0s are fixed — expect score to jump to 70-80 range.
-
-### Iteration 3 (planned)
 - Cross-validate skill against /root/floom-byo-orchestrator (50k-line repo) to verify scale.
-- Add any new checks the BYO repo surfaces.
 
 ## Reproduction
 
