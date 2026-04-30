@@ -15,6 +15,9 @@ export FLOOM_TOKEN="<agent-token>"
 
 ## Supported App Contract
 
+Agents can ask the Floom MCP tool `get_app_contract` for the current v0 contract
+and copy-paste starter files before generating an app.
+
 Accept:
 
 - Single-file Python.
@@ -27,6 +30,7 @@ Reject:
 
 - `requirements.txt`, `pyproject.toml`, `package.json`, or `openapi.json`.
 - FastAPI, OpenAPI, TypeScript, Node, multi-file Python, secrets, dependencies, long-running servers, CLIs, workers, queues, cron, browser automation, OAuth callbacks, and local databases.
+- `floom.yaml` fields named `actions`, `dependencies`, or `secrets`.
 
 ## Virgin Agent Test Matrix
 
@@ -34,6 +38,7 @@ Run every item from a fresh shell/session.
 
 1. Candidate discovery
    - Inspect a repo or fixture directory.
+   - Call MCP `get_app_contract` and confirm it returns the v0 manifest, `app.py`, input schema, output schema, and unsupported cases.
    - Identify one valid single-file Python function candidate.
    - Identify at least one unsupported candidate and record the exact rejection reason.
 

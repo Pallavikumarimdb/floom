@@ -140,6 +140,7 @@ Authorization: Bearer YOUR_FLOOM_AGENT_TOKEN
 Launch tools:
 
 - `auth_status`
+- `get_app_contract`
 - `validate_manifest`
 - `find_candidate_apps`
 - `publish_app`
@@ -148,6 +149,8 @@ Launch tools:
 - `create_agent_token`
 
 `create_agent_token` requires a Supabase user JWT from the web login flow. The other publish/run tools accept a Floom agent token when the token has the required scope.
+
+`get_app_contract` returns the current v0 manifest, `app.py`, input/output schema examples, and explicit unsupported cases. Agents use it before generating app files so they do not create FastAPI/OpenAPI, dependency, TypeScript, multi-file, secrets, or multi-action apps for the v0 runtime.
 
 ## Fake Mode
 

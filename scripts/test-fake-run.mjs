@@ -43,6 +43,7 @@ async function test() {
   const toolNames = floomTools.map((tool) => tool.name);
   for (const toolName of [
     'auth_status',
+    'get_app_contract',
     'validate_manifest',
     'publish_app',
     'find_candidate_apps',
@@ -136,6 +137,17 @@ async function test() {
   assert.equal(authStatus.isError, undefined);
   assert.equal(parseToolResult(authStatus).authenticated, false);
 
+  const appContract = await callFloomTool('get_app_contract', {}, { baseUrl: 'http://localhost:3000' });
+  assert.equal(appContract.isError, undefined);
+  const contract = parseToolResult(appContract);
+  assert.equal(contract.version, 'v0');
+  assert.match(contract.files['floom.yaml'], /runtime: python/);
+  assert.match(contract.files['app.py'], /def run/);
+  assert.equal(contract.files['input.schema.json'].type, 'object');
+  assert.equal(contract.files['output.schema.json'].type, 'object');
+  assert.match(JSON.stringify(contract.unsupported), /OpenBlog/);
+  assert.match(JSON.stringify(contract.unsupported), /requirements\.txt/);
+
   const candidates = await callFloomTool(
     'find_candidate_apps',
     {
@@ -156,6 +168,7 @@ async function test() {
       files: {
         'openapi.json': '{"openapi":"3.1.0"}',
         'api.py': 'from fastapi import FastAPI\napp = FastAPI()\n',
+        'worker.py': 'def helper():\n    return True\n',
         'requirements.txt': 'fastapi\n',
         'package.json': '{"scripts":{}}',
       },
@@ -169,6 +182,65 @@ async function test() {
   assert.match(unsupportedReasons, /FastAPI\/OpenAPI/);
   assert.match(unsupportedReasons, /dependencies/);
   assert.match(unsupportedReasons, /TypeScript\/Node/);
+  assert.match(unsupportedReasons, /Multi-file Python/);
+
+  const manifestUnsupportedCandidates = await callFloomTool(
+    'find_candidate_apps',
+    {
+      files: {
+        'bad/floom.yaml': [
+          'name: Bad',
+          'slug: bad-app',
+          'runtime: python',
+          'entrypoint: app.py',
+          'handler: run',
+          'actions:',
+          '  first: {}',
+          'dependencies:',
+          '  python:',
+          '    - requests',
+          'secrets:',
+          '  - API_KEY',
+        ].join('\n'),
+        'bad/app.py': 'def run(inputs):\n    return {"ok": True}\n',
+        'bad/input.schema.json': '{}',
+        'bad/output.schema.json': '{}',
+      },
+    },
+    { baseUrl: 'http://localhost:3000' }
+  );
+  const manifestUnsupportedReason = parseToolResult(manifestUnsupportedCandidates)
+    .candidates[0]
+    .unsupported_reason;
+  assert.match(manifestUnsupportedReason, /actions/);
+  assert.match(manifestUnsupportedReason, /dependencies/);
+  assert.match(manifestUnsupportedReason, /secrets/);
+
+  const manifestFileUnsupportedCandidates = await callFloomTool(
+    'find_candidate_apps',
+    {
+      files: {
+        'blocked/floom.yaml': manifestText,
+        'blocked/app.py': sourceText,
+        'blocked/helper.py': 'VALUE = 1\n',
+        'blocked/input.schema.json': inputSchemaText,
+        'blocked/output.schema.json': outputSchemaText,
+        'blocked/requirements.txt': 'requests\n',
+        'blocked/pyproject.toml': '[project]\nname = "blocked"\n',
+        'blocked/package.json': '{"scripts":{}}\n',
+        'blocked/openapi.json': '{"openapi":"3.1.0"}',
+      },
+    },
+    { baseUrl: 'http://localhost:3000' }
+  );
+  const manifestFileUnsupportedReason = parseToolResult(manifestFileUnsupportedCandidates)
+    .candidates[0]
+    .unsupported_reason;
+  assert.match(manifestFileUnsupportedReason, /requirements\.txt/);
+  assert.match(manifestFileUnsupportedReason, /pyproject\.toml/);
+  assert.match(manifestFileUnsupportedReason, /package\.json/);
+  assert.match(manifestFileUnsupportedReason, /openapi\.json/);
+  assert.match(manifestFileUnsupportedReason, /Multiple Python files/);
   testCliRejectsUnsupportedV0Shapes(manifestText, inputSchemaText, outputSchemaText);
 
   const originalFetch = globalThis.fetch;

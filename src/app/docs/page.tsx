@@ -16,6 +16,9 @@ const apiExample = `curl -X POST https://floom-60sec.vercel.app/api/apps/pitch-c
   -d '{"inputs":{"pitch":"AI app hosting for agents"}}'`;
 
 const mcpExample = `POST https://floom-60sec.vercel.app/mcp
+tool: get_app_contract
+
+POST https://floom-60sec.vercel.app/mcp
 tool: run_app
 arguments: { "slug": "pitch-coach", "inputs": { ... } }`;
 
@@ -129,7 +132,8 @@ export default function DocsPage() {
 
         <Section title="Run through MCP">
           <p>
-            MCP clients can discover Floom at <code>/mcp</code> and use{" "}
+            MCP clients can discover Floom at <code>/mcp</code>, call{" "}
+            <code>get_app_contract</code> before generating files, and use{" "}
             <code>run_app</code> for the same app execution path as the browser
             and API.
           </p>

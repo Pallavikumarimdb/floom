@@ -36,6 +36,7 @@ export type McpToolContext = {
 
 type FloomToolName =
   | "auth_status"
+  | "get_app_contract"
   | "validate_manifest"
   | "publish_app"
   | "find_candidate_apps"
@@ -49,6 +50,15 @@ export const floomTools: McpToolDefinition[] = [
   {
     name: "auth_status",
     description: "Report whether the current Authorization bearer token resolves to a Floom user or agent token.",
+    inputSchema: {
+      type: "object",
+      properties: {},
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "get_app_contract",
+    description: "Return the exact Floom v0 app contract, copy-paste starter files, and explicit post-v0 unsupported cases.",
     inputSchema: {
       type: "object",
       properties: {},
@@ -220,6 +230,10 @@ async function callFloomToolUnchecked(
     return authStatus(context);
   }
 
+  if (name === "get_app_contract") {
+    return getAppContract();
+  }
+
   if (name === "validate_manifest") {
     return validateManifest(args);
   }
@@ -361,6 +375,87 @@ async function authStatus(context: McpToolContext): Promise<McpToolResult> {
   });
 }
 
+function getAppContract(): McpToolResult {
+  return okResult({
+    version: "v0",
+    supported: [
+      "single-file Python",
+      "Python standard library only",
+      "one handler function that accepts a JSON object and returns a JSON object",
+      "floom.yaml plus input.schema.json and output.schema.json",
+      "public apps with public: true; private apps when public is omitted or false",
+    ],
+    unsupported: [
+      {
+        case: "requirements.txt or pyproject.toml",
+        reason: "Dependency installation is post-v0. v0 runs one stdlib Python file without an install step.",
+      },
+      {
+        case: "openapi.json, FastAPI, Flask, or HTTP servers",
+        reason: "HTTP app routing is post-v0. v0 exposes one JSON Schema form and one handler.",
+      },
+      {
+        case: "package.json, TypeScript, or Node apps",
+        reason: "TypeScript/Node runtime parity is post-v0. v0 runtime is runtime: python.",
+      },
+      {
+        case: "multiple Python files",
+        reason: "Multi-file bundles are post-v0. v0 packaging accepts one top-level Python entrypoint file.",
+      },
+      {
+        case: "manifest fields actions, dependencies, or secrets",
+        reason: "Multiple actions, dependency installs, and app secrets are post-v0 features.",
+      },
+      {
+        case: "OpenBlog/OpenAPI apps",
+        reason: "OpenBlog has an HTTP/OpenAPI surface and dependency-style app shape. It belongs to the post-v0 HTTP app runner, not the 60-second v0 function path.",
+      },
+    ],
+    files: {
+      "floom.yaml": [
+        "name: Hello Floom",
+        "slug: hello-floom",
+        "runtime: python",
+        "entrypoint: app.py",
+        "handler: run",
+        "public: true",
+        "input_schema: ./input.schema.json",
+        "output_schema: ./output.schema.json",
+      ].join("\n"),
+      "app.py": [
+        "def run(inputs: dict) -> dict:",
+        "    name = str(inputs.get(\"name\", \"world\"))",
+        "    return {\"message\": f\"Hello, {name}!\"}",
+      ].join("\n"),
+      "input.schema.json": {
+        type: "object",
+        required: ["name"],
+        additionalProperties: false,
+        properties: {
+          name: {
+            type: "string",
+            title: "Name",
+            default: "Federico",
+          },
+        },
+      },
+      "output.schema.json": {
+        type: "object",
+        required: ["message"],
+        additionalProperties: false,
+        properties: {
+          message: {
+            type: "string",
+            title: "Message",
+          },
+        },
+      },
+    },
+    publish_command:
+      "FLOOM_TOKEN=<agent-token> FLOOM_API_URL=https://floom-60sec.vercel.app npx tsx cli/deploy.ts <app-dir>",
+  });
+}
+
 function validateManifest(args: JsonObject): McpToolResult {
   const manifestResult = parseManifestArgument(args.manifest);
   if (!manifestResult.ok) {
@@ -458,7 +553,15 @@ function findCandidateApps(args: JsonObject): McpToolResult {
       let manifest: FloomManifest | null = null;
 
       try {
-        manifest = parseManifest(yaml.load(manifestText));
+        const rawManifest = yaml.load(manifestText);
+        const rawManifestObject = asObject(rawManifest);
+        const unsupportedFields = rawManifestObject
+          ? unsupportedManifestFields(rawManifestObject)
+          : [];
+        errors.push(...unsupportedFields);
+        if (unsupportedFields.length === 0) {
+          manifest = parseManifest(rawManifest);
+        }
       } catch (error) {
         errors.push(error instanceof Error ? error.message : "Invalid floom.yaml");
       }
@@ -470,7 +573,14 @@ function findCandidateApps(args: JsonObject): McpToolResult {
         }
 
         for (const unsupportedPath of unsupportedV0Files(appDir, files)) {
-          errors.push(`${unsupportedPath} is not supported in v0`);
+          errors.push(unsupportedFileReason(unsupportedPath));
+        }
+
+        const pythonFiles = pythonFilesInAppDir(appDir, files);
+        if (pythonFiles.length > 1) {
+          errors.push(
+            `Multiple Python files are not supported in v0: ${pythonFiles.join(", ")}. Use one stdlib entrypoint file or wait for post-v0 multi-file bundles.`
+          );
         }
 
         const inputSchemaPath = joinPath(appDir, manifest.input_schema || "input.schema.json");
@@ -509,6 +619,43 @@ function unsupportedV0Files(appDir: string, files: Record<string, string>) {
     .filter((filePath) => filePath in files);
 }
 
+function unsupportedManifestFields(manifest: JsonObject) {
+  const reasons: string[] = [];
+  if (manifest.actions !== undefined) {
+    reasons.push("floom.yaml field actions is not supported in v0; multiple actions are post-v0.");
+  }
+  if (manifest.dependencies !== undefined) {
+    reasons.push("floom.yaml field dependencies is not supported in v0; dependency installation is post-v0.");
+  }
+  if (manifest.secrets !== undefined) {
+    reasons.push("floom.yaml field secrets is not supported in v0; app secret injection is post-v0.");
+  }
+  return reasons;
+}
+
+function unsupportedFileReason(filePath: string) {
+  const fileName = basename(filePath);
+  if (fileName === "requirements.txt") {
+    return `${filePath} is not supported in v0; Python dependencies require the post-v0 dependency installer.`;
+  }
+  if (fileName === "pyproject.toml") {
+    return `${filePath} is not supported in v0; Python packaging/dependencies require the post-v0 dependency installer.`;
+  }
+  if (fileName === "package.json") {
+    return `${filePath} is not supported in v0; TypeScript/Node apps require the post-v0 TypeScript runner.`;
+  }
+  if (fileName === "openapi.json") {
+    return `${filePath} is not supported in v0; OpenAPI/HTTP apps require the post-v0 HTTP app runner.`;
+  }
+  return `${filePath} is not supported in v0.`;
+}
+
+function pythonFilesInAppDir(appDir: string, files: Record<string, string>) {
+  return Object.keys(files)
+    .filter((filePath) => dirname(filePath) === appDir && basename(filePath).endsWith(".py"))
+    .sort();
+}
+
 function unsupportedRepositoryCandidates(files: Record<string, string>) {
   if (Object.keys(files).some((filePath) => basename(filePath) === "floom.yaml")) {
     return [];
@@ -516,6 +663,7 @@ function unsupportedRepositoryCandidates(files: Record<string, string>) {
 
   const fileNames = new Set(Object.keys(files).map((filePath) => basename(filePath)));
   const fileText = Object.values(files).join("\n");
+  const pythonFiles = Object.keys(files).filter((filePath) => basename(filePath).endsWith(".py"));
   const candidates = [];
 
   if (fileNames.has("openapi.json") || /FastAPI\s*\(/.test(fileText)) {
@@ -528,6 +676,14 @@ function unsupportedRepositoryCandidates(files: Record<string, string>) {
 
   if (fileNames.has("package.json")) {
     candidates.push(unsupportedCandidate("TypeScript/Node apps require the post-v0 TypeScript runner"));
+  }
+
+  if (pythonFiles.length > 1) {
+    candidates.push(
+      unsupportedCandidate(
+        `Multi-file Python apps require the post-v0 multi-file bundle path: ${pythonFiles.sort().join(", ")}`
+      )
+    );
   }
 
   return candidates;

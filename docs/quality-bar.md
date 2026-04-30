@@ -102,6 +102,7 @@ Required tools:
 
 - `auth_status`
 - `create_agent_token`
+- `get_app_contract`
 - `find_candidate_apps`
 - `validate_manifest`
 - `publish_app`
