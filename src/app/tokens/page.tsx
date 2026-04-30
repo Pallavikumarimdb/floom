@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { SiteHeader } from "@/components/SiteHeader";
+import { FloomFooter } from "@/components/FloomFooter";
 import { createClient } from "@/lib/supabase/client";
 
 type AgentToken = {
@@ -154,21 +155,22 @@ export default function TokensPage() {
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-[#faf9f5] text-[#11110f]">
-        <SiteHeader showProductLinks />
+      <div className="min-h-screen bg-[#faf9f5] text-[#11110f]">
+        <SiteHeader />
         <section className="mx-auto max-w-4xl px-5 py-14">
           <div className="flex items-center gap-3 text-neutral-500">
             <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-neutral-300 border-t-emerald-600" />
             Loading tokens…
           </div>
         </section>
-      </main>
+        <FloomFooter />
+      </div>
     );
   }
 
   return (
-    <main className="min-h-screen bg-[#faf9f5] text-[#11110f]">
-      <SiteHeader showProductLinks />
+    <div className="min-h-screen bg-[#faf9f5] text-[#11110f]">
+      <SiteHeader />
       <section className="mx-auto max-w-5xl px-5 py-12">
         {/* Header row */}
         <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
@@ -443,6 +445,7 @@ export default function TokensPage() {
           </a>
         </p>
       </section>
-    </main>
+      <FloomFooter />
+    </div>
   );
 }

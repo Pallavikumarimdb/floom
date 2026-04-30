@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { SiteHeader } from "@/components/SiteHeader";
+import { FloomFooter } from "@/components/FloomFooter";
 import { createClient } from "@/lib/supabase/client";
 
 type Mode = "signin" | "signup";
@@ -54,8 +55,8 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#faf9f5] text-[#11110f]">
-      <SiteHeader showProductLinks />
+    <div className="min-h-screen bg-[#faf9f5] text-[#11110f]">
+      <SiteHeader />
       <section className="mx-auto max-w-md px-5 py-14">
         <p className="mb-3 text-sm font-semibold text-emerald-700">
           Floom builder access
@@ -180,7 +181,7 @@ export default function LoginPage() {
         <p className="mt-8 text-sm text-neutral-500">
           Already have a token? Use the{" "}
           <Link
-            href="/p/smoke-1777538613152"
+            href="/p/demo-app"
             className="font-semibold text-emerald-700"
           >
             live app
@@ -188,6 +189,7 @@ export default function LoginPage() {
           or publish with the CLI.
         </p>
       </section>
-    </main>
+      <FloomFooter />
+    </div>
   );
 }
