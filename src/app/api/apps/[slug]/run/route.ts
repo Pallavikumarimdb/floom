@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { demoApp, hasSupabaseConfig, runDemoApp } from "@/lib/demo-app";
 import { runInSandbox } from "@/lib/runner";
+import { MAX_INPUT_BYTES, MAX_REQUEST_BYTES, MAX_SOURCE_BYTES } from "@/lib/limits";
 import Ajv from "ajv";
 
 const ajv = new Ajv({ strict: false });
@@ -11,8 +12,20 @@ export async function POST(
   { params }: { params: Promise<{ slug: string }> }
 ) {
   const { slug } = await params;
+  const contentLength = Number(req.headers.get("content-length") ?? 0);
+  if (contentLength > MAX_REQUEST_BYTES) {
+    return NextResponse.json({ error: "Request is too large" }, { status: 413 });
+  }
+
   const body = await req.json().catch(() => ({}));
   const { inputs } = body as { inputs: Record<string, unknown> };
+  if (!inputs || typeof inputs !== "object" || Array.isArray(inputs)) {
+    return NextResponse.json({ error: "Missing inputs object" }, { status: 400 });
+  }
+
+  if (Buffer.byteLength(JSON.stringify(inputs), "utf8") > MAX_INPUT_BYTES) {
+    return NextResponse.json({ error: "Inputs are too large" }, { status: 413 });
+  }
 
   if (!hasSupabaseConfig() && slug === demoApp.slug) {
     const validateDemoInput = ajv.compile(demoApp.input_schema);
@@ -125,6 +138,26 @@ export async function POST(
   }
 
   const bundleText = bundleData ? await bundleData.text() : "";
+  if (Buffer.byteLength(bundleText, "utf8") > MAX_SOURCE_BYTES) {
+    await admin
+      .from("executions")
+      .update({
+        status: "error",
+        error: "App source is too large",
+        completed_at: new Date().toISOString(),
+      })
+      .eq("id", execution.id);
+
+    return NextResponse.json(
+      {
+        execution_id: execution.id,
+        status: "error",
+        output: {},
+        error: "App source is too large",
+      },
+      { status: 413 }
+    );
+  }
 
   // Run
   const result = await runInSandbox(

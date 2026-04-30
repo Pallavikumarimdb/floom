@@ -4,6 +4,7 @@ import yaml from "js-yaml";
 import FormData from "form-data";
 import fetch from "node-fetch";
 import { parseManifest } from "../src/lib/manifest";
+import { MAX_SCHEMA_BYTES, MAX_SOURCE_BYTES } from "../src/lib/limits";
 
 type DeployResponse = {
   app?: {
@@ -32,6 +33,10 @@ async function deploy(appDir: string, apiUrl: string, token: string) {
 
   const entrypointPath = path.join(appDir, manifest.entrypoint);
   if (!fs.existsSync(entrypointPath)) throw new Error("Entrypoint not found");
+  if (fs.statSync(entrypointPath).size > MAX_SOURCE_BYTES) throw new Error("Entrypoint is too large");
+  if (fs.statSync(manifestPath).size > MAX_SCHEMA_BYTES) throw new Error("Manifest is too large");
+  if (fs.statSync(inputSchemaPath).size > MAX_SCHEMA_BYTES) throw new Error("Input schema is too large");
+  if (fs.statSync(outputSchemaPath).size > MAX_SCHEMA_BYTES) throw new Error("Output schema is too large");
 
   const form = new FormData();
   form.append("manifest", fs.createReadStream(manifestPath), { filename: "floom.yaml" });

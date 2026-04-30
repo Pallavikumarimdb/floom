@@ -10,7 +10,7 @@ export type FloomManifest = {
 };
 
 const SLUG_RE = /^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$/;
-const PYTHON_FILE_RE = /^[A-Za-z0-9_-]+\.py$/;
+const PYTHON_FILE_RE = /^[A-Za-z_][A-Za-z0-9_]*\.py$/;
 const IDENTIFIER_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
 function requiredString(value: unknown, field: string): string {

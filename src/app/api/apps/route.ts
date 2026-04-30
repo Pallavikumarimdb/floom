@@ -4,6 +4,7 @@ import yaml from "js-yaml";
 import { v4 as uuidv4 } from "uuid";
 import { hasSupabaseConfig } from "@/lib/demo-app";
 import { parseManifest, type FloomManifest } from "@/lib/manifest";
+import { MAX_REQUEST_BYTES, MAX_SCHEMA_BYTES, MAX_SOURCE_BYTES } from "@/lib/limits";
 
 export async function POST(req: NextRequest) {
   if (!hasSupabaseConfig()) {
@@ -11,6 +12,11 @@ export async function POST(req: NextRequest) {
       { error: "Supabase is not configured. Set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY." },
       { status: 503 }
     );
+  }
+
+  const contentLength = Number(req.headers.get("content-length") ?? 0);
+  if (contentLength > MAX_REQUEST_BYTES) {
+    return NextResponse.json({ error: "Request is too large" }, { status: 413 });
   }
 
   const form = await req.formData();
@@ -21,6 +27,21 @@ export async function POST(req: NextRequest) {
 
   if (!manifestFile || !bundleFile) {
     return NextResponse.json({ error: "Missing manifest or bundle" }, { status: 400 });
+  }
+
+  if (manifestFile.size > MAX_SCHEMA_BYTES) {
+    return NextResponse.json({ error: "Manifest is too large" }, { status: 413 });
+  }
+
+  if (bundleFile.size > MAX_SOURCE_BYTES) {
+    return NextResponse.json({ error: "App source is too large" }, { status: 413 });
+  }
+
+  if (
+    (inputSchemaFile && inputSchemaFile.size > MAX_SCHEMA_BYTES) ||
+    (outputSchemaFile && outputSchemaFile.size > MAX_SCHEMA_BYTES)
+  ) {
+    return NextResponse.json({ error: "Schema is too large" }, { status: 413 });
   }
 
   const manifestText = await manifestFile.text();

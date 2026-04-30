@@ -109,6 +109,50 @@ export default function AppPage() {
 
   return (
     <main className="min-h-screen bg-[#faf9f5] text-[#11110f]">
+      <style jsx global>{`
+        .floom-run-form .form-group {
+          margin-bottom: 1rem;
+        }
+
+        .floom-run-form label {
+          display: block;
+          margin-bottom: 0.4rem;
+          font-size: 0.875rem;
+          font-weight: 700;
+          color: #26221c;
+        }
+
+        .floom-run-form input,
+        .floom-run-form textarea,
+        .floom-run-form select {
+          width: 100%;
+          border: 1px solid #cfc7b8;
+          border-radius: 0.5rem;
+          background: #fffdf8;
+          padding: 0.75rem 0.85rem;
+          color: #11110f;
+          outline: none;
+        }
+
+        .floom-run-form textarea {
+          min-height: 8rem;
+          resize: vertical;
+        }
+
+        .floom-run-form input:focus,
+        .floom-run-form textarea:focus,
+        .floom-run-form select:focus {
+          border-color: #047857;
+          box-shadow: 0 0 0 3px rgba(4, 120, 87, 0.14);
+        }
+
+        .floom-run-form .field-description,
+        .floom-run-form .help-block {
+          margin-top: 0.35rem;
+          font-size: 0.8rem;
+          color: #716b61;
+        }
+      `}</style>
       <header className="border-b border-[#e7e2d8]">
         <nav className="mx-auto flex max-w-6xl items-center justify-between px-5 py-4">
           <Link href="/" className="flex items-center gap-2 text-xl font-black">
@@ -165,6 +209,7 @@ export default function AppPage() {
                 Inputs
               </p>
               <Form
+                className="floom-run-form"
                 schema={app.input_schema}
                 validator={validator}
                 formData={formData}
