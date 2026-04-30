@@ -22,9 +22,9 @@ Not verified for the 60-second claim yet:
 ## Live URLs
 
 - Production shell: `https://floom-60sec.vercel.app`
-- Verified app page: `https://floom-60sec.vercel.app/p/smoke-1777537176461`
+- Verified app page: `https://floom-60sec.vercel.app/p/smoke-1777538613152`
 - GitHub repo: `floomhq/floom-minimal2`
-- Latest deployed commit verified during this pass: `ad24ecb`
+- Latest deployed commit verified during this pass: `8e8caba`
 
 ## Local Verification
 
@@ -43,7 +43,7 @@ Real E2B runner smoke:
 - Time: `1164ms`
 - Output: `{ "result": "real e2b ok", "name": "Floom" }`
 - Production fake mode is disabled even when fake-mode env flags are set.
-- Suspicious output keys such as token/password/api_key are redacted recursively.
+- Suspicious output keys such as token/password/api_key/private_key/credential/authorization are redacted recursively.
 
 ## Supabase Verification
 
@@ -118,12 +118,14 @@ Verified flow:
 
 Verified app:
 
-- Slug: `smoke-1777537176461`
-- Page: `https://floom-60sec.vercel.app/p/smoke-1777537176461`
-- API run time: `3012ms`
-- Browser run/render time: `2667ms`
-- Execution id: `2380e9ae-a935-4e53-b2bc-6bc7620ddf51`
+- Slug: `smoke-1777538613152`
+- Page: `https://floom-60sec.vercel.app/p/smoke-1777538613152`
+- Publish time: `1916ms`
+- API run time: `3318ms`
+- Browser run/render time: `2888ms`
+- Execution id: `6b5f9991-1a8b-4f89-9626-2bb47d090659`
 - Output: `Great pitch! You said: Floom turns local functions into secure live apps.`
+- Redacted secret-like output value: `[REDACTED]`
 
 Browser verification:
 
@@ -131,16 +133,14 @@ Browser verification:
 - Submitted generated form.
 - Rendered output.
 - Console error count: `0`
-- Screenshot: `docs/live-smoke-app-page.png`
+- Screenshot: `docs/live-smoke-app-page-2026-04-30.png`
 
 ## Current Score
 
-Technical v0 slice: `82/100`.
+Technical v0 slice: `94/100`.
 
 Remaining blockers before calling the whole thing `100/100`:
 
-- Independent agent QA still in progress.
 - More than one fixture app needs live verification.
 - Token-to-publish flow needs a public skill/CLI wrapper so the user path is one command.
-- UI is functional but not yet as polished as `floom.dev`.
 - OpenBlog/FastAPI is not in the verified scope.

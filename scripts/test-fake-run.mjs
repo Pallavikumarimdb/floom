@@ -332,6 +332,9 @@ function testSecretOutputRedaction() {
       visible_extra: 'public-extra',
       api_key: 'dynamic-private',
       nested_extra: { password: 'nested-private', display: 'public-nested' },
+      private_key: 'private-key',
+      credential: 'credential-value',
+      authorization: 'bearer-value',
     },
   };
 
@@ -355,6 +358,9 @@ function testSecretOutputRedaction() {
       visible_extra: 'public-extra',
       api_key: REDACTED_OUTPUT_VALUE,
       nested_extra: { password: REDACTED_OUTPUT_VALUE, display: 'public-nested' },
+      private_key: REDACTED_OUTPUT_VALUE,
+      credential: REDACTED_OUTPUT_VALUE,
+      authorization: REDACTED_OUTPUT_VALUE,
     },
   });
   assert.equal(output.token, 'secret-token');

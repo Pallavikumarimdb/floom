@@ -262,7 +262,10 @@ function isSuspiciousSecretKey(key: string) {
     normalized.includes("secret") ||
     normalized.includes("password") ||
     normalized.includes("token") ||
-    normalized.includes("apikey")
+    normalized.includes("apikey") ||
+    normalized.includes("privatekey") ||
+    normalized.includes("credential") ||
+    normalized.includes("authorization")
   );
 }
 
