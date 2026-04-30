@@ -1,4 +1,5 @@
 import { createHash } from "crypto";
+import type { AuthCaller } from "@/lib/supabase/auth";
 
 const PUBLIC_ANONYMOUS_RATE_LIMIT_ID = "anonymous";
 const RATE_LIMIT_KEY_PART_RE = /[^a-zA-Z0-9_-]/g;
@@ -19,6 +20,19 @@ export function getPublicRunCallerKey(headers: Headers) {
     .update(`${directIp || "unknown-ip"}|${userAgent}`)
     .digest("hex")
     .slice(0, 32);
+}
+
+export function getRunCallerKey(caller: AuthCaller | null, headers: Headers) {
+  if (!caller) {
+    return getPublicRunCallerKey(headers);
+  }
+
+  const identity =
+    caller.kind === "agent_token"
+      ? `agent:${caller.agentTokenId}`
+      : `user:${caller.userId}`;
+
+  return createHash("sha256").update(identity).digest("hex").slice(0, 32);
 }
 
 function safeRateLimitPart(value: string) {

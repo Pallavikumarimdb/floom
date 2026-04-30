@@ -69,7 +69,7 @@ Required:
 - A builder can create/revoke an agent token.
 - Agent token permits app publish/update through MCP/CLI.
 - Agent token is stored hashed in Supabase.
-- Agent token scopes are explicit: `read`, `run`, `publish`, `revoke`.
+- Agent token scopes are explicit: `read`, `run`, `publish`.
 - Agent tokens expire by default.
 - Token prefix is stored for display; raw token is shown once.
 - Token hashing uses a server-only pepper outside the database.

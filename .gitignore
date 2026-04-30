@@ -37,6 +37,7 @@ yarn-error.log*
 .vercel
 
 # supabase local link/cache
+supabase/.branches/
 supabase/.temp/
 
 # typescript

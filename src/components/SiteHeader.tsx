@@ -16,9 +16,9 @@ export function SiteHeader({ showProductLinks = false }: SiteHeaderProps) {
         </Link>
         {showProductLinks && (
           <div className="hidden items-center gap-7 text-sm text-neutral-600 sm:flex">
-            <a href="https://floom.dev/apps">Apps</a>
-            <a href="https://floom.dev/docs">Docs</a>
-            <a href="https://floom.dev/changelog">Changelog</a>
+            <Link href="/p/smoke-1777538613152">Live demo</Link>
+            <Link href="/docs">Docs</Link>
+            <Link href="/legal">Legal</Link>
           </div>
         )}
         <Link

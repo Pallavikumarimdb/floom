@@ -54,7 +54,7 @@ export async function createAgentToken(
   admin: SupabaseClient,
   ownerId: string,
   name: string,
-  scopes: string[] = ["read", "run", "publish", "revoke"]
+  scopes: string[] = ["read", "run", "publish"]
 ) {
   const token = generateAgentToken();
   const { data, error } = await admin

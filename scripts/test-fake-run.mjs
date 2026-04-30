@@ -9,6 +9,7 @@ import { runInSandbox, runInSandboxContained } from '../src/lib/e2b/runner.ts';
 import {
   getPublicRunCallerKey,
   getPublicRunRateLimitKey,
+  getRunCallerKey,
 } from '../src/lib/floom/rate-limit.ts';
 import {
   parseManifest,
@@ -446,12 +447,28 @@ function testPublicRunRateLimitHardening() {
   assert.notEqual(callerA, callerB);
   assert.equal(getPublicRunCallerKey(new Headers()), 'anonymous');
   assert.equal(getPublicRunRateLimitKey('app/123', callerA), `public-run:app-123:${callerA}`);
+  assert.match(getRunCallerKey(
+    { kind: 'user', userId: 'user-123', agentTokenId: null },
+    new Headers()
+  ), /^[a-f0-9]{32}$/);
+  assert.notEqual(
+    getRunCallerKey({ kind: 'user', userId: 'user-123', agentTokenId: null }, new Headers()),
+    getRunCallerKey({
+      kind: 'agent_token',
+      userId: 'user-123',
+      agentTokenId: 'token-123',
+      scopes: ['run'],
+    }, new Headers())
+  );
   assert.match(routeText, /check_public_run_rate_limit/);
   assert.ok(
     routeText.indexOf('checkPublicRunRateLimit') < routeText.indexOf('runInSandboxContained('),
     'public run rate limit must run before sandbox execution'
   );
-  assert.match(routeText, /getPublicRunCallerKey\(req\.headers\)/);
+  assert.match(routeText, /getBearerToken\(req\)/);
+  assert.match(routeText, /bearerToken && !caller/);
+  assert.match(routeText, /getRunCallerKey\(caller, req\.headers\)/);
+  assert.doesNotMatch(routeText, /if \(!caller && isPublic\)/);
   assert.match(routeText, /getPublicRunRateLimitKey\(appId, callerKey\)/);
   assert.match(routeText, /Run rate limit check failed/);
   assert.match(routeText, /redactSecretOutput/);
@@ -506,7 +523,8 @@ function testPublicRunRateLimitHardening() {
   );
   assertSqlContains(storageHardeningText, "update storage.buckets set public = false where id = 'app-bundles'");
   assertSqlContains(storageHardeningText, 'alter table storage.objects enable row level security');
-  assertSqlContains(storageHardeningText, "alter table public.agent_tokens alter column scopes set default array['read', 'run', 'publish', 'revoke']::text[]");
+  assertSqlContains(storageHardeningText, "alter table public.agent_tokens alter column scopes set default array['read', 'run', 'publish']::text[]");
+  assert.doesNotMatch(storageHardeningText, /publish', 'revoke/);
   assertSqlContains(storageHardeningText, 'create policy "app bundles readable by owning user"');
   assertSqlContains(storageHardeningText, 'create policy "app bundles writable by owning user"');
   assertSqlContains(storageHardeningText, 'create policy "app bundles updateable by owning user"');
@@ -514,6 +532,17 @@ function testPublicRunRateLimitHardening() {
   assert.doesNotMatch(migrationText, /create or replace function public\.set_updated_at\(\)/);
   assert.doesNotMatch(migrationText, /create or replace function public\.handle_new_user\(\)/);
   assert.doesNotMatch(migrationText, /on conflict \(id\) do update\s+set public = excluded\.public/);
+
+  const tokenRouteText = readFileSync('src/app/api/agent-tokens/route.ts', 'utf8');
+  assert.match(tokenRouteText, /MAX_AGENT_TOKEN_NAME_LENGTH = 80/);
+  assert.match(tokenRouteText, /DEFAULT_MAX_ACTIVE_AGENT_TOKENS_PER_USER = 10/);
+  assert.match(tokenRouteText, /\.select\("id", \{ count: "exact", head: true \}\)/);
+  assert.match(tokenRouteText, /status: 400/);
+  assert.match(tokenRouteText, /status: 429/);
+
+  const tokenLibText = readFileSync('src/lib/supabase/agent-tokens.ts', 'utf8');
+  assert.match(tokenLibText, /scopes: string\[\] = \["read", "run", "publish"\]/);
+  assert.doesNotMatch(tokenLibText, /"revoke"\]/);
 }
 
 function testCliRejectsUnsupportedV0Shapes(manifestText, inputSchemaText, outputSchemaText) {

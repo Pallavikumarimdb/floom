@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { callerHasScope, resolveAuthCaller } from "@/lib/supabase/auth";
+import { callerHasScope, getBearerToken, resolveAuthCaller } from "@/lib/supabase/auth";
 import { demoApp, hasSupabaseConfig, runDemoApp } from "@/lib/demo-app";
 import { runInSandboxContained } from "@/lib/e2b/runner";
 import { MAX_INPUT_BYTES, MAX_REQUEST_BYTES, MAX_SOURCE_BYTES } from "@/lib/floom/limits";
-import { getPublicRunCallerKey, getPublicRunRateLimitKey } from "@/lib/floom/rate-limit";
+import { getPublicRunRateLimitKey, getRunCallerKey } from "@/lib/floom/rate-limit";
 import { redactSecretOutput } from "@/lib/floom/schema";
 import Ajv from "ajv";
 
@@ -75,7 +75,12 @@ export async function POST(
   }
 
   // Auth / sharing check
+  const bearerToken = getBearerToken(req);
   const caller = await resolveAuthCaller(req, admin);
+  if (bearerToken && !caller) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const userId = caller?.userId ?? null;
 
   const isOwner = userId === app.owner_id;
@@ -98,18 +103,16 @@ export async function POST(
     );
   }
 
-  if (!caller && isPublic) {
-    const rateLimit = await checkPublicRunRateLimit(
-      admin,
-      app.id,
-      getPublicRunCallerKey(req.headers)
+  const rateLimit = await checkPublicRunRateLimit(
+    admin,
+    app.id,
+    getRunCallerKey(caller, req.headers)
+  );
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      { error: rateLimit.error },
+      { status: rateLimit.status }
     );
-    if (!rateLimit.allowed) {
-      return NextResponse.json(
-        { error: rateLimit.error },
-        { status: rateLimit.status }
-      );
-    }
   }
 
   // Create execution record

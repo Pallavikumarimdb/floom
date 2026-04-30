@@ -21,7 +21,7 @@ end;
 $$;
 
 alter table public.agent_tokens
-  alter column scopes set default array['read', 'run', 'publish', 'revoke']::text[];
+  alter column scopes set default array['read', 'run', 'publish']::text[];
 
 drop policy if exists "app bundles readable by owning user" on storage.objects;
 create policy "app bundles readable by owning user"

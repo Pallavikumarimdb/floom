@@ -357,7 +357,7 @@ async function authStatus(context: McpToolContext): Promise<McpToolResult> {
     scopes:
       caller.kind === "agent_token"
         ? caller.scopes
-        : ["read", "run", "publish", "revoke"],
+        : ["read", "run", "publish"],
   });
 }
 
