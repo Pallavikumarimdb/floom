@@ -10,6 +10,24 @@ Independent QA logs:
 - `docs/qa-runs/qa-run-2-20260430114407.md`
 - `docs/qa-runs/qa-run-3-20260430113428.md`
 
+## Locked Launch Claim
+
+Exact claim wording:
+
+> from localhost to live and secure in 60sec
+
+Verified meaning:
+
+- The 60sec path starts after account setup and agent-token creation.
+- The app is one stdlib-only Python file with `floom.yaml`, `input.schema.json`, and `output.schema.json`.
+- The CLI publishes with `FLOOM_TOKEN`.
+- The app becomes live at `/p/:slug` and runs through browser/API flows.
+- Public apps allow anonymous metadata and run access.
+- Private apps block anonymous metadata and runs, and allow owner-token metadata and runs.
+- Secure means the verified v0 controls: E2B sandboxed execution, scoped/revocable agent tokens created through `/tokens`, schema-marked input/output redaction before persistence, caller-derived plus per-app run rate limits, and public/private access control.
+
+Out of mainline unless re-verified end to end: TypeScript apps, Java apps, dependency installation, user-provided secrets, OpenAPI/FastAPI apps, multi-file bundles, background workers, arbitrary web servers, and full repo hosting.
+
 ## Verified Working
 
 - Authenticated browser token creation works.
@@ -26,7 +44,7 @@ Independent QA logs:
 - MCP descriptor and `run_app` work for tested flows.
 - Supabase evidence exists for apps, app versions, executions, token metadata, bundle storage, and private bucket config in QA runs #1 and #2.
 - E2B-backed production execution returned app output; fake-mode output was not observed.
-- Secret-like output fields marked in the output schema were redacted.
+- Secret-like inputs and schema-marked output fields are redacted before persistence or response output.
 - `/docs` and `/legal` are live.
 - OpenBlog was classified as outside v0 scope: multi-file Python, dependencies, OpenAPI/FastAPI-style surface, stateful async endpoints.
 
@@ -44,6 +62,28 @@ Required Supabase Auth settings:
 - Google Cloud OAuth redirect URI includes the Supabase callback URL shown in the Supabase Google provider settings.
 
 After provider email is unblocked, run `docs/virgin-agent-qa.md` again from a fresh browser and verify confirmation lands on production, not localhost.
+
+## Fresh-Agent Launch Gate Checklist
+
+Before launch, a fresh agent must verify each item with live production evidence:
+
+- [ ] Start from a fresh browser profile or cleared session.
+- [ ] Confirm signup/sign-in lands on `https://floom-60sec.vercel.app/auth/callback`, not localhost.
+- [ ] Create an agent token in `/tokens`; verify the raw token is shown once.
+- [ ] Publish the verified single-file stdlib Python fixture with `FLOOM_TOKEN` and production `FLOOM_API_URL`.
+- [ ] Open the returned `/p/:slug` page and run it in the browser.
+- [ ] Run the same app through the REST API with the owner token.
+- [ ] Verify a public app allows anonymous metadata and run.
+- [ ] Verify a private app blocks anonymous metadata and run.
+- [ ] Verify a private app allows owner-token metadata and run.
+- [ ] Verify an invalid bearer token returns `401`.
+- [ ] Revoke the token and verify publish/private run fail.
+- [ ] Capture Supabase evidence for app, app version, execution, token metadata, and private bundle storage.
+- [ ] Confirm production execution is E2B-backed and fake-mode output is not observed.
+- [ ] Confirm secret-like inputs and schema-marked output are redacted as `[REDACTED]`.
+- [ ] Confirm MCP does not expose token creation; create tokens from `/tokens`.
+- [ ] Confirm caller-derived and per-app run rate limits execute before E2B execution.
+- [ ] Confirm docs do not present TypeScript, Java, dependencies, secrets, OpenAPI/FastAPI, or multi-file apps as v0 mainline.
 
 ## Scores From Independent Runs
 

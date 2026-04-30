@@ -1,10 +1,12 @@
 # Floom v0
 
-Local function apps with a generated UI in 60 seconds.
+from localhost to live and secure in 60sec.
 
 ## What is this?
 
-Floom v0 is a minimal vertical slice for packaging a local Python function app and running it through a generated JSON Schema UI. The local demo works without Supabase. Supabase-backed API routes require Supabase env and return 503 JSON when that env is missing.
+Floom v0 is a minimal vertical slice for packaging a local, single-file, stdlib-only Python function app and running it through a generated JSON Schema UI. The verified launch claim is: from localhost to live and secure in 60sec. This claim starts after account and agent-token setup, and covers CLI publish plus browser/API run for the verified v0 contract.
+
+Secure in the v0 claim means the verified controls are in place: E2B sandboxed execution, scoped agent tokens created through `/tokens`, schema-marked input/output redaction before persistence, caller-derived plus per-app run rate limits, and public/private access control. The local demo works without Supabase. Supabase-backed API routes require Supabase env and return 503 JSON when that env is missing.
 
 ## Stack
 
@@ -95,6 +97,19 @@ FLOOM_TOKEN=YOUR_FLOOM_AGENT_TOKEN FLOOM_API_URL=https://floom-60sec.vercel.app 
 For local development, set `FLOOM_API_URL=http://localhost:3000` after `npm run dev`.
 Without Supabase env, visit `/p/demo-app` for the local demo. In the hosted v0, use the homepage CTA to open the retained live app.
 
+## Launch Claim Contract
+
+The mainline v0 path is intentionally narrow:
+
+- Account setup and agent-token creation happen before the 60sec timer.
+- Apps use one `app.py` file with Python stdlib only.
+- Inputs and outputs are declared with JSON Schema.
+- Publish uses `FLOOM_TOKEN` and the CLI.
+- Public apps can be read and run anonymously.
+- Private apps require a valid owner token for metadata and runs.
+
+Not mainline unless re-verified end to end: TypeScript apps, Java apps, dependency installation, user-provided secrets, OpenAPI/FastAPI apps, multi-file bundles, background workers, and arbitrary web servers.
+
 ## App Contract
 
 `floom.yaml`:
@@ -148,9 +163,8 @@ Launch tools:
 - `publish_app`
 - `run_app`
 - `get_app`
-- `create_agent_token`
 
-`create_agent_token` requires a Supabase user JWT from the web login flow. The other publish/run tools accept a Floom agent token when the token has the required scope.
+MCP cannot create or return raw agent tokens. Create agent tokens from the signed-in `/tokens` page, where the raw token is shown once. The publish/run tools accept a Floom agent token when the token has the required scope.
 
 `get_app_contract` returns the current v0 manifest, `app.py`, input/output schema examples, and explicit unsupported cases. Agents use it before generating app files so they do not create FastAPI/OpenAPI, dependency, TypeScript, multi-file, secrets, or multi-action apps for the v0 runtime.
 

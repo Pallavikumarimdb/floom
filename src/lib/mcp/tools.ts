@@ -43,8 +43,7 @@ type FloomToolName =
   | "publish_app"
   | "find_candidate_apps"
   | "get_app"
-  | "run_app"
-  | "create_agent_token";
+  | "run_app";
 
 const SLUG_RE = /^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$/;
 
@@ -198,20 +197,6 @@ export const floomTools: McpToolDefinition[] = [
       additionalProperties: false,
     },
   },
-  {
-    name: "create_agent_token",
-    description: "Create an agent token for the authenticated Floom user.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        name: {
-          type: "string",
-          description: "Human-readable token name.",
-        },
-      },
-      additionalProperties: false,
-    },
-  },
 ];
 
 export async function callFloomTool(
@@ -246,10 +231,6 @@ async function callFloomToolUnchecked(
 
   if (name === "run_app") {
     return runApp(args, context);
-  }
-
-  if (name === "create_agent_token") {
-    return createAgentToken(args, context);
   }
 
   if (name === "auth_status") {
@@ -330,31 +311,6 @@ async function runApp(args: JsonObject, context: McpToolContext): Promise<McpToo
       ...forwardedHeaders(context),
     },
     body: JSON.stringify({ inputs }),
-  });
-}
-
-async function createAgentToken(
-  args: JsonObject,
-  context: McpToolContext
-): Promise<McpToolResult> {
-  if (!context.authorization) {
-    return errorResult("create_agent_token requires an Authorization bearer token");
-  }
-
-  const name = args.name;
-  if (name !== undefined && typeof name !== "string") {
-    return errorResult("name must be a string when provided");
-  }
-
-  return proxyJson(`${context.baseUrl}/api/agent-tokens`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...forwardedHeaders(context),
-    },
-    body: JSON.stringify({
-      ...(typeof name === "string" ? { name } : {}),
-    }),
   });
 }
 
