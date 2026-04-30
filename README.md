@@ -39,7 +39,6 @@ src/
       server.ts            # Server Supabase client
       admin.ts             # Service-role Supabase client
     types.ts               # TypeScript types
-supabase/migrations/        # Database schema + RLS policies
 fixture-app/                # Example Python app for testing
 cli/
   deploy.ts                # CLI deploy script
@@ -64,9 +63,7 @@ E2B_API_KEY=your-e2b-api-key
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 ```
 
-### 2. Run Supabase migrations
 
-Apply the migration in `supabase/migrations/20260429120000_init.sql` to your Supabase project.
 
 ### 3. Install dependencies
 
