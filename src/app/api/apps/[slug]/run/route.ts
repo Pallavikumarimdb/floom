@@ -115,9 +115,30 @@ export async function POST(
   }
 
   // Fetch bundle
-  const { data: bundleData } = await admin.storage
+  const { data: bundleData, error: bundleError } = await admin.storage
     .from("app-bundles")
     .download(latestVersion.bundle_path);
+
+  if (bundleError || !bundleData) {
+    await admin
+      .from("executions")
+      .update({
+        status: "error",
+        error: "Failed to download app bundle",
+        completed_at: new Date().toISOString(),
+      })
+      .eq("id", execution.id);
+
+    return NextResponse.json(
+      {
+        execution_id: execution.id,
+        status: "error",
+        output: {},
+        error: "Failed to download app bundle",
+      },
+      { status: 500 }
+    );
+  }
 
   const bundleText = bundleData ? await bundleData.text() : "";
 
@@ -146,10 +167,12 @@ export async function POST(
     })
     .eq("id", execution.id);
 
+  const status = result.error ? "error" : outputValid ? "success" : "error";
+
   return NextResponse.json({
     execution_id: execution.id,
-    status: result.error ? "error" : "success",
-    output: result.output,
-    error: result.error,
+    status,
+    output: result.error ? null : result.output,
+    error: result.error || (!outputValid ? "Output validation failed" : null),
   });
 }

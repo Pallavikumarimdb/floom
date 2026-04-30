@@ -130,7 +130,7 @@ export async function POST(req: NextRequest) {
   }
 
   // Create version
-  await admin.from("app_versions").insert({
+  const { error: versionError } = await admin.from("app_versions").insert({
     app_id: app.id,
     version: 1,
     bundle_path: bundlePath,
@@ -139,6 +139,12 @@ export async function POST(req: NextRequest) {
     dependencies: manifest.dependencies ?? {},
     secrets: manifest.secrets ?? [],
   });
+
+  if (versionError) {
+    await admin.from("apps").delete().eq("id", app.id);
+    await admin.storage.from("app-bundles").remove([bundlePath]);
+    return NextResponse.json({ error: "Failed to create app version" }, { status: 500 });
+  }
 
   return NextResponse.json({
     app: {
