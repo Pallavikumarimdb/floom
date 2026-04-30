@@ -151,7 +151,7 @@ export async function POST(req: NextRequest) {
       id: app.id,
       slug: app.slug,
       name: app.name,
-      url: `${process.env.NEXT_PUBLIC_APP_URL}/p/${app.slug}`,
+      url: new URL(`/p/${app.slug}`, req.url).toString(),
     },
   });
 }
