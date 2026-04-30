@@ -169,6 +169,8 @@ async function test() {
   delete process.env.FLOOM_EXECUTION_MODE;
   delete process.env.FLOOM_FAKE_E2B;
   process.env.NODE_ENV = 'production';
+  process.env.FLOOM_EXECUTION_MODE = 'fake';
+  process.env.FLOOM_FAKE_E2B = '1';
   try {
     const closedResult = await runInSandbox(
       'def run(inputs): return {"result": "hello"}',
@@ -178,6 +180,7 @@ async function test() {
       'run'
     );
     assert.equal(closedResult.error, 'E2B execution is not configured');
+    assert.notEqual(closedResult.output?.result, 'hello from fake mode');
   } finally {
     restoreEnv(failClosedEnv);
   }
@@ -297,7 +300,7 @@ function testSecretOutputRedaction() {
       },
       dynamic: {
         type: 'object',
-        additionalProperties: { type: 'string', secret: true },
+        additionalProperties: true,
       },
     },
   };
@@ -325,7 +328,11 @@ function testSecretOutputRedaction() {
     ],
     ref_rows: [{ row_ref_secret: 'row-ref-private' }],
     union_value: { hidden: 'union-private' },
-    dynamic: { api_key: 'dynamic-private' },
+    dynamic: {
+      visible_extra: 'public-extra',
+      api_key: 'dynamic-private',
+      nested_extra: { password: 'nested-private', display: 'public-nested' },
+    },
   };
 
   assert.deepEqual(redactSecretOutput(outputSchema, output), {
@@ -344,7 +351,11 @@ function testSecretOutputRedaction() {
     ],
     ref_rows: [{ row_ref_secret: REDACTED_OUTPUT_VALUE }],
     union_value: { hidden: REDACTED_OUTPUT_VALUE },
-    dynamic: { api_key: REDACTED_OUTPUT_VALUE },
+    dynamic: {
+      visible_extra: 'public-extra',
+      api_key: REDACTED_OUTPUT_VALUE,
+      nested_extra: { password: REDACTED_OUTPUT_VALUE, display: 'public-nested' },
+    },
   });
   assert.equal(output.token, 'secret-token');
   assert.equal(output.rows[0].row_secret, 'row-private');
@@ -412,6 +423,17 @@ function testPublicRunRateLimitHardening() {
   );
   assertSqlContains(triggerRetirementText, 'drop trigger if exists on_auth_user_created on auth.users');
   assertSqlContains(migrationText, 'values (\'app-bundles\', \'app-bundles\', false, 1048576) on conflict (id) do nothing');
+  const storageHardeningText = readFileSync(
+    'supabase/migrations/20260430103000_harden_app_bundle_storage.sql',
+    'utf8'
+  );
+  assertSqlContains(storageHardeningText, "update storage.buckets set public = false where id = 'app-bundles'");
+  assertSqlContains(storageHardeningText, 'alter table storage.objects enable row level security');
+  assertSqlContains(storageHardeningText, "alter table public.agent_tokens alter column scopes set default array['read', 'run', 'publish', 'revoke']::text[]");
+  assertSqlContains(storageHardeningText, 'create policy "app bundles readable by owning user"');
+  assertSqlContains(storageHardeningText, 'create policy "app bundles writable by owning user"');
+  assertSqlContains(storageHardeningText, 'create policy "app bundles updateable by owning user"');
+  assertSqlContains(storageHardeningText, 'create policy "app bundles deletable by owning user"');
   assert.doesNotMatch(migrationText, /create or replace function public\.set_updated_at\(\)/);
   assert.doesNotMatch(migrationText, /create or replace function public\.handle_new_user\(\)/);
   assert.doesNotMatch(migrationText, /on conflict \(id\) do update\s+set public = excluded\.public/);

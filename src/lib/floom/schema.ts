@@ -57,7 +57,7 @@ export function validateJsonSchemaValue(
 }
 
 export function redactSecretOutput(outputSchema: unknown, output: unknown): unknown {
-  return redactBySchema(outputSchema, output, outputSchema, new Set());
+  return redactSuspiciousKeys(redactBySchema(outputSchema, output, outputSchema, new Set()));
 }
 
 function getJsonComplexity(value: unknown): { ok: true } | { ok: false } {
@@ -237,6 +237,33 @@ function cloneJsonValue(value: unknown): unknown {
   }
 
   return value;
+}
+
+function redactSuspiciousKeys(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map((item) => redactSuspiciousKeys(item));
+  }
+
+  if (!isJsonObject(value)) {
+    return value;
+  }
+
+  return Object.fromEntries(
+    Object.entries(value).map(([key, item]) => [
+      key,
+      isSuspiciousSecretKey(key) ? REDACTED_OUTPUT_VALUE : redactSuspiciousKeys(item),
+    ])
+  );
+}
+
+function isSuspiciousSecretKey(key: string) {
+  const normalized = key.toLowerCase().replace(/[^a-z0-9]/g, "");
+  return (
+    normalized.includes("secret") ||
+    normalized.includes("password") ||
+    normalized.includes("token") ||
+    normalized.includes("apikey")
+  );
 }
 
 function isJsonObject(value: unknown): value is JsonObject {

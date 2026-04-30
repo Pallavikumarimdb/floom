@@ -2,9 +2,13 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
-import Link from "next/link";
-import Form from "@rjsf/core";
-import validator from "@rjsf/validator-ajv8";
+import type { RJSFSchema } from "@rjsf/utils";
+import {
+  AppRunSurface,
+  type RunFormData,
+  type RunResult,
+} from "@/components/AppRunSurface";
+import { SiteHeader } from "@/components/SiteHeader";
 import { createClient } from "@/lib/supabase/client";
 
 interface AppData {
@@ -12,13 +16,10 @@ interface AppData {
   slug: string;
   name: string;
   runtime: string;
-  input_schema: object;
+  input_schema: RJSFSchema;
   output_schema: object;
   public: boolean;
 }
-
-type RunResult = Record<string, unknown> | null;
-type FormData = Record<string, unknown>;
 
 function hasBrowserSupabaseConfig() {
   return Boolean(
@@ -36,7 +37,7 @@ export default function AppPage() {
   const [runLoading, setRunLoading] = useState(false);
   const [runResult, setRunResult] = useState<RunResult>(null);
   const [runError, setRunError] = useState<string | null>(null);
-  const [formData, setFormData] = useState<FormData>({});
+  const [formData, setFormData] = useState<RunFormData>({});
 
   const fetchApp = useCallback(async () => {
     setLoading(true);
@@ -153,20 +154,7 @@ export default function AppPage() {
           color: #716b61;
         }
       `}</style>
-      <header className="border-b border-[#e7e2d8]">
-        <nav className="mx-auto flex max-w-6xl items-center justify-between px-5 py-4">
-          <Link href="/" className="flex items-center gap-2 text-xl font-black">
-            <span className="h-3 w-3 rounded-sm bg-emerald-500" />
-            floom<span className="text-emerald-600">.</span>
-          </Link>
-          <a
-            href="https://floom.dev"
-            className="rounded-md bg-black px-4 py-2 text-sm font-semibold text-white"
-          >
-            Join waitlist
-          </a>
-        </nav>
-      </header>
+      <SiteHeader />
 
       <section className="mx-auto max-w-6xl px-5 py-10">
         <p className="mb-5 text-sm text-neutral-500">Apps / {app.name}</p>
@@ -178,9 +166,6 @@ export default function AppPage() {
               Schema and executed in an isolated sandbox.
             </p>
             <div className="mt-4 flex flex-wrap gap-2 text-xs text-neutral-600">
-              <span className="rounded-full border border-[#ded8cc] bg-white px-3 py-1">
-                research
-              </span>
               <span className="rounded-full border border-[#ded8cc] bg-white px-3 py-1">
                 Runtime: {app.runtime}
               </span>
@@ -199,74 +184,16 @@ export default function AppPage() {
           </span>
         </div>
 
-        <div className="overflow-hidden rounded-2xl border border-[#ded8cc] bg-white shadow-xl shadow-neutral-200/60">
-          <div className="border-b border-[#ded8cc] px-6 py-4 font-mono text-xs font-bold uppercase tracking-widest text-neutral-500">
-            Run ready
-          </div>
-          <div className="grid min-h-[420px] md:grid-cols-[380px_1fr]">
-            <div className="border-b border-[#ded8cc] p-8 md:border-b-0 md:border-r">
-              <p className="mb-5 font-mono text-xs font-bold uppercase tracking-widest text-neutral-500">
-                Inputs
-              </p>
-              <Form
-                className="floom-run-form"
-                schema={app.input_schema}
-                validator={validator}
-                formData={formData}
-                onChange={(e) => setFormData((e.formData ?? {}) as FormData)}
-                onSubmit={handleRun}
-              >
-                <div className="mt-6 flex gap-3">
-                  <button
-                    type="submit"
-                    disabled={runLoading}
-                    className="rounded-lg bg-emerald-700 px-8 py-3 font-semibold text-white transition hover:bg-emerald-800 disabled:opacity-50"
-                  >
-                    {runLoading ? "Running..." : "Run"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setFormData({})}
-                    className="rounded-lg border border-[#ded8cc] bg-white px-5 py-3 font-semibold text-neutral-600"
-                  >
-                    Reset
-                  </button>
-                </div>
-              </Form>
-            </div>
-
-            <div className="flex min-h-[360px] flex-col p-8">
-              <p className="mb-5 font-mono text-xs font-bold uppercase tracking-widest text-neutral-500">
-                Output
-              </p>
-              {runError && (
-                <div className="rounded-xl border border-red-200 bg-red-50 p-4">
-                  <p className="font-medium text-red-700">Error</p>
-                  <pre className="mt-1 whitespace-pre-wrap text-sm text-red-600">
-                    {runError}
-                  </pre>
-                </div>
-              )}
-              {!runError && !runResult && (
-                <div className="flex flex-1 items-center justify-center text-center">
-                  <div>
-                    <p className="font-semibold">Output will appear here</p>
-                    <p className="mt-2 text-sm text-neutral-500">
-                      Fill the form and press Run.
-                    </p>
-                  </div>
-                </div>
-              )}
-              {runResult && (
-                <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-5">
-                  <pre className="overflow-auto whitespace-pre-wrap text-sm leading-7 text-emerald-900">
-                    {JSON.stringify(runResult, null, 2)}
-                  </pre>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
+        <AppRunSurface
+          inputSchema={app.input_schema}
+          formData={formData}
+          runError={runError}
+          runLoading={runLoading}
+          runResult={runResult}
+          onFormDataChange={setFormData}
+          onReset={() => setFormData({})}
+          onRun={handleRun}
+        />
       </section>
     </main>
   );

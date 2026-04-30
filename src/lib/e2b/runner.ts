@@ -110,6 +110,10 @@ export async function runInSandboxContained(
 }
 
 function isExplicitFakeMode() {
+  if (process.env.NODE_ENV === "production") {
+    return false;
+  }
+
   return (
     process.env.FLOOM_EXECUTION_MODE === "fake" ||
     process.env.FLOOM_FAKE_E2B === "1" ||

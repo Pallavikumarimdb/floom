@@ -40,8 +40,10 @@ Real E2B runner smoke:
 
 - Path: `src/lib/e2b/runner.ts`
 - Result: success
-- Time: `1103ms`
-- Output: `{ "result": "Floom from real e2b" }`
+- Time: `1164ms`
+- Output: `{ "result": "real e2b ok", "name": "Floom" }`
+- Production fake mode is disabled even when fake-mode env flags are set.
+- Suspicious output keys such as token/password/api_key are redacted recursively.
 
 ## Supabase Verification
 
@@ -55,6 +57,7 @@ Applied migrations:
 - `20260430080000_floom_v0_core`
 - `20260430093000_drop_public_metadata_policies`
 - `20260430100000_retire_legacy_auth_trigger`
+- `20260430103000_harden_app_bundle_storage`
 
 Verified live tables:
 
@@ -78,6 +81,9 @@ Verified live policies:
 - Legacy direct public-read policies for `apps` and `app_versions` were removed.
 - Owner policies remain.
 - Storage bucket `app-bundles` is private.
+- `storage.objects` has RLS enabled.
+- `app-bundles` has owner-scoped select, insert, update, and delete policies.
+- `agent_tokens.scopes` defaults to `read`, `run`, `publish`, and `revoke`.
 
 Verified RPC:
 
