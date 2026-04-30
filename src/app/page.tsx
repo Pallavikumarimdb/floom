@@ -734,10 +734,10 @@ const STEPS = [
   },
   {
     num: '02',
-    kicker: 'DEPLOY (BUILDERS ONLY)',
-    title: 'Join the waitlist to publish your own app',
-    body: 'Deploying your own app is rolling out to early builders. Join the waitlist — marketplace apps are already live for everyone.',
-    mono: 'publishing via waitlist',
+    kicker: 'PUBLISH FROM CLI',
+    title: 'Sign up, mint a token, ship.',
+    body: 'One npx command sets up MCP and mints your agent token. Floom hosts the UI, the REST endpoint, and the MCP tool.',
+    mono: 'floom publish ./my-app',
   },
   {
     num: '03',
