@@ -1,16 +1,16 @@
 # Floom v0
 
-From localhost to live and secure in 60 seconds.
+Local function apps with a generated UI in 60 seconds.
 
 ## What is this?
 
-Floom v0 is a minimal vertical slice that lets a developer deploy a local Python or TypeScript function app with one command. It packages the app, validates schemas, stores the record in Supabase, and returns a secure shareable URL at `floom.dev/p/:slug`.
+Floom v0 is a minimal vertical slice for packaging a local Python or TypeScript function app and running it through a generated JSON Schema UI. The local demo works without Supabase. Supabase-backed API routes require Supabase env and return 503 JSON when that env is missing.
 
 ## Stack
 
-- Next.js on Vercel for the Floom shell
-- Supabase Auth + Postgres + RLS
-- E2B SDK for sandboxed execution
+- Next.js app shell
+- Supabase schema/Auth integration when configured
+- E2B SDK integration with fake mode for local testing
 - JSON Schema as the app contract
 - `@rjsf/core` + `@rjsf/validator-ajv8` for generated forms
 - AJV for server validation
@@ -33,7 +33,7 @@ src/
       page.tsx             # Generated UI for running apps
     page.tsx               # Homepage
   lib/
-    runner.ts              # E2B sandbox runner (with fake mode)
+    runner.ts              # Runner with E2B integration and fake mode
     supabase/
       client.ts            # Browser Supabase client
       server.ts            # Server Supabase client
@@ -77,13 +77,13 @@ npm install
 npm run dev
 ```
 
-### 5. Deploy the fixture app
+### 5. Register the fixture app with Supabase configured
 
 ```bash
 npx tsx cli/deploy.ts ./fixture-app http://localhost:3000 YOUR_SUPABASE_AUTH_TOKEN
 ```
 
-Or manually seed the database and visit `/p/pitch-coach`.
+Without Supabase env, visit `/p/demo-app` for the local demo.
 
 ## App Contract
 
@@ -122,13 +122,11 @@ export async function run(inputs: Record<string, unknown>) {
 1. CLI packages local app directory.
 2. CLI validates `floom.yaml`, input JSON Schema, output JSON Schema.
 3. CLI sends bundle to Floom API (`POST /api/apps`).
-4. Floom API creates app/version records in Supabase.
-5. Floom starts E2B from one shared runner template.
-6. Floom uploads bundle to E2B.
-7. E2B installs declared dependencies.
-8. E2B runs a tiny wrapper server.
-9. Floom stores sandbox metadata and returns `https://floom.dev/p/:slug`.
-10. Coworkers use the generated UI. Floom validates inputs, invokes E2B, stores output, and renders results.
+4. With Supabase env configured, Floom API creates app/version records in Supabase.
+5. Floom runs through fake mode unless `E2B_API_KEY` is configured.
+6. In fake mode, the runner returns mock output for local testing.
+7. With `E2B_API_KEY`, the runner uploads the entrypoint to E2B, installs declared dependencies, and invokes the handler.
+8. Floom validates inputs and outputs, stores execution records when Supabase is configured, and renders results.
 
 ## Fake Mode
 
@@ -139,11 +137,11 @@ If `E2B_API_KEY` is not set, the runner operates in fake mode and returns mock o
 - [x] App deploy/register API exists
 - [x] `/p/:slug` loads with generated form
 - [x] Input validation via JSON Schema
-- [x] E2B execution (real or fake mode)
+- [x] Fake runner execution
 - [x] Output validation via JSON Schema
 - [x] Supabase RLS policies defined
-- [x] Share URL logic implemented
-- [x] Raw E2B host/token hidden from users
+- [x] Share-token authorization lookup implemented
+- [x] Share token lookup compares SHA-256 hashes
 - [x] Build passes
 - [ ] Live E2B verification (requires E2B_API_KEY)
 

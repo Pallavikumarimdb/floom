@@ -1,11 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { demoApp, hasSupabaseConfig } from "@/lib/demo-app";
 
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ slug: string }> }
 ) {
   const { slug } = await params;
+  if (!hasSupabaseConfig() && slug === demoApp.slug) {
+    return NextResponse.json(demoApp);
+  }
+
+  if (!hasSupabaseConfig()) {
+    return NextResponse.json(
+      { error: "Supabase is not configured. Only the demo app is available without Supabase env." },
+      { status: 503 }
+    );
+  }
+
   const admin = createAdminClient();
 
   const { data: app, error } = await admin

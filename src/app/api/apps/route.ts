@@ -2,8 +2,45 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import yaml from "js-yaml";
 import { v4 as uuidv4 } from "uuid";
+import { hasSupabaseConfig } from "@/lib/demo-app";
+
+type AppManifest = {
+  name: string;
+  slug: string;
+  runtime: "python" | "typescript";
+  entrypoint: string;
+  handler: string;
+  public?: boolean;
+  dependencies?: Record<string, string[]>;
+  secrets?: string[];
+};
+
+function parseManifest(value: unknown): AppManifest | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+
+  const manifest = value as Partial<AppManifest>;
+  const required: Array<keyof AppManifest> = ["name", "slug", "runtime", "entrypoint", "handler"];
+  if (required.some((key) => !manifest[key])) {
+    return null;
+  }
+
+  if (manifest.runtime !== "python" && manifest.runtime !== "typescript") {
+    return null;
+  }
+
+  return manifest as AppManifest;
+}
 
 export async function POST(req: NextRequest) {
+  if (!hasSupabaseConfig()) {
+    return NextResponse.json(
+      { error: "Supabase is not configured. Set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY." },
+      { status: 503 }
+    );
+  }
+
   const form = await req.formData();
   const manifestFile = form.get("manifest") as File | null;
   const bundleFile = form.get("bundle") as File | null;
@@ -15,18 +52,15 @@ export async function POST(req: NextRequest) {
   }
 
   const manifestText = await manifestFile.text();
-  let manifest: any;
+  let manifest: AppManifest | null;
   try {
-    manifest = yaml.load(manifestText);
+    manifest = parseManifest(yaml.load(manifestText));
   } catch {
     return NextResponse.json({ error: "Invalid floom.yaml" }, { status: 400 });
   }
 
-  const required = ["name", "slug", "runtime", "entrypoint", "handler"];
-  for (const key of required) {
-    if (!manifest[key]) {
-      return NextResponse.json({ error: `Missing ${key} in manifest` }, { status: 400 });
-    }
+  if (!manifest) {
+    return NextResponse.json({ error: "Invalid or incomplete floom.yaml" }, { status: 400 });
   }
 
   const authHeader = req.headers.get("authorization");
@@ -96,7 +130,7 @@ export async function POST(req: NextRequest) {
   }
 
   // Create version
-  await admin.from("app_versions").insert({
+  const { error: versionError } = await admin.from("app_versions").insert({
     app_id: app.id,
     version: 1,
     bundle_path: bundlePath,
@@ -106,12 +140,18 @@ export async function POST(req: NextRequest) {
     secrets: manifest.secrets ?? [],
   });
 
+  if (versionError) {
+    await admin.from("apps").delete().eq("id", app.id);
+    await admin.storage.from("app-bundles").remove([bundlePath]);
+    return NextResponse.json({ error: "Failed to create app version" }, { status: 500 });
+  }
+
   return NextResponse.json({
     app: {
       id: app.id,
       slug: app.slug,
       name: app.name,
-      url: `${process.env.NEXT_PUBLIC_APP_URL}/p/${app.slug}`,
+      url: new URL(`/p/${app.slug}`, req.url).toString(),
     },
   });
 }

@@ -2,11 +2,14 @@
   "name": "floom-v0",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint",
+    "test": "tsx scripts/test-fake-run.mjs"
   },
   "dependencies": {
     "@rjsf/core": "^6.5.1",
@@ -38,5 +41,8 @@
     "tailwindcss": "^4",
     "tsx": "^4.21.0",
     "typescript": "^5"
+  },
+  "overrides": {
+    "postcss": "8.5.12"
   }
 }
