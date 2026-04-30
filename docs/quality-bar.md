@@ -1,4 +1,4 @@
-# Floom Minimal2 Quality Bar
+# Floom Minimal Quality Bar
 
 Updated: 2026-04-29
 
@@ -43,7 +43,7 @@ No duplicate Supabase model/schema definitions spread across root and `src`.
 
 Required:
 
-- One live Supabase project for Floom Minimal2.
+- One live Supabase project for Floom Minimal.
 - Migration files in repo recreate:
   - `profiles`
   - `apps`
@@ -205,7 +205,7 @@ Do not call this 100/100 until all are verified:
 - browser screenshots for local and live
 - live Vercel deploy serves current commit
 - at least two independent agents run the token-to-publish flow
-- comparison against `floom-minimal`
+- comparison against archived `floom-minimal-archive`
 
 ## Claim Measurement Bar
 

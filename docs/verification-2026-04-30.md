@@ -1,4 +1,4 @@
-# Floom Minimal2 Verification - 2026-04-30
+# Floom Minimal Verification - 2026-04-30
 
 ## Current Claim Scope
 
@@ -23,7 +23,7 @@ Not verified for the 60-second claim yet:
 
 - Production shell: `https://floom-60sec.vercel.app`
 - Verified app page: `https://floom-60sec.vercel.app/p/smoke-1777538613152`
-- GitHub repo: `floomhq/floom-minimal2`
+- GitHub repo: `floomhq/floom-minimal`
 - Latest deployed commit verified during this pass: `8e8caba`
 
 ## Local Verification
