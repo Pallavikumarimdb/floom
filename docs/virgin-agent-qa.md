@@ -203,6 +203,8 @@ curl -sS "$FLOOM_API_URL/mcp"
 - Through an MCP-capable client, test:
   - `auth_status`
   - `get_app_contract`
+  - `list_app_templates`
+  - `get_app_template`
   - `validate_manifest`
   - `publish_app`
   - `get_app`
@@ -212,6 +214,8 @@ Pass criteria:
 
 - MCP endpoint is reachable.
 - `get_app_contract` returns the v0 manifest, app.py, input/output schemas, and unsupported cases.
+- `list_app_templates` returns useful v0-safe templates.
+- `get_app_template` returns copy-paste bundles for invoice calculator, UTM URL builder, CSV stats, and meeting action item extraction.
 - Tool errors return structured MCP errors.
 - MCP publish/run matches CLI/API behavior.
 - No token appears in tool output, logs, screenshots, or reports.

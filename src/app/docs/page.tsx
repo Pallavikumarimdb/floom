@@ -19,6 +19,13 @@ const mcpExample = `POST https://floom-60sec.vercel.app/mcp
 tool: get_app_contract
 
 POST https://floom-60sec.vercel.app/mcp
+tool: list_app_templates
+
+POST https://floom-60sec.vercel.app/mcp
+tool: get_app_template
+arguments: { "key": "invoice_calculator" }
+
+POST https://floom-60sec.vercel.app/mcp
 tool: run_app
 arguments: { "slug": "pitch-coach", "inputs": { ... } }`;
 
@@ -133,11 +140,43 @@ export default function DocsPage() {
         <Section title="Run through MCP">
           <p>
             MCP clients can discover Floom at <code>/mcp</code>, call{" "}
-            <code>get_app_contract</code> before generating files, and use{" "}
-            <code>run_app</code> for the same app execution path as the browser
-            and API.
+            <code>get_app_contract</code> before generating files, fetch useful
+            starters with <code>list_app_templates</code> and{" "}
+            <code>get_app_template</code>, and use <code>run_app</code> for the
+            same app execution path as the browser and API.
           </p>
           <CodeBlock>{mcpExample}</CodeBlock>
+        </Section>
+
+        <Section title="MCP app templates">
+          <p>
+            Floom serves copy-paste v0-safe bundles for agents that need a fast,
+            useful starting point instead of a blank function.
+          </p>
+          <ul className="list-disc space-y-3 pl-5">
+            <li>
+              <code>invoice_calculator</code>: line items, discount, tax, and
+              total.
+            </li>
+            <li>
+              <code>utm_url_builder</code>: campaign links with clean UTM
+              parameters.
+            </li>
+            <li>
+              <code>csv_stats</code>: row count, columns, and numeric stats from
+              pasted CSV text.
+            </li>
+            <li>
+              <code>meeting_action_items</code>: deterministic action item
+              extraction from pasted notes.
+            </li>
+          </ul>
+          <p className="text-sm text-neutral-500">
+            Every template uses one stdlib-only Python file and includes
+            <code> floom.yaml</code>, <code>app.py</code>,{" "}
+            <code>input.schema.json</code>, and{" "}
+            <code>output.schema.json</code>.
+          </p>
         </Section>
 
         <Section title="Limits and exclusions">

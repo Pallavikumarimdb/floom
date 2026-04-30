@@ -16,7 +16,8 @@ export FLOOM_TOKEN="<agent-token>"
 ## Supported App Contract
 
 Agents can ask the Floom MCP tool `get_app_contract` for the current v0 contract
-and copy-paste starter files before generating an app.
+and `list_app_templates` / `get_app_template` for useful copy-paste app bundles
+before generating an app.
 
 Accept:
 
@@ -32,6 +33,21 @@ Reject:
 - FastAPI, OpenAPI, TypeScript, Node, multi-file Python, secrets, dependencies, long-running servers, CLIs, workers, queues, cron, browser automation, OAuth callbacks, and local databases.
 - `floom.yaml` fields named `actions`, `dependencies`, or `secrets`.
 
+## v0.1 Boundary
+
+v0.1 is dependencies plus secret names with secure runtime injection. It is not
+generic web hosting.
+
+Add in v0.1:
+
+- A constrained `requirements.txt` install path for Python packages.
+- `floom.yaml` secret names only, never raw secret values.
+- Secure storage for secret values and E2B runtime injection.
+
+Still reject until later: FastAPI/OpenAPI apps, arbitrary HTTP servers,
+TypeScript/Node apps, background workers, multi-service repos, and long-running
+processes.
+
 ## Virgin Agent Test Matrix
 
 Run every item from a fresh shell/session.
@@ -39,6 +55,8 @@ Run every item from a fresh shell/session.
 1. Candidate discovery
    - Inspect a repo or fixture directory.
    - Call MCP `get_app_contract` and confirm it returns the v0 manifest, `app.py`, input schema, output schema, and unsupported cases.
+   - Call MCP `list_app_templates` and confirm it lists `invoice_calculator`, `utm_url_builder`, `csv_stats`, and `meeting_action_items`.
+   - Call MCP `get_app_template` for at least one template and confirm it returns `floom.yaml`, `app.py`, `input.schema.json`, and `output.schema.json`.
    - Identify one valid single-file Python function candidate.
    - Identify at least one unsupported candidate and record the exact rejection reason.
 

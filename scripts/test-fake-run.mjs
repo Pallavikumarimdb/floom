@@ -44,6 +44,8 @@ async function test() {
   for (const toolName of [
     'auth_status',
     'get_app_contract',
+    'list_app_templates',
+    'get_app_template',
     'validate_manifest',
     'publish_app',
     'find_candidate_apps',
@@ -147,6 +149,14 @@ async function test() {
   assert.equal(contract.files['output.schema.json'].type, 'object');
   assert.match(JSON.stringify(contract.unsupported), /OpenBlog/);
   assert.match(JSON.stringify(contract.unsupported), /requirements\.txt/);
+  assert.deepEqual(contract.templates_tool.available_keys, [
+    'invoice_calculator',
+    'utm_url_builder',
+    'csv_stats',
+    'meeting_action_items',
+  ]);
+
+  await testMcpAppTemplates();
 
   const candidates = await callFloomTool(
     'find_candidate_apps',
@@ -335,6 +345,88 @@ async function test() {
   } else {
     console.log('❌ Unexpected output');
     process.exit(1);
+  }
+}
+
+async function testMcpAppTemplates() {
+  const templatesResult = await callFloomTool(
+    'list_app_templates',
+    {},
+    { baseUrl: 'http://localhost:3000' }
+  );
+  assert.equal(templatesResult.isError, undefined);
+  const templates = parseToolResult(templatesResult).templates;
+  assert.deepEqual(
+    templates.map((template) => template.key),
+    ['invoice_calculator', 'utm_url_builder', 'csv_stats', 'meeting_action_items']
+  );
+
+  for (const templateInfo of templates) {
+    const templateResult = await callFloomTool(
+      'get_app_template',
+      { key: templateInfo.key },
+      { baseUrl: 'http://localhost:3000' }
+    );
+    assert.equal(templateResult.isError, undefined);
+    const template = parseToolResult(templateResult);
+    assert.equal(template.key, templateInfo.key);
+    assert.ok(template.files['floom.yaml'], `${templateInfo.key} missing floom.yaml`);
+    assert.ok(template.files['app.py'], `${templateInfo.key} missing app.py`);
+    assert.equal(template.files['input.schema.json'].type, 'object');
+    assert.equal(template.files['output.schema.json'].type, 'object');
+    assert.doesNotMatch(template.files['app.py'], /requests|fastapi|openai|anthropic|supabase/i);
+    assert.doesNotMatch(template.files['floom.yaml'], /dependencies|secrets|actions/);
+
+    const manifestValidation = await callFloomTool(
+      'validate_manifest',
+      {
+        manifest: template.files['floom.yaml'],
+        input_schema: template.files['input.schema.json'],
+        output_schema: template.files['output.schema.json'],
+      },
+      { baseUrl: 'http://localhost:3000' }
+    );
+    assert.equal(manifestValidation.isError, undefined);
+    assert.equal(parseToolResult(manifestValidation).valid, true);
+
+    runTemplatePython(template);
+  }
+
+  const unknownTemplate = await callFloomTool(
+    'get_app_template',
+    { key: 'not-real' },
+    { baseUrl: 'http://localhost:3000' }
+  );
+  assert.equal(unknownTemplate.isError, true);
+  assert.match(parseToolResult(unknownTemplate).error, /Unknown app template/);
+}
+
+function runTemplatePython(template) {
+  const appDir = mkdtempSync(join(tmpdir(), `floom-template-${template.key}-`));
+  try {
+    writeFileSync(join(appDir, 'app.py'), template.files['app.py']);
+    const output = execFileSync(
+      'python3',
+      [
+        '-c',
+        [
+          'import importlib.util, json, pathlib, sys',
+          'path = pathlib.Path(sys.argv[1]) / "app.py"',
+          'spec = importlib.util.spec_from_file_location("template_app", path)',
+          'module = importlib.util.module_from_spec(spec)',
+          'spec.loader.exec_module(module)',
+          'print(json.dumps(module.run(json.loads(sys.argv[2])), sort_keys=True))',
+        ].join('\n'),
+        appDir,
+        JSON.stringify(template.example_inputs),
+      ],
+      { encoding: 'utf8' }
+    );
+    const parsed = JSON.parse(output);
+    assert.equal(typeof parsed, 'object');
+    assert.notEqual(parsed, null);
+  } finally {
+    rmSync(appDir, { recursive: true, force: true });
   }
 }
 

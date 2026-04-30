@@ -141,6 +141,8 @@ Launch tools:
 
 - `auth_status`
 - `get_app_contract`
+- `list_app_templates`
+- `get_app_template`
 - `validate_manifest`
 - `find_candidate_apps`
 - `publish_app`
@@ -151,6 +153,24 @@ Launch tools:
 `create_agent_token` requires a Supabase user JWT from the web login flow. The other publish/run tools accept a Floom agent token when the token has the required scope.
 
 `get_app_contract` returns the current v0 manifest, `app.py`, input/output schema examples, and explicit unsupported cases. Agents use it before generating app files so they do not create FastAPI/OpenAPI, dependency, TypeScript, multi-file, secrets, or multi-action apps for the v0 runtime.
+
+`list_app_templates` and `get_app_template` return useful copy-paste v0 app bundles. Current templates:
+
+- `invoice_calculator`
+- `utm_url_builder`
+- `csv_stats`
+- `meeting_action_items`
+
+Each template includes `floom.yaml`, `app.py`, `input.schema.json`, and `output.schema.json`. They use one stdlib-only Python file and no secrets.
+
+## v0.1 Scope
+
+v0.1 adds the two capabilities that unlock many real apps without turning Floom into broad web hosting:
+
+- Python dependency installation from a constrained `requirements.txt`.
+- Secret names in `floom.yaml`, with secret values stored securely by Floom and injected only into the E2B runtime.
+
+v0.1 does not claim arbitrary HTTP servers, FastAPI/OpenAPI apps, TypeScript apps, background workers, or full repo hosting. Those stay post-v0.1 until the runtime, auth, limits, and UI contracts are verified end to end.
 
 ## Fake Mode
 
