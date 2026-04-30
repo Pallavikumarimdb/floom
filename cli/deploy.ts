@@ -16,6 +16,7 @@ type DeployResponse = {
 
 async function deploy(appDir: string, apiUrl: string, token: string) {
   const rootDir = path.resolve(appDir);
+  validateV0AppDirectory(rootDir);
   const manifestPath = path.join(appDir, "floom.yaml");
   if (!fs.existsSync(manifestPath)) {
     throw new Error("floom.yaml not found in " + appDir);
@@ -71,6 +72,23 @@ async function deploy(appDir: string, apiUrl: string, token: string) {
   console.log("Deployed successfully!");
   console.log("URL:", data.app?.url);
   return data;
+}
+
+function validateV0AppDirectory(rootDir: string) {
+  const unsupportedFiles = ["requirements.txt", "pyproject.toml", "package.json", "openapi.json"];
+  for (const fileName of unsupportedFiles) {
+    if (fs.existsSync(path.join(rootDir, fileName))) {
+      throw new Error(`${fileName} is not supported in v0; use a stdlib single-file Python app`);
+    }
+  }
+
+  const pythonFiles = fs
+    .readdirSync(rootDir, { withFileTypes: true })
+    .filter((entry) => entry.isFile() && entry.name.endsWith(".py"))
+    .map((entry) => entry.name);
+  if (pythonFiles.length > 1) {
+    throw new Error(`v0 supports exactly one Python source file; found ${pythonFiles.join(", ")}`);
+  }
 }
 
 function resolveAppPath(rootDir: string, relativePath: string) {

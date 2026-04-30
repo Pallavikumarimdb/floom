@@ -26,6 +26,16 @@ export function parseManifest(value: unknown): FloomManifest {
   }
 
   const data = value as Record<string, unknown>;
+  if (data.actions !== undefined) {
+    throw new Error("v0 only supports one handler per app; actions are not supported");
+  }
+  if (data.dependencies !== undefined) {
+    throw new Error("v0 only supports stdlib single-file Python apps; dependencies are not supported");
+  }
+  if (data.secrets !== undefined) {
+    throw new Error("v0 does not support app secrets yet");
+  }
+
   const manifest: FloomManifest = {
     name: requiredString(data.name, "name"),
     slug: requiredString(data.slug, "slug"),

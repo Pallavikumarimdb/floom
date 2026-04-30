@@ -449,7 +449,7 @@ function findCandidateApps(args: JsonObject): McpToolResult {
       ? args.max_results
       : 20;
 
-  const candidates = Object.entries(files)
+  const manifestCandidates = Object.entries(files)
     .filter(([filePath]) => basename(filePath) === "floom.yaml")
     .slice(0, maxResults)
     .map(([manifestPath, manifestText]) => {
@@ -469,6 +469,10 @@ function findCandidateApps(args: JsonObject): McpToolResult {
           errors.push(`Missing entrypoint: ${entrypointPath}`);
         }
 
+        for (const unsupportedPath of unsupportedV0Files(appDir, files)) {
+          errors.push(`${unsupportedPath} is not supported in v0`);
+        }
+
         const inputSchemaPath = joinPath(appDir, manifest.input_schema || "input.schema.json");
         const outputSchemaPath = joinPath(appDir, manifest.output_schema || "output.schema.json");
         validateCandidateSchema(files, inputSchemaPath, "input_schema", errors);
@@ -484,13 +488,63 @@ function findCandidateApps(args: JsonObject): McpToolResult {
         entrypoint: manifest?.entrypoint ?? null,
         valid: errors.length === 0,
         errors,
+        unsupported_reason: errors.length === 0 ? null : errors.join("; "),
       };
     });
+
+  const candidates = [
+    ...manifestCandidates,
+    ...unsupportedRepositoryCandidates(files).slice(0, Math.max(0, maxResults - manifestCandidates.length)),
+  ];
 
   return okResult({
     candidates,
     count: candidates.length,
   });
+}
+
+function unsupportedV0Files(appDir: string, files: Record<string, string>) {
+  return ["requirements.txt", "pyproject.toml", "package.json", "openapi.json"]
+    .map((fileName) => joinPath(appDir, fileName))
+    .filter((filePath) => filePath in files);
+}
+
+function unsupportedRepositoryCandidates(files: Record<string, string>) {
+  if (Object.keys(files).some((filePath) => basename(filePath) === "floom.yaml")) {
+    return [];
+  }
+
+  const fileNames = new Set(Object.keys(files).map((filePath) => basename(filePath)));
+  const fileText = Object.values(files).join("\n");
+  const candidates = [];
+
+  if (fileNames.has("openapi.json") || /FastAPI\s*\(/.test(fileText)) {
+    candidates.push(unsupportedCandidate("FastAPI/OpenAPI apps require the post-v0 HTTP app runner"));
+  }
+
+  if (fileNames.has("requirements.txt") || fileNames.has("pyproject.toml")) {
+    candidates.push(unsupportedCandidate("Python dependencies require the post-v0 dependency installer"));
+  }
+
+  if (fileNames.has("package.json")) {
+    candidates.push(unsupportedCandidate("TypeScript/Node apps require the post-v0 TypeScript runner"));
+  }
+
+  return candidates;
+}
+
+function unsupportedCandidate(reason: string) {
+  return {
+    manifest_path: null,
+    app_dir: ".",
+    slug: null,
+    name: null,
+    runtime: null,
+    entrypoint: null,
+    valid: false,
+    errors: [reason],
+    unsupported_reason: reason,
+  };
 }
 
 async function proxyJson(url: string, init: RequestInit): Promise<McpToolResult> {

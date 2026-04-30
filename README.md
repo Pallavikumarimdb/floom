@@ -59,8 +59,9 @@ Copy `.env.local` and fill in your credentials:
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+AGENT_TOKEN_PEPPER=your-random-server-only-pepper
 
-# E2B (optional — without it, runner operates in fake/local mode)
+# E2B (required for production runs; local tests can use explicit fake mode)
 E2B_API_KEY=your-e2b-api-key
 
 ```
@@ -149,7 +150,7 @@ Launch tools:
 
 ## Fake Mode
 
-If `E2B_API_KEY` is not set, fake mode is available only outside production. This is useful for local development and testing without E2B credits.
+If `E2B_API_KEY` is not set, fake mode is available only outside production when explicitly enabled. Production fails closed without E2B credentials.
 
 ## Quality Gates
 

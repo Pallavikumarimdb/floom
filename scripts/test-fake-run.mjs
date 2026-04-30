@@ -1,9 +1,15 @@
 // Test script that exercises the fake-mode runner locally
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { execFileSync } from 'node:child_process';
 import { Sandbox } from 'e2b';
 import { runInSandbox, runInSandboxContained } from '../src/lib/e2b/runner.ts';
-import { getPublicRunRateLimitKey } from '../src/lib/floom/rate-limit.ts';
+import {
+  getPublicRunCallerKey,
+  getPublicRunRateLimitKey,
+} from '../src/lib/floom/rate-limit.ts';
 import {
   parseManifest,
   isSafePythonEntrypoint,
@@ -58,6 +64,22 @@ async function test() {
   } catch (error) {
     if (!(error instanceof Error) || !error.message.includes('entrypoint')) throw error;
   }
+  assert.throws(
+    () => parseManifest({ name: 'Bad', slug: 'bad-app', runtime: 'typescript', entrypoint: 'app.ts', handler: 'run' }),
+    /runtime: python/
+  );
+  assert.throws(
+    () => parseManifest({ name: 'Bad', slug: 'bad-app', runtime: 'python', entrypoint: 'app.py', handler: 'run', dependencies: { python: ['requests'] } }),
+    /dependencies are not supported/
+  );
+  assert.throws(
+    () => parseManifest({ name: 'Bad', slug: 'bad-app', runtime: 'python', entrypoint: 'app.py', handler: 'run', secrets: ['API_KEY'] }),
+    /secrets/
+  );
+  assert.throws(
+    () => parseManifest({ name: 'Bad', slug: 'bad-app', runtime: 'python', entrypoint: 'app.py', handler: 'run', actions: { run: {} } }),
+    /actions are not supported/
+  );
 
   const sourceManifest = parseManifest({
     name: 'Source Test',
@@ -127,6 +149,26 @@ async function test() {
   );
   assert.equal(candidates.isError, undefined);
   assert.equal(parseToolResult(candidates).candidates[0].valid, true);
+  const unsupportedCandidates = await callFloomTool(
+    'find_candidate_apps',
+    {
+      files: {
+        'openapi.json': '{"openapi":"3.1.0"}',
+        'api.py': 'from fastapi import FastAPI\napp = FastAPI()\n',
+        'requirements.txt': 'fastapi\n',
+        'package.json': '{"scripts":{}}',
+      },
+    },
+    { baseUrl: 'http://localhost:3000' }
+  );
+  const unsupportedReasons = parseToolResult(unsupportedCandidates)
+    .candidates
+    .map((candidate) => candidate.unsupported_reason)
+    .join('\n');
+  assert.match(unsupportedReasons, /FastAPI\/OpenAPI/);
+  assert.match(unsupportedReasons, /dependencies/);
+  assert.match(unsupportedReasons, /TypeScript\/Node/);
+  testCliRejectsUnsupportedV0Shapes(manifestText, inputSchemaText, outputSchemaText);
 
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async (url, init) => {
@@ -392,13 +434,25 @@ function testPublicRunRateLimitHardening() {
   );
 
   assert.equal(getPublicRunRateLimitKey('app_123'), 'public-run:app_123:anonymous');
+  const callerA = getPublicRunCallerKey(new Headers({
+    'x-forwarded-for': '203.0.113.8, 10.0.0.1',
+    'user-agent': 'ua-a',
+  }));
+  const callerB = getPublicRunCallerKey(new Headers({
+    'x-forwarded-for': '203.0.113.9',
+    'user-agent': 'ua-a',
+  }));
+  assert.match(callerA, /^[a-f0-9]{32}$/);
+  assert.notEqual(callerA, callerB);
+  assert.equal(getPublicRunCallerKey(new Headers()), 'anonymous');
+  assert.equal(getPublicRunRateLimitKey('app/123', callerA), `public-run:app-123:${callerA}`);
   assert.match(routeText, /check_public_run_rate_limit/);
   assert.ok(
     routeText.indexOf('checkPublicRunRateLimit') < routeText.indexOf('runInSandboxContained('),
     'public run rate limit must run before sandbox execution'
   );
-  assert.match(routeText, /getPublicRunRateLimitKey\(appId\)/);
-  assert.doesNotMatch(routeText, /x-forwarded-for|cf-connecting-ip|x-real-ip/);
+  assert.match(routeText, /getPublicRunCallerKey\(req\.headers\)/);
+  assert.match(routeText, /getPublicRunRateLimitKey\(appId, callerKey\)/);
   assert.match(routeText, /Run rate limit check failed/);
   assert.match(routeText, /redactSecretOutput/);
   assert.match(routeText, /output: redactedOutput/);
@@ -460,6 +514,46 @@ function testPublicRunRateLimitHardening() {
   assert.doesNotMatch(migrationText, /create or replace function public\.set_updated_at\(\)/);
   assert.doesNotMatch(migrationText, /create or replace function public\.handle_new_user\(\)/);
   assert.doesNotMatch(migrationText, /on conflict \(id\) do update\s+set public = excluded\.public/);
+}
+
+function testCliRejectsUnsupportedV0Shapes(manifestText, inputSchemaText, outputSchemaText) {
+  const appDir = mkdtempSync(join(tmpdir(), 'floom-v0-reject-'));
+  try {
+    writeFileSync(join(appDir, 'floom.yaml'), manifestText);
+    writeFileSync(join(appDir, 'input.schema.json'), inputSchemaText);
+    writeFileSync(join(appDir, 'output.schema.json'), outputSchemaText);
+    writeFileSync(join(appDir, 'app.py'), 'def run(inputs):\n    return {"result": "ok", "length": 2}\n');
+    writeFileSync(join(appDir, 'helper.py'), 'VALUE = 1\n');
+    expectCliFailure(appDir, /exactly one Python source file/);
+    rmSync(join(appDir, 'helper.py'));
+    writeFileSync(join(appDir, 'requirements.txt'), 'requests\n');
+    expectCliFailure(appDir, /requirements\.txt is not supported/);
+  } finally {
+    rmSync(appDir, { recursive: true, force: true });
+  }
+}
+
+function expectCliFailure(appDir, pattern) {
+  try {
+    execFileSync('npx', ['tsx', 'cli/deploy.ts', appDir], {
+      cwd: process.cwd(),
+      env: {
+        ...process.env,
+        FLOOM_TOKEN: 'test-token',
+        FLOOM_API_URL: 'http://127.0.0.1:9',
+      },
+      stdio: 'pipe',
+      encoding: 'utf8',
+    });
+    throw new Error('CLI unexpectedly succeeded');
+  } catch (error) {
+    const output = [
+      error instanceof Error ? error.message : '',
+      typeof error.stdout === 'string' ? error.stdout : '',
+      typeof error.stderr === 'string' ? error.stderr : '',
+    ].join('\n');
+    assert.match(output, pattern);
+  }
 }
 
 async function testSandboxErrorContainment() {

@@ -100,13 +100,13 @@ Required:
 
 Required tools:
 
-- `floom.auth_status`
-- `floom.create_agent_token`
-- `floom.find_candidate_apps`
-- `floom.validate_manifest`
-- `floom.publish_app`
-- `floom.run_app`
-- `floom.get_app`
+- `auth_status`
+- `create_agent_token`
+- `find_candidate_apps`
+- `validate_manifest`
+- `publish_app`
+- `run_app`
+- `get_app`
 
 The MCP must be tested by another agent from token creation through publish and live run.
 

@@ -4,7 +4,7 @@ import { callerHasScope, resolveAuthCaller } from "@/lib/supabase/auth";
 import { demoApp, hasSupabaseConfig, runDemoApp } from "@/lib/demo-app";
 import { runInSandboxContained } from "@/lib/e2b/runner";
 import { MAX_INPUT_BYTES, MAX_REQUEST_BYTES, MAX_SOURCE_BYTES } from "@/lib/floom/limits";
-import { getPublicRunRateLimitKey } from "@/lib/floom/rate-limit";
+import { getPublicRunCallerKey, getPublicRunRateLimitKey } from "@/lib/floom/rate-limit";
 import { redactSecretOutput } from "@/lib/floom/schema";
 import Ajv from "ajv";
 
@@ -99,7 +99,11 @@ export async function POST(
   }
 
   if (!caller && isPublic) {
-    const rateLimit = await checkPublicRunRateLimit(admin, app.id);
+    const rateLimit = await checkPublicRunRateLimit(
+      admin,
+      app.id,
+      getPublicRunCallerKey(req.headers)
+    );
     if (!rateLimit.allowed) {
       return NextResponse.json(
         { error: rateLimit.error },
@@ -213,7 +217,8 @@ export async function POST(
 
 async function checkPublicRunRateLimit(
   admin: ReturnType<typeof createAdminClient>,
-  appId: string
+  appId: string,
+  callerKey: string
 ): Promise<
   | { allowed: true }
   | {
@@ -223,7 +228,7 @@ async function checkPublicRunRateLimit(
     }
 > {
   const { data, error } = await admin.rpc("check_public_run_rate_limit", {
-    p_rate_key: getPublicRunRateLimitKey(appId),
+    p_rate_key: getPublicRunRateLimitKey(appId, callerKey),
     p_limit: readPositiveIntegerEnv(
       "FLOOM_PUBLIC_RUN_RATE_LIMIT_MAX",
       DEFAULT_PUBLIC_RUN_RATE_LIMIT_MAX
