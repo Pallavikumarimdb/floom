@@ -11,6 +11,13 @@ export async function GET(
     return NextResponse.json(demoApp);
   }
 
+  if (!hasSupabaseConfig()) {
+    return NextResponse.json(
+      { error: "Supabase is not configured. Only the demo app is available without Supabase env." },
+      { status: 503 }
+    );
+  }
+
   const admin = createAdminClient();
 
   const { data: app, error } = await admin

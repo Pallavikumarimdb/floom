@@ -10,11 +10,11 @@ export default function Home() {
           Floom v0
         </p>
         <h1 className="mb-4 text-5xl font-bold leading-none">
-          Localhost to live apps.
+          Local function apps, generated UI.
         </h1>
         <p className="mb-8 max-w-xl text-lg leading-8 text-neutral-300">
-          Ship a tiny function app as a generated UI backed by JSON Schema,
-          Supabase records, and sandbox execution.
+          Run the local demo app with JSON Schema validation. Supabase-backed
+          routes are available when Supabase env is configured.
         </p>
         <div className="grid gap-4 sm:grid-cols-2">
           <a
@@ -34,7 +34,7 @@ export default function Home() {
             <span className="mb-3 block text-xs font-bold uppercase tracking-normal text-white/80">
               Run
             </span>
-            <strong className="block text-2xl">Test live app</strong>
+            <strong className="block text-2xl">Test demo app</strong>
             <span className="mt-2 block text-white/80">Generated UI</span>
           </Link>
         </div>

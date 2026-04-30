@@ -3,8 +3,13 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { demoApp, hasSupabaseConfig, runDemoApp } from "@/lib/demo-app";
 import { runInSandbox } from "@/lib/runner";
 import Ajv from "ajv";
+import { createHash } from "crypto";
 
 const ajv = new Ajv({ strict: false });
+
+function sha256(value: string) {
+  return createHash("sha256").update(value).digest("hex");
+}
 
 export async function POST(
   req: NextRequest,
@@ -28,6 +33,13 @@ export async function POST(
       status: "success",
       output: runDemoApp(inputs),
     });
+  }
+
+  if (!hasSupabaseConfig()) {
+    return NextResponse.json(
+      { error: "Supabase is not configured. Only the demo app is available without Supabase env." },
+      { status: 503 }
+    );
   }
 
   const admin = createAdminClient();
@@ -68,7 +80,7 @@ export async function POST(
       .from("app_share_links")
       .select("id")
       .eq("app_id", app.id)
-      .eq("token_hash", share_token)
+      .eq("token_hash", sha256(share_token))
       .maybeSingle();
     isShared = !!share;
   }

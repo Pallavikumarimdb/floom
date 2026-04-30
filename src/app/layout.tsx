@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Floom — Deploy functions in 60 seconds",
-  description: "From localhost to live and secure. Deploy Python and TypeScript functions with one command.",
+  title: "Floom — Function UI in 60 seconds",
+  description: "Generate a local UI for Python and TypeScript function apps.",
 };
 
 export default function RootLayout({

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import yaml from "js-yaml";
 import { v4 as uuidv4 } from "uuid";
+import { hasSupabaseConfig } from "@/lib/demo-app";
 
 type AppManifest = {
   name: string;
@@ -33,6 +34,13 @@ function parseManifest(value: unknown): AppManifest | null {
 }
 
 export async function POST(req: NextRequest) {
+  if (!hasSupabaseConfig()) {
+    return NextResponse.json(
+      { error: "Supabase is not configured. Set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY." },
+      { status: 503 }
+    );
+  }
+
   const form = await req.formData();
   const manifestFile = form.get("manifest") as File | null;
   const bundleFile = form.get("bundle") as File | null;
