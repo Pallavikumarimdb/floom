@@ -3,13 +3,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { demoApp, hasSupabaseConfig, runDemoApp } from "@/lib/demo-app";
 import { runInSandbox } from "@/lib/runner";
 import Ajv from "ajv";
-import { createHash } from "crypto";
 
 const ajv = new Ajv({ strict: false });
-
-function sha256(value: string) {
-  return createHash("sha256").update(value).digest("hex");
-}
 
 export async function POST(
   req: NextRequest,
@@ -17,7 +12,7 @@ export async function POST(
 ) {
   const { slug } = await params;
   const body = await req.json().catch(() => ({}));
-  const { inputs, share_token } = body as { inputs: Record<string, unknown>; share_token?: string };
+  const { inputs } = body as { inputs: Record<string, unknown> };
 
   if (!hasSupabaseConfig() && slug === demoApp.slug) {
     const validateDemoInput = ajv.compile(demoApp.input_schema);
@@ -73,19 +68,8 @@ export async function POST(
 
   const isOwner = userId === app.owner_id;
   const isPublic = app.public;
-  let isShared = false;
 
-  if (share_token) {
-    const { data: share } = await admin
-      .from("app_share_links")
-      .select("id")
-      .eq("app_id", app.id)
-      .eq("token_hash", sha256(share_token))
-      .maybeSingle();
-    isShared = !!share;
-  }
-
-  if (!isOwner && !isPublic && !isShared) {
+  if (!isOwner && !isPublic) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -148,8 +132,7 @@ export async function POST(
     inputs,
     app.runtime,
     app.entrypoint,
-    app.handler,
-    latestVersion.dependencies as Record<string, string[]>
+    app.handler
   );
 
   // Validate output

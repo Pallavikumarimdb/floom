@@ -6,6 +6,3 @@ handler: run
 public: true
 input_schema: ./input.schema.json
 output_schema: ./output.schema.json
-secrets: []
-dependencies:
-  python: []

@@ -1,4 +1,5 @@
 import { Sandbox } from "e2b";
+import { isSafePythonEntrypoint, isSafePythonIdentifier } from "./manifest";
 
 export interface RunnerResult {
   output: Record<string, unknown>;
@@ -13,16 +14,23 @@ function errorMessage(err: unknown): string {
 }
 
 export async function runInSandbox(
-  codeBundle: string,
+  source: string,
   inputs: Record<string, unknown>,
-  runtime: "python" | "typescript",
+  runtime: "python",
   entrypoint: string,
-  handler: string,
-  dependencies: Record<string, string[]>
+  handler: string
 ): Promise<RunnerResult> {
   if (FAKE_MODE) {
     console.log("[FAKE MODE] No E2B_API_KEY set. Returning mock output.");
     return { output: { result: "hello from fake mode", inputs } };
+  }
+
+  if (runtime !== "python") {
+    return { output: {}, error: "v0 only supports runtime: python" };
+  }
+
+  if (!isSafePythonEntrypoint(entrypoint) || !isSafePythonIdentifier(handler)) {
+    return { output: {}, error: "Invalid app entrypoint or handler" };
   }
 
   const sbx = await Sandbox.create("base", {
@@ -30,41 +38,24 @@ export async function runInSandbox(
   });
 
   try {
-    // Upload bundle
-    await sbx.files.write(`/home/user/${entrypoint}`, codeBundle);
+    await sbx.files.write(`/home/user/${entrypoint}`, source);
 
-    // Install dependencies
-    if (runtime === "python" && dependencies.python && dependencies.python.length > 0) {
-      await sbx.commands.run(`pip install ${dependencies.python.join(" ")}`);
-    } else if (runtime === "typescript" && dependencies.typescript && dependencies.typescript.length > 0) {
-      await sbx.commands.run(`npm install ${dependencies.typescript.join(" ")}`);
-    }
-
-    // Write wrapper server
-    const wrapper = runtime === "python" ? `
+    const moduleName = entrypoint.replace(".py", "");
+    const wrapper = `
 import json
 import sys
 sys.path.insert(0, "/home/user")
-from ${entrypoint.replace(".py", "")} import ${handler}
+from ${moduleName} import ${handler}
 
 inputs = json.loads(open("/home/user/inputs.json").read())
 result = ${handler}(inputs)
 print(json.dumps(result))
-` : `
-import { ${handler} } from "./${entrypoint.replace(".ts", "")}";
-const inputs = JSON.parse(require("fs").readFileSync("/home/user/inputs.json", "utf8"));
-${handler}(inputs).then((result: any) => {
-  console.log(JSON.stringify(result));
-  process.exit(0);
-});
 `;
 
-    const wrapperPath = runtime === "python" ? "/home/user/runner.py" : "/home/user/runner.ts";
-    await sbx.files.write(wrapperPath, wrapper);
+    await sbx.files.write("/home/user/runner.py", wrapper);
     await sbx.files.write("/home/user/inputs.json", JSON.stringify(inputs));
 
-    const cmd = runtime === "python" ? "python3 /home/user/runner.py" : "npx tsx /home/user/runner.ts";
-    const result = await sbx.commands.run(cmd);
+    const result = await sbx.commands.run("python3 /home/user/runner.py");
     const output = JSON.parse(result.stdout);
     return { output };
   } catch (err: unknown) {

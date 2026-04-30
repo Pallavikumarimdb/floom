@@ -25,8 +25,6 @@ export const demoApp = {
     },
     required: ["result", "length"],
   },
-  dependencies: { python: [] },
-  secrets: [],
 };
 
 export function hasSupabaseConfig() {

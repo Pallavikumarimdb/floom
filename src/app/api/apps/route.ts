@@ -3,35 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import yaml from "js-yaml";
 import { v4 as uuidv4 } from "uuid";
 import { hasSupabaseConfig } from "@/lib/demo-app";
-
-type AppManifest = {
-  name: string;
-  slug: string;
-  runtime: "python" | "typescript";
-  entrypoint: string;
-  handler: string;
-  public?: boolean;
-  dependencies?: Record<string, string[]>;
-  secrets?: string[];
-};
-
-function parseManifest(value: unknown): AppManifest | null {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return null;
-  }
-
-  const manifest = value as Partial<AppManifest>;
-  const required: Array<keyof AppManifest> = ["name", "slug", "runtime", "entrypoint", "handler"];
-  if (required.some((key) => !manifest[key])) {
-    return null;
-  }
-
-  if (manifest.runtime !== "python" && manifest.runtime !== "typescript") {
-    return null;
-  }
-
-  return manifest as AppManifest;
-}
+import { parseManifest, type FloomManifest } from "@/lib/manifest";
 
 export async function POST(req: NextRequest) {
   if (!hasSupabaseConfig()) {
@@ -52,15 +24,14 @@ export async function POST(req: NextRequest) {
   }
 
   const manifestText = await manifestFile.text();
-  let manifest: AppManifest | null;
+  let manifest: FloomManifest;
   try {
     manifest = parseManifest(yaml.load(manifestText));
-  } catch {
-    return NextResponse.json({ error: "Invalid floom.yaml" }, { status: 400 });
-  }
-
-  if (!manifest) {
-    return NextResponse.json({ error: "Invalid or incomplete floom.yaml" }, { status: 400 });
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Invalid floom.yaml" },
+      { status: 400 }
+    );
   }
 
   const authHeader = req.headers.get("authorization");
@@ -99,12 +70,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON schema" }, { status: 400 });
   }
 
-  // Upload bundle
   const bundleBuffer = Buffer.from(await bundleFile.arrayBuffer());
-  const bundlePath = `${ownerId}/${manifest.slug}/${uuidv4()}.zip`;
+  const bundlePath = `${ownerId}/${manifest.slug}/${uuidv4()}-${manifest.entrypoint}`;
   const { error: uploadError } = await admin.storage
     .from("app-bundles")
-    .upload(bundlePath, bundleBuffer, { contentType: "application/zip" });
+    .upload(bundlePath, bundleBuffer, { contentType: "application/octet-stream" });
 
   if (uploadError) {
     return NextResponse.json({ error: "Upload failed" }, { status: 500 });
@@ -136,8 +106,8 @@ export async function POST(req: NextRequest) {
     bundle_path: bundlePath,
     input_schema: inputSchema,
     output_schema: outputSchema,
-    dependencies: manifest.dependencies ?? {},
-    secrets: manifest.secrets ?? [],
+    dependencies: {},
+    secrets: [],
   });
 
   if (versionError) {

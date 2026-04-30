@@ -3,7 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { demoApp, hasSupabaseConfig } from "@/lib/demo-app";
 
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ slug: string }> }
 ) {
   const { slug } = await params;
@@ -19,6 +19,14 @@ export async function GET(
   }
 
   const admin = createAdminClient();
+  const authHeader = req.headers.get("authorization");
+  let userId: string | null = null;
+
+  if (authHeader?.startsWith("Bearer ")) {
+    const token = authHeader.replace("Bearer ", "");
+    const { data: userData } = await admin.auth.getUser(token);
+    userId = userData.user?.id ?? null;
+  }
 
   const { data: app, error } = await admin
     .from("apps")
@@ -29,6 +37,10 @@ export async function GET(
     .single();
 
   if (error || !app) {
+    return NextResponse.json({ error: "App not found" }, { status: 404 });
+  }
+
+  if (!app.public && app.owner_id !== userId) {
     return NextResponse.json({ error: "App not found" }, { status: 404 });
   }
 
@@ -44,7 +56,5 @@ export async function GET(
     public: app.public,
     input_schema: latestVersion?.input_schema ?? {},
     output_schema: latestVersion?.output_schema ?? {},
-    dependencies: latestVersion?.dependencies ?? {},
-    secrets: latestVersion?.secrets ?? [],
   });
 }

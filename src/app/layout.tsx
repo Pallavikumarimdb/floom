@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Floom — Function UI in 60 seconds",
-  description: "Generate a local UI for Python and TypeScript function apps.",
+  description: "Generate a UI for Python function apps.",
 };
 
 export default function RootLayout({

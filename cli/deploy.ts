@@ -3,16 +3,7 @@ import * as path from "path";
 import yaml from "js-yaml";
 import FormData from "form-data";
 import fetch from "node-fetch";
-
-type FloomManifest = {
-  name: string;
-  slug: string;
-  runtime: "python" | "typescript";
-  entrypoint: string;
-  handler: string;
-  input_schema?: string;
-  output_schema?: string;
-};
+import { parseManifest } from "../src/lib/manifest";
 
 type DeployResponse = {
   app?: {
@@ -20,24 +11,6 @@ type DeployResponse = {
   };
   error?: string;
 };
-
-function parseManifest(value: unknown): FloomManifest {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    throw new Error("floom.yaml must contain an object");
-  }
-
-  const manifest = value as Partial<FloomManifest>;
-  const required: Array<keyof FloomManifest> = ["name", "slug", "runtime", "entrypoint", "handler"];
-  for (const key of required) {
-    if (!manifest[key]) throw new Error(`Missing ${key} in floom.yaml`);
-  }
-
-  if (manifest.runtime !== "python" && manifest.runtime !== "typescript") {
-    throw new Error("runtime must be python or typescript");
-  }
-
-  return manifest as FloomManifest;
-}
 
 async function deploy(appDir: string, apiUrl: string, token: string) {
   const manifestPath = path.join(appDir, "floom.yaml");
@@ -57,11 +30,9 @@ async function deploy(appDir: string, apiUrl: string, token: string) {
   JSON.parse(fs.readFileSync(inputSchemaPath, "utf8"));
   JSON.parse(fs.readFileSync(outputSchemaPath, "utf8"));
 
-  // Create bundle zip (simplified: just the entrypoint for now)
   const entrypointPath = path.join(appDir, manifest.entrypoint);
   if (!fs.existsSync(entrypointPath)) throw new Error("Entrypoint not found");
 
-  // Build form data
   const form = new FormData();
   form.append("manifest", fs.createReadStream(manifestPath), { filename: "floom.yaml" });
   form.append("bundle", fs.createReadStream(entrypointPath), { filename: manifest.entrypoint });
