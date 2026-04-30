@@ -1,10 +1,10 @@
-# Floom v0
+# Floom v0 / v0.1 hardening
 
 from localhost to live and secure in 60sec.
 
 ## What is this?
 
-Floom v0 is a minimal vertical slice for packaging a local, single-file, stdlib-only Python function app and running it through a generated JSON Schema UI. The verified launch claim is: from localhost to live and secure in 60sec. This claim starts after account and agent-token setup, and covers CLI publish plus browser/API run for the verified v0 contract.
+Floom v0 is a minimal vertical slice for packaging a local, single-file, stdlib-only Python function app and running it through a generated JSON Schema UI. The verified v0 launch claim is: from localhost to live and secure in 60sec. This claim starts after account and agent-token setup, and covers CLI publish plus browser/API run for the verified v0 contract.
 
 Secure in the v0 claim means the verified controls are in place: E2B sandboxed execution, scoped agent tokens created through `/tokens`, schema-marked input/output redaction before persistence, caller-derived plus per-app run rate limits, and public/private access control. The local demo works without Supabase. Supabase-backed API routes require Supabase env and return 503 JSON when that env is missing.
 
@@ -108,7 +108,9 @@ The mainline v0 path is intentionally narrow:
 - Public apps can be read and run anonymously.
 - Private apps require a valid owner token for metadata and runs.
 
-Not mainline unless re-verified end to end: TypeScript apps, Java apps, dependency installation, user-provided secrets, OpenAPI/FastAPI apps, multi-file bundles, background workers, and arbitrary web servers.
+Not part of the v0 launch claim: TypeScript apps, Java apps, dependency installation, user-provided secrets, OpenAPI/FastAPI apps, multi-file bundles, background workers, and arbitrary web servers.
+
+The v0.1 branch claim is separate: it adds exact-pinned Python dependencies and manifest-declared secret names with operator-provisioned server env injection. v0.1 is not covered by the v0 60-second launch claim until it receives its own end-to-end launch verification.
 
 ## App Contract
 
@@ -166,7 +168,7 @@ Launch tools:
 
 MCP cannot create or return raw agent tokens. Create agent tokens from the signed-in `/tokens` page, where the raw token is shown once. The publish/run tools accept a Floom agent token when the token has the required scope.
 
-`get_app_contract` returns the current v0 manifest, `app.py`, input/output schema examples, and explicit unsupported cases. Agents use it before generating app files so they do not create FastAPI/OpenAPI, dependency, TypeScript, multi-file, secrets, or multi-action apps for the v0 runtime.
+`get_app_contract` returns the current manifest, `app.py`, input/output schema examples, optional v0.1 dependency/secret fields, and explicit unsupported cases. Agents use it before generating app files so they do not create FastAPI/OpenAPI, TypeScript, multi-file, server, or multi-action apps for this function runtime.
 
 `list_app_templates` and `get_app_template` return useful copy-paste v0 app bundles. Current templates:
 
@@ -179,12 +181,14 @@ Each template includes `floom.yaml`, `app.py`, `input.schema.json`, and `output.
 
 ## v0.1 Scope
 
-v0.1 adds the two capabilities that unlock many real apps without turning Floom into broad web hosting:
+v0.1 adds two capabilities without turning Floom into broad web hosting:
 
-- Python dependency installation from a constrained `requirements.txt`.
-- Secret names in `floom.yaml`, with secret values stored securely by Floom and injected only into the E2B runtime.
+- Python dependency installation from an exact-pinned `requirements.txt` declared as `dependencies.python`.
+- Secret names in `floom.yaml`, with owner-scoped server env values injected only into the E2B runtime.
 
 v0.1 does not claim arbitrary HTTP servers, FastAPI/OpenAPI apps, TypeScript apps, background workers, or full repo hosting. Those stay post-v0.1 until the runtime, auth, limits, and UI contracts are verified end to end.
+
+Secret value storage is operator-provisioned environment injection only. User-managed secret storage and encrypted per-user secret persistence remain a launch blocker for a self-serve v0.1 secrets flow.
 
 ## Fake Mode
 

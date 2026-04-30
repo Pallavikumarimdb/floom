@@ -24,27 +24,34 @@ MCP cannot create or return raw agent tokens. Create tokens only from the signed
 Accept:
 
 - Single-file Python.
-- Standard library only.
+- v0: Python standard library only.
+- v0.1 branch: exact-pinned `requirements.txt` when `floom.yaml` declares `dependencies.python: ./requirements.txt`.
 - One handler function, usually `run(inputs: dict) -> dict`.
 - `floom.yaml`, `input.schema.json`, and `output.schema.json`.
 - `public: true` for public apps; omitted or `false` for private apps.
+- Secret names only, never raw secret values, via `secrets: ["OPENAI_API_KEY"]`.
 
 Reject:
 
-- `requirements.txt`, `pyproject.toml`, `package.json`, or `openapi.json`.
-- FastAPI, OpenAPI, TypeScript, Node, multi-file Python, secrets, dependencies, long-running servers, CLIs, workers, queues, cron, browser automation, OAuth callbacks, and local databases.
-- `floom.yaml` fields named `actions`, `dependencies`, or `secrets`.
+- Undeclared `requirements.txt`, `pyproject.toml`, `package.json`, or `openapi.json`.
+- FastAPI, OpenAPI, TypeScript, Node, multi-file Python, raw secret values, long-running servers, CLIs, workers, queues, cron, browser automation, OAuth callbacks, and local databases.
+- `floom.yaml` field named `actions`.
 
 ## v0.1 Boundary
 
-v0.1 is dependencies plus secret names with secure runtime injection. It is not
-generic web hosting.
+v0.1 is exact-pinned dependencies plus secret names with operator-provisioned
+runtime environment injection. It is not generic web hosting, and it is not part
+of the v0 60-second launch claim until separately verified end to end.
 
 Add in v0.1:
 
-- A constrained `requirements.txt` install path for Python packages.
+- An exact-pinned `requirements.txt` install path for Python packages.
 - `floom.yaml` secret names only, never raw secret values.
-- Secure storage for secret values and E2B runtime injection.
+- Owner-scoped server-side secret env lookup and E2B runtime injection.
+
+Blocker for self-serve secrets: encrypted user-managed secret value storage is
+not implemented. Operators provision values as server environment variables
+named from the app owner and manifest secret name.
 
 Still reject until later: FastAPI/OpenAPI apps, arbitrary HTTP servers,
 TypeScript/Node apps, background workers, multi-service repos, and long-running
@@ -112,9 +119,10 @@ npx tsx /Users/federicodeponte/floom-60sec/cli/deploy.ts <app-dir>
    - Confirm app ownership and `public` values match the manifest.
 
 8. Unsupported app proof
-   - Try one app with `requirements.txt`; expect CLI rejection.
+   - Try one app with undeclared `requirements.txt`; expect CLI rejection.
+   - Try one v0.1 app with `dependencies.python: ./requirements.txt` and exact `package==version` pins; expect candidate validation to pass.
    - Try one app with two top-level `.py` files; expect CLI rejection.
-   - Try one manifest with `dependencies`, `secrets`, or `actions`; expect CLI rejection.
+   - Try one manifest with `actions`, malformed `dependencies`, or raw/malformed `secrets`; expect CLI rejection.
 
 ## Result Log Template
 

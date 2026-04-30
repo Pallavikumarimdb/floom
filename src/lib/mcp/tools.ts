@@ -1,12 +1,18 @@
 import yaml from "js-yaml";
 import type { NextRequest } from "next/server";
 import { hasSupabaseConfig } from "@/lib/demo-app";
-import { MAX_SCHEMA_BYTES, MAX_SOURCE_BYTES } from "@/lib/floom/limits";
+import {
+  MAX_INPUT_BYTES,
+  MAX_REQUEST_BYTES,
+  MAX_SCHEMA_BYTES,
+  MAX_SOURCE_BYTES,
+} from "@/lib/floom/limits";
 import {
   parseManifest,
   validatePythonSourceForManifest,
   type FloomManifest,
 } from "@/lib/floom/manifest";
+import { validatePythonRequirementsText } from "@/lib/floom/requirements";
 import { validateJsonSchemaValue } from "@/lib/floom/schema";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { resolveAuthCaller } from "@/lib/supabase/auth";
@@ -46,6 +52,9 @@ type FloomToolName =
   | "run_app";
 
 const SLUG_RE = /^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$/;
+const MAX_MCP_FILE_COUNT = 100;
+const MAX_MCP_FILE_PATH_BYTES = 256;
+const MAX_MCP_FILE_BYTES = 64 * 1024;
 
 export const floomTools: McpToolDefinition[] = [
   {
@@ -134,6 +143,10 @@ export const floomTools: McpToolDefinition[] = [
         output_schema: {
           oneOf: [{ type: "string" }, { type: "object", additionalProperties: true }],
           description: "Output JSON Schema as JSON text or an object.",
+        },
+        requirements: {
+          type: "string",
+          description: "requirements.txt content, required only when floom.yaml declares dependencies.python.",
         },
       },
       required: ["manifest", "source", "input_schema", "output_schema"],
@@ -225,6 +238,11 @@ async function callFloomToolUnchecked(
     return errorResult("Tool arguments must be an object");
   }
 
+  const argumentSize = jsonByteLength(args);
+  if (argumentSize === null || argumentSize > MAX_REQUEST_BYTES) {
+    return errorResult("Tool arguments are too large");
+  }
+
   if (name === "get_app") {
     return getApp(args, context);
   }
@@ -304,13 +322,23 @@ async function runApp(args: JsonObject, context: McpToolContext): Promise<McpToo
     return errorResult("inputs must be an object");
   }
 
+  const inputSize = jsonByteLength(inputs);
+  if (inputSize === null || inputSize > MAX_INPUT_BYTES) {
+    return errorResult("inputs are too large");
+  }
+
+  const body = JSON.stringify({ inputs });
+  if (Buffer.byteLength(body, "utf8") > MAX_REQUEST_BYTES) {
+    return errorResult("run_app request body is too large");
+  }
+
   return proxyJson(`${context.baseUrl}/api/apps/${encodeURIComponent(slug)}/run`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       ...forwardedHeaders(context),
     },
-    body: JSON.stringify({ inputs }),
+    body,
   });
 }
 
@@ -378,7 +406,7 @@ function getAppContract(): McpToolResult {
     unsupported: [
       {
         case: "requirements.txt or pyproject.toml",
-        reason: "Dependency installation is post-v0. v0 runs one stdlib Python file without an install step.",
+        reason: "v0.1 supports exact-pinned requirements.txt packages only when floom.yaml declares dependencies.python.",
       },
       {
         case: "openapi.json, FastAPI, Flask, or HTTP servers",
@@ -393,8 +421,8 @@ function getAppContract(): McpToolResult {
         reason: "Multi-file bundles are post-v0. v0 packaging accepts one top-level Python entrypoint file.",
       },
       {
-        case: "manifest fields actions, dependencies, or secrets",
-        reason: "Multiple actions, dependency installs, and app secrets are post-v0 features.",
+        case: "manifest field actions",
+        reason: "Multiple actions are post-v0. v0.1 still exposes one handler.",
       },
       {
         case: "OpenBlog/OpenAPI apps",
@@ -411,6 +439,11 @@ function getAppContract(): McpToolResult {
         "public: true",
         "input_schema: ./input.schema.json",
         "output_schema: ./output.schema.json",
+        "# Optional v0.1:",
+        "# dependencies:",
+        "#   python: ./requirements.txt",
+        "# secrets:",
+        "#   - OPENAI_API_KEY",
       ].join("\n"),
       "app.py": [
         "def run(inputs: dict) -> dict:",
@@ -950,11 +983,31 @@ async function publishApp(args: JsonObject, context: McpToolContext): Promise<Mc
     return errorResult(outputSchemaResult.error);
   }
 
+  const requirements = args.requirements;
+  if (manifestResult.manifest.dependencies?.python) {
+    if (typeof requirements !== "string") {
+      return errorResult("requirements must be provided when dependencies.python is declared");
+    }
+
+    try {
+      validatePythonRequirementsText(requirements);
+    } catch (requirementsError) {
+      return errorResult(
+        requirementsError instanceof Error ? requirementsError.message : "Invalid requirements.txt"
+      );
+    }
+  } else if (requirements !== undefined) {
+    return errorResult("requirements requires dependencies.python in floom.yaml");
+  }
+
   const form = new FormData();
   form.append("manifest", textBlob(manifestToYaml(manifestResult.manifest), "application/x-yaml"), "floom.yaml");
   form.append("bundle", textBlob(source, "text/x-python"), manifestResult.manifest.entrypoint);
   form.append("input_schema", textBlob(JSON.stringify(inputSchemaResult.schema), "application/json"), "input.schema.json");
   form.append("output_schema", textBlob(JSON.stringify(outputSchemaResult.schema), "application/json"), "output.schema.json");
+  if (typeof requirements === "string") {
+    form.append("requirements", textBlob(validatePythonRequirementsText(requirements), "text/plain"), "requirements.txt");
+  }
 
   return proxyJson(`${context.baseUrl}/api/apps`, {
     method: "POST",
@@ -964,10 +1017,11 @@ async function publishApp(args: JsonObject, context: McpToolContext): Promise<Mc
 }
 
 function findCandidateApps(args: JsonObject): McpToolResult {
-  const files = asStringMap(args.files);
-  if (!files) {
-    return errorResult("files must be an object mapping paths to text contents");
+  const filesResult = parseFileMap(args.files);
+  if (!filesResult.ok) {
+    return errorResult(filesResult.error);
   }
+  const files = filesResult.files;
 
   const maxResults =
     typeof args.max_results === "number" &&
@@ -1005,8 +1059,25 @@ function findCandidateApps(args: JsonObject): McpToolResult {
           errors.push(`Missing entrypoint: ${entrypointPath}`);
         }
 
-        for (const unsupportedPath of unsupportedV0Files(appDir, files)) {
+        for (const unsupportedPath of unsupportedV0Files(appDir, files, manifest)) {
           errors.push(unsupportedFileReason(unsupportedPath));
+        }
+
+        if (manifest.dependencies?.python) {
+          const requirementsPath = joinPath(appDir, manifest.dependencies.python);
+          if (!(requirementsPath in files)) {
+            errors.push(`Missing requirements.txt: ${requirementsPath}`);
+          } else {
+            try {
+              validatePythonRequirementsText(files[requirementsPath]);
+            } catch (requirementsError) {
+              errors.push(
+                requirementsError instanceof Error
+                  ? requirementsError.message
+                  : "Invalid requirements.txt"
+              );
+            }
+          }
         }
 
         const pythonFiles = pythonFilesInAppDir(appDir, files);
@@ -1046,8 +1117,13 @@ function findCandidateApps(args: JsonObject): McpToolResult {
   });
 }
 
-function unsupportedV0Files(appDir: string, files: Record<string, string>) {
-  return ["requirements.txt", "pyproject.toml", "package.json", "openapi.json"]
+function unsupportedV0Files(appDir: string, files: Record<string, string>, manifest?: FloomManifest) {
+  const unsupported = ["pyproject.toml", "package.json", "openapi.json"];
+  if (!manifest?.dependencies?.python) {
+    unsupported.push("requirements.txt");
+  }
+
+  return unsupported
     .map((fileName) => joinPath(appDir, fileName))
     .filter((filePath) => filePath in files);
 }
@@ -1057,22 +1133,16 @@ function unsupportedManifestFields(manifest: JsonObject) {
   if (manifest.actions !== undefined) {
     reasons.push("floom.yaml field actions is not supported in v0; multiple actions are post-v0.");
   }
-  if (manifest.dependencies !== undefined) {
-    reasons.push("floom.yaml field dependencies is not supported in v0; dependency installation is post-v0.");
-  }
-  if (manifest.secrets !== undefined) {
-    reasons.push("floom.yaml field secrets is not supported in v0; app secret injection is post-v0.");
-  }
   return reasons;
 }
 
 function unsupportedFileReason(filePath: string) {
   const fileName = basename(filePath);
   if (fileName === "requirements.txt") {
-    return `${filePath} is not supported in v0; Python dependencies require the post-v0 dependency installer.`;
+    return `${filePath} requires floom.yaml dependencies.python: ./requirements.txt.`;
   }
   if (fileName === "pyproject.toml") {
-    return `${filePath} is not supported in v0; Python packaging/dependencies require the post-v0 dependency installer.`;
+    return `${filePath} is not supported in v0.1; use requirements.txt with dependencies.python.`;
   }
   if (fileName === "package.json") {
     return `${filePath} is not supported in v0; TypeScript/Node apps require the post-v0 TypeScript runner.`;
@@ -1104,7 +1174,7 @@ function unsupportedRepositoryCandidates(files: Record<string, string>) {
   }
 
   if (fileNames.has("requirements.txt") || fileNames.has("pyproject.toml")) {
-    candidates.push(unsupportedCandidate("Python dependencies require the post-v0 dependency installer"));
+    candidates.push(unsupportedCandidate("Python dependencies require a floom.yaml manifest with dependencies.python: ./requirements.txt"));
   }
 
   if (fileNames.has("package.json")) {
@@ -1172,6 +1242,14 @@ function parseManifestArgument(
   manifestValue: unknown
 ): { ok: true; manifest: FloomManifest } | { ok: false; error: string } {
   try {
+    const manifestSize =
+      typeof manifestValue === "string"
+        ? Buffer.byteLength(manifestValue, "utf8")
+        : jsonByteLength(manifestValue);
+    if (manifestSize === null || manifestSize > MAX_SCHEMA_BYTES) {
+      return { ok: false, error: "manifest is too large" };
+    }
+
     const value =
       typeof manifestValue === "string" ? yaml.load(manifestValue) : manifestValue;
     return { ok: true, manifest: parseManifest(value) };
@@ -1229,6 +1307,8 @@ function manifestToYaml(manifest: FloomManifest) {
     public: manifest.public ?? false,
     ...(manifest.input_schema ? { input_schema: manifest.input_schema } : {}),
     ...(manifest.output_schema ? { output_schema: manifest.output_schema } : {}),
+    ...(manifest.dependencies ? { dependencies: manifest.dependencies } : {}),
+    ...(manifest.secrets ? { secrets: manifest.secrets } : {}),
   });
 }
 
@@ -1236,18 +1316,50 @@ function textBlob(text: string, type: string) {
   return new Blob([text], { type });
 }
 
-function asStringMap(value: unknown): Record<string, string> | null {
+function parseFileMap(
+  value: unknown
+): { ok: true; files: Record<string, string> } | { ok: false; error: string } {
   const object = asObject(value);
   if (!object) {
-    return null;
+    return { ok: false, error: "files must be an object mapping paths to text contents" };
   }
 
   const entries = Object.entries(object);
-  if (!entries.every(([, fileText]) => typeof fileText === "string")) {
-    return null;
+  if (entries.length > MAX_MCP_FILE_COUNT) {
+    return { ok: false, error: `files supports at most ${MAX_MCP_FILE_COUNT} entries` };
   }
 
-  return object as Record<string, string>;
+  let totalBytes = 0;
+  const files: Record<string, string> = {};
+
+  for (const [filePath, fileText] of entries) {
+    if (typeof fileText !== "string") {
+      return { ok: false, error: "files must map paths to text contents" };
+    }
+
+    const normalizedPath = normalizePath(filePath);
+    if (!isSafeRepositoryPath(normalizedPath)) {
+      return { ok: false, error: `Invalid file path: ${filePath}` };
+    }
+
+    if (Buffer.byteLength(normalizedPath, "utf8") > MAX_MCP_FILE_PATH_BYTES) {
+      return { ok: false, error: `File path is too long: ${filePath}` };
+    }
+
+    const fileBytes = Buffer.byteLength(fileText, "utf8");
+    if (fileBytes > MAX_MCP_FILE_BYTES) {
+      return { ok: false, error: `File is too large: ${normalizedPath}` };
+    }
+
+    totalBytes += Buffer.byteLength(normalizedPath, "utf8") + fileBytes;
+    if (totalBytes > MAX_REQUEST_BYTES) {
+      return { ok: false, error: "files map is too large" };
+    }
+
+    files[normalizedPath] = fileText;
+  }
+
+  return { ok: true, files };
 }
 
 function validateCandidateSchema(
@@ -1291,6 +1403,27 @@ function joinPath(dir: string, filePath: string) {
 
 function normalizePath(filePath: string) {
   return filePath.replace(/\\/g, "/").replace(/^\.\//, "");
+}
+
+function isSafeRepositoryPath(filePath: string) {
+  if (
+    filePath === "" ||
+    filePath.startsWith("/") ||
+    filePath.includes("\0") ||
+    filePath.split("/").some((part) => part === "" || part === "." || part === "..")
+  ) {
+    return false;
+  }
+
+  return true;
+}
+
+function jsonByteLength(value: unknown) {
+  try {
+    return Buffer.byteLength(JSON.stringify(value), "utf8");
+  } catch {
+    return null;
+  }
 }
 
 function okResult(data: unknown): McpToolResult {

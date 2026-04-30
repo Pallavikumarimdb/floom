@@ -181,22 +181,23 @@ export default function DocsPage() {
 
         <Section title="v0.1 scope">
           <p>
-            v0.1 adds dependencies and secrets without changing Floom into broad
-            app hosting.
+            v0.1 adds exact-pinned dependencies and operator-provisioned secret
+            env injection without changing Floom into broad app hosting.
           </p>
           <ul className="list-disc space-y-3 pl-5">
             <li>
-              Constrained Python dependency installation from{" "}
+              Exact-pinned Python dependency installation from{" "}
               <code>requirements.txt</code>.
             </li>
             <li>
               Secret names in <code>floom.yaml</code>, never raw secret values.
             </li>
-            <li>Secure secret storage and E2B runtime injection.</li>
+            <li>Owner-scoped server env lookup and E2B runtime injection.</li>
           </ul>
           <p className="text-sm text-neutral-500">
             FastAPI/OpenAPI, arbitrary HTTP servers, TypeScript apps,
-            background workers, and full repo hosting remain later milestones.
+            background workers, full repo hosting, and encrypted self-serve
+            secret storage remain later milestones.
           </p>
         </Section>
 

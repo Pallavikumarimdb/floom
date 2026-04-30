@@ -18,6 +18,13 @@ import {
   validatePythonSourceForManifest,
 } from '../src/lib/floom/manifest.ts';
 import {
+  validatePythonRequirementsText,
+} from '../src/lib/floom/requirements.ts';
+import {
+  resolveRuntimeSecrets,
+  serverSecretEnvName,
+} from '../src/lib/floom/runtime-secrets.ts';
+import {
   REDACTED_OUTPUT_VALUE,
   redactSecretInput,
   redactSecretOutput,
@@ -81,13 +88,24 @@ async function test() {
     () => parseManifest({ name: 'Bad', slug: 'bad-app', runtime: 'typescript', entrypoint: 'app.ts', handler: 'run' }),
     /runtime: python/
   );
+  const v01Manifest = parseManifest({
+    name: 'Deps',
+    slug: 'deps-app',
+    runtime: 'python',
+    entrypoint: 'app.py',
+    handler: 'run',
+    dependencies: { python: './requirements.txt' },
+    secrets: ['OPENAI_API_KEY'],
+  });
+  assert.deepEqual(v01Manifest.dependencies, { python: 'requirements.txt' });
+  assert.deepEqual(v01Manifest.secrets, ['OPENAI_API_KEY']);
   assert.throws(
     () => parseManifest({ name: 'Bad', slug: 'bad-app', runtime: 'python', entrypoint: 'app.py', handler: 'run', dependencies: { python: ['requests'] } }),
-    /dependencies are not supported/
+    /dependencies.python/
   );
   assert.throws(
-    () => parseManifest({ name: 'Bad', slug: 'bad-app', runtime: 'python', entrypoint: 'app.py', handler: 'run', secrets: ['API_KEY'] }),
-    /secrets/
+    () => parseManifest({ name: 'Bad', slug: 'bad-app', runtime: 'python', entrypoint: 'app.py', handler: 'run', secrets: ['sk-test'] }),
+    /uppercase environment variable names/
   );
   assert.throws(
     () => parseManifest({ name: 'Bad', slug: 'bad-app', runtime: 'python', entrypoint: 'app.py', handler: 'run', actions: { run: {} } }),
@@ -141,7 +159,9 @@ async function test() {
   assert.match(complexResult.error, /too complex/);
 
   testSecretRedaction();
+  testV01DependencyAndSecretMetadata();
   testPublicRunRateLimitHardening();
+  await testSandboxDependenciesAndSecrets();
   await testSandboxErrorContainment();
 
   const authStatus = await callFloomTool('auth_status', {}, { baseUrl: 'http://localhost:3000' });
@@ -158,6 +178,8 @@ async function test() {
   assert.equal(contract.files['output.schema.json'].type, 'object');
   assert.match(JSON.stringify(contract.unsupported), /OpenBlog/);
   assert.match(JSON.stringify(contract.unsupported), /requirements\.txt/);
+  assert.match(contract.files['floom.yaml'], /dependencies:/);
+  assert.match(contract.files['floom.yaml'], /secrets:/);
   assert.deepEqual(contract.templates_tool.available_keys, [
     'invoice_calculator',
     'utm_url_builder',
@@ -215,11 +237,6 @@ async function test() {
           'handler: run',
           'actions:',
           '  first: {}',
-          'dependencies:',
-          '  python:',
-          '    - requests',
-          'secrets:',
-          '  - API_KEY',
         ].join('\n'),
         'bad/app.py': 'def run(inputs):\n    return {"ok": True}\n',
         'bad/input.schema.json': '{}',
@@ -232,8 +249,32 @@ async function test() {
     .candidates[0]
     .unsupported_reason;
   assert.match(manifestUnsupportedReason, /actions/);
-  assert.match(manifestUnsupportedReason, /dependencies/);
-  assert.match(manifestUnsupportedReason, /secrets/);
+
+  const v01Candidate = await callFloomTool(
+    'find_candidate_apps',
+    {
+      files: {
+        'deps/floom.yaml': [
+          'name: Deps',
+          'slug: deps-app',
+          'runtime: python',
+          'entrypoint: app.py',
+          'handler: run',
+          'dependencies:',
+          '  python: ./requirements.txt',
+          'secrets:',
+          '  - OPENAI_API_KEY',
+        ].join('\n'),
+        'deps/app.py': 'def run(inputs):\n    return {"ok": True}\n',
+        'deps/input.schema.json': '{}',
+        'deps/output.schema.json': '{}',
+        'deps/requirements.txt': 'requests==2.32.3\n',
+      },
+    },
+    { baseUrl: 'http://localhost:3000' }
+  );
+  assert.equal(parseToolResult(v01Candidate).candidates[0].valid, true);
+  await testMcpGuardrails();
 
   const manifestFileUnsupportedCandidates = await callFloomTool(
     'find_candidate_apps',
@@ -244,7 +285,6 @@ async function test() {
         'blocked/helper.py': 'VALUE = 1\n',
         'blocked/input.schema.json': inputSchemaText,
         'blocked/output.schema.json': outputSchemaText,
-        'blocked/requirements.txt': 'requests\n',
         'blocked/pyproject.toml': '[project]\nname = "blocked"\n',
         'blocked/package.json': '{"scripts":{}}\n',
         'blocked/openapi.json': '{"openapi":"3.1.0"}',
@@ -255,7 +295,6 @@ async function test() {
   const manifestFileUnsupportedReason = parseToolResult(manifestFileUnsupportedCandidates)
     .candidates[0]
     .unsupported_reason;
-  assert.match(manifestFileUnsupportedReason, /requirements\.txt/);
   assert.match(manifestFileUnsupportedReason, /pyproject\.toml/);
   assert.match(manifestFileUnsupportedReason, /package\.json/);
   assert.match(manifestFileUnsupportedReason, /openapi\.json/);
@@ -289,6 +328,49 @@ async function test() {
     );
     assert.notEqual(publishResult.isError, true);
     assert.equal(parseToolResult(publishResult).app.slug, 'pitch-coach');
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+
+  globalThis.fetch = async (url, init) => {
+    assert.equal(url, 'http://localhost:3000/api/apps');
+    const form = init.body;
+    const publishedManifest = await form.get('manifest').text();
+    assert.match(publishedManifest, /dependencies:/);
+    assert.match(publishedManifest, /python: requirements\.txt/);
+    assert.match(publishedManifest, /secrets:/);
+    assert.match(publishedManifest, /OPENAI_API_KEY/);
+    assert.equal(await form.get('requirements').text(), 'requests==2.32.3\n');
+    return new Response(JSON.stringify({ app: { slug: 'deps-app' } }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    });
+  };
+
+  try {
+    const publishV01Result = await callFloomTool(
+      'publish_app',
+      {
+        manifest: [
+          'name: Deps',
+          'slug: deps-app',
+          'runtime: python',
+          'entrypoint: app.py',
+          'handler: run',
+          'dependencies:',
+          '  python: ./requirements.txt',
+          'secrets:',
+          '  - OPENAI_API_KEY',
+        ].join('\n'),
+        source: 'def run(inputs):\n    return {"ok": True}\n',
+        input_schema: '{}',
+        output_schema: '{}',
+        requirements: 'requests==2.32.3\n',
+      },
+      { baseUrl: 'http://localhost:3000', authorization: 'Bearer test-token' }
+    );
+    assert.notEqual(publishV01Result.isError, true);
+    assert.equal(parseToolResult(publishV01Result).app.slug, 'deps-app');
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -611,6 +693,130 @@ function testSecretRedaction() {
   );
 }
 
+function testV01DependencyAndSecretMetadata() {
+  assert.equal(
+    validatePythonRequirementsText('requests==2.32.3\n# ok\nopenai==1.14.0\n'),
+    'requests==2.32.3\nopenai==1.14.0\n'
+  );
+  assert.throws(
+    () => validatePythonRequirementsText('openai>=1.0\n'),
+    /exact package pins/
+  );
+  assert.throws(
+    () => validatePythonRequirementsText('--extra-index-url https://example.com\nrequests\n'),
+    /exact package pins/
+  );
+  assert.throws(
+    () => validatePythonRequirementsText('git+https://example.com/repo.git\n'),
+    /exact package pins/
+  );
+
+  const ownerId = 'user-123';
+  const envName = serverSecretEnvName(ownerId, 'OPENAI_API_KEY');
+  assert.equal(envName, 'FLOOM_APP_SECRET_USER_123_OPENAI_API_KEY');
+  const saved = snapshotEnv([envName]);
+  try {
+    process.env[envName] = 'server-side-secret';
+    const resolved = resolveRuntimeSecrets(['OPENAI_API_KEY'], ownerId);
+    assert.deepEqual(Object.keys(resolved.envs), ['OPENAI_API_KEY']);
+    assert.equal(resolved.envs.OPENAI_API_KEY, 'server-side-secret');
+    assert.deepEqual(resolved.missing, []);
+
+    delete process.env[envName];
+    const missing = resolveRuntimeSecrets(['OPENAI_API_KEY'], ownerId);
+    assert.deepEqual(missing.envs, {});
+    assert.deepEqual(missing.missing, ['OPENAI_API_KEY']);
+  } finally {
+    restoreEnv(saved);
+  }
+}
+
+async function testMcpGuardrails() {
+  const traversal = await callFloomTool(
+    'find_candidate_apps',
+    { files: { '../floom.yaml': 'name: Bad\n' } },
+    { baseUrl: 'http://localhost:3000' }
+  );
+  assert.equal(traversal.isError, true);
+  assert.match(parseToolResult(traversal).error, /Invalid file path/);
+
+  const largeFile = await callFloomTool(
+    'find_candidate_apps',
+    { files: { 'huge/floom.yaml': 'x'.repeat(70 * 1024) } },
+    { baseUrl: 'http://localhost:3000' }
+  );
+  assert.equal(largeFile.isError, true);
+  assert.match(parseToolResult(largeFile).error, /File is too large/);
+
+  const largeManifest = await callFloomTool(
+    'validate_manifest',
+    { manifest: 'x'.repeat(40 * 1024) },
+    { baseUrl: 'http://localhost:3000' }
+  );
+  assert.equal(largeManifest.isError, true);
+  assert.match(parseToolResult(largeManifest).error, /manifest is too large|Tool arguments are too large/);
+
+  const largeRun = await callFloomTool(
+    'run_app',
+    { slug: 'pitch-coach', inputs: { text: 'x'.repeat(20 * 1024) } },
+    { baseUrl: 'http://localhost:3000' }
+  );
+  assert.equal(largeRun.isError, true);
+  assert.match(parseToolResult(largeRun).error, /inputs are too large/);
+}
+
+async function testSandboxDependenciesAndSecrets() {
+  const saved = snapshotEnv([
+    'E2B_API_KEY',
+    'FLOOM_EXECUTION_MODE',
+    'FLOOM_FAKE_E2B',
+    'NODE_ENV',
+  ]);
+  const originalCreate = Sandbox.create;
+  const commands = [];
+  const writes = new Map();
+
+  process.env.E2B_API_KEY = 'test-e2b-key';
+  delete process.env.FLOOM_EXECUTION_MODE;
+  delete process.env.FLOOM_FAKE_E2B;
+  process.env.NODE_ENV = 'production';
+
+  Sandbox.create = async (_template, opts) => ({
+    files: {
+      write: async (path, value) => writes.set(path, value),
+      read: async () => '{"ok": true}',
+    },
+    commands: {
+      run: async (command, runOpts) => {
+        commands.push({ command, runOpts });
+      },
+    },
+    kill: async () => undefined,
+    createOpts: opts,
+  });
+
+  try {
+    const result = await runInSandbox(
+      'def run(inputs): return {"ok": True}',
+      {},
+      'python',
+      'app.py',
+      'run',
+      { python_requirements: 'requests==2.32.3\n' },
+      { OPENAI_API_KEY: 'runtime-secret' }
+    );
+    assert.deepEqual(result, { output: { ok: true } });
+    assert.equal(writes.get('/home/user/requirements.txt'), 'requests==2.32.3\n');
+    assert.match(commands[0].command, /pip install/);
+    assert.match(commands[1].command, /runner\.py/);
+    assert.deepEqual(commands[1].runOpts.envs, { OPENAI_API_KEY: 'runtime-secret' });
+    assert.match(writes.get('/home/user/runner.py'), /\/home\/user\/\.deps/);
+  } finally {
+    Sandbox.create = originalCreate;
+    restoreEnv(saved);
+  }
+}
+
 function testPublicRunRateLimitHardening() {
   const routeText = readFileSync('src/app/api/apps/[slug]/run/route.ts', 'utf8');
   const migrationText = readFileSync(
@@ -753,7 +959,13 @@ function testCliRejectsUnsupportedV0Shapes(manifestText, inputSchemaText, output
     expectCliFailure(appDir, /exactly one Python source file/);
     rmSync(join(appDir, 'helper.py'));
     writeFileSync(join(appDir, 'requirements.txt'), 'requests\n');
-    expectCliFailure(appDir, /requirements\.txt is not supported/);
+    expectCliFailure(appDir, /requirements\.txt requires dependencies\.python/);
+    writeFileSync(
+      join(appDir, 'floom.yaml'),
+      `${manifestText}\ndependencies:\n  python: ./requirements.txt\n`
+    );
+    writeFileSync(join(appDir, 'requirements.txt'), 'https://example.com/pkg.whl\n');
+    expectCliFailure(appDir, /exact package pins/);
   } finally {
     rmSync(appDir, { recursive: true, force: true });
   }

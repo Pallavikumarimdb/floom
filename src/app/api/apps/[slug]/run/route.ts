@@ -9,6 +9,8 @@ import {
   getPublicRunRateLimitKey,
   getRunCallerKey,
 } from "@/lib/floom/rate-limit";
+import { readRuntimeDependencies } from "@/lib/floom/requirements";
+import { resolveRuntimeSecrets } from "@/lib/floom/runtime-secrets";
 import { redactSecretInput, redactSecretOutput } from "@/lib/floom/schema";
 import Ajv from "ajv";
 
@@ -187,13 +189,38 @@ export async function POST(
     );
   }
 
+  const runtimeSecrets = resolveRuntimeSecrets(latestVersion.secrets ?? [], app.owner_id);
+  if (runtimeSecrets.missing.length > 0) {
+    const errorMessage = `Missing configured app secret(s): ${runtimeSecrets.missing.join(", ")}`;
+    await admin
+      .from("executions")
+      .update({
+        status: "error",
+        error: errorMessage,
+        completed_at: new Date().toISOString(),
+      })
+      .eq("id", execution.id);
+
+    return NextResponse.json(
+      {
+        execution_id: execution.id,
+        status: "error",
+        output: null,
+        error: errorMessage,
+      },
+      { status: 400 }
+    );
+  }
+
   // Run
   const result = await runInSandboxContained(
     bundleText,
     inputs,
     app.runtime,
     app.entrypoint,
-    app.handler
+    app.handler,
+    readRuntimeDependencies(latestVersion.dependencies),
+    runtimeSecrets.envs
   );
 
   // Validate output

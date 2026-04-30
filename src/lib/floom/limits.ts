@@ -1,5 +1,6 @@
 export const MAX_REQUEST_BYTES = 128 * 1024;
 export const MAX_SOURCE_BYTES = 64 * 1024;
+export const MAX_REQUIREMENTS_BYTES = 16 * 1024;
 export const MAX_SCHEMA_BYTES = 32 * 1024;
 export const MAX_SCHEMA_DEPTH = 12;
 export const MAX_SCHEMA_NODES = 500;

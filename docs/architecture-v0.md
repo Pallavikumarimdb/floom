@@ -54,7 +54,7 @@ Current v0 accepts:
 
 Current v0 rejects:
 
-- `requirements.txt` unless working on the v0.1 branch
+- `requirements.txt`
 - raw secret values
 - FastAPI/OpenAPI servers
 - TypeScript/Node apps
@@ -89,12 +89,15 @@ Verified working:
 
 Goal: unlock useful `input -> API/AI call -> output` apps.
 
-Scope:
+Separate branch scope:
 
-- `requirements.txt`
+- exact-pinned `requirements.txt` packages via `dependencies.python: ./requirements.txt`
 - manifest-declared secret names
-- server-side secret injection into E2B
+- operator-provisioned server env injection into E2B
 - no raw secret values in source, manifest, logs, MCP output, or docs
+
+Encrypted user-managed secret value storage is not implemented in this branch.
+That remains a blocker for self-serve v0.1 secrets.
 
 Branch: `v0.1-deps-secrets`
 
