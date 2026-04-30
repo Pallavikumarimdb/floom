@@ -40,6 +40,8 @@ Required Supabase Auth settings:
 
 - Site URL: `https://floom-60sec.vercel.app`
 - Redirect URL: `https://floom-60sec.vercel.app/auth/callback`
+- Google provider enabled in Supabase Auth with the production Google OAuth client ID and client secret.
+- Google Cloud OAuth redirect URI includes the Supabase callback URL shown in the Supabase Google provider settings.
 
 After provider email is unblocked, run `docs/virgin-agent-qa.md` again from a fresh browser and verify confirmation lands on production, not localhost.
 

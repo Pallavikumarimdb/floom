@@ -15,7 +15,7 @@ It does not mean every app gets a new Vercel project.
 - Super clean codebase with clear module ownership.
 - Supabase is live, reproducible, and documented.
 - Supabase Auth is configured for email auth first.
-- Google Auth is later.
+- Google OAuth sign-in is available in the login UI once the Supabase Google provider is configured.
 - Agent token flow exists for app publishing.
 - MCP exists for agent-driven create/test/publish.
 - Floom skill instructs agents how to find and package deployable apps.
