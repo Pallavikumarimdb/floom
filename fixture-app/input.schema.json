@@ -1,0 +1,11 @@
+{
+  "type": "object",
+  "properties": {
+    "pitch": {
+      "type": "string",
+      "title": "Your Pitch",
+      "description": "Enter your elevator pitch"
+    }
+  },
+  "required": ["pitch"]
+}

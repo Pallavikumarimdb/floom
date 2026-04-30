@@ -1,0 +1,8 @@
+{
+  "type": "object",
+  "properties": {
+    "result": { "type": "string" },
+    "length": { "type": "integer" }
+  },
+  "required": ["result", "length"]
+}

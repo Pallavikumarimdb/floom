@@ -1,0 +1,10 @@
+name: Pitch Coach
+slug: pitch-coach
+runtime: python
+entrypoint: app.py
+handler: run
+input_schema: ./input.schema.json
+output_schema: ./output.schema.json
+secrets: []
+dependencies:
+  python: []
