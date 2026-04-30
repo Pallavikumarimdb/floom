@@ -39,7 +39,7 @@ Reject:
 
 ## v0.1 Boundary
 
-v0.1 is exact-pinned dependencies plus secret names with operator-provisioned
+v0.1 is exact-pinned dependencies plus owner-managed encrypted app secrets with
 runtime environment injection. It is not generic web hosting, and it is not part
 of the v0 60-second launch claim until separately verified end to end.
 
@@ -47,11 +47,10 @@ Add in v0.1:
 
 - An exact-pinned `requirements.txt` install path for Python packages.
 - `floom.yaml` secret names only, never raw secret values.
-- Owner-scoped server-side secret env lookup and E2B runtime injection.
+- Owner-scoped encrypted secret storage and E2B runtime injection.
 
-Blocker for self-serve secrets: encrypted user-managed secret value storage is
-not implemented. Operators provision values as server environment variables
-named from the app owner and manifest secret name.
+Self-serve secret values are set through `GET`/`PUT`/`DELETE /api/apps/:slug/secrets`
+or `cli/secrets.ts`. Responses contain metadata only.
 
 Still reject until later: FastAPI/OpenAPI apps, arbitrary HTTP servers,
 TypeScript/Node apps, background workers, multi-service repos, and long-running

@@ -189,7 +189,33 @@ export async function POST(
     );
   }
 
-  const runtimeSecrets = resolveRuntimeSecrets(latestVersion.secrets ?? [], app.owner_id);
+  const runtimeSecrets = await resolveRuntimeSecrets(
+    admin,
+    latestVersion.secrets ?? [],
+    app.id,
+    app.owner_id
+  );
+  if (!runtimeSecrets.ok) {
+    await admin
+      .from("executions")
+      .update({
+        status: "error",
+        error: runtimeSecrets.error,
+        completed_at: new Date().toISOString(),
+      })
+      .eq("id", execution.id);
+
+    return NextResponse.json(
+      {
+        execution_id: execution.id,
+        status: "error",
+        output: null,
+        error: runtimeSecrets.error,
+      },
+      { status: 503 }
+    );
+  }
+
   if (runtimeSecrets.missing.length > 0) {
     const errorMessage = `Missing configured app secret(s): ${runtimeSecrets.missing.join(", ")}`;
     await admin

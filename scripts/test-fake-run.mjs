@@ -21,8 +21,9 @@ import {
   validatePythonRequirementsText,
 } from '../src/lib/floom/requirements.ts';
 import {
+  decryptSecretValue,
+  encryptSecretValue,
   resolveRuntimeSecrets,
-  serverSecretEnvName,
 } from '../src/lib/floom/runtime-secrets.ts';
 import {
   REDACTED_OUTPUT_VALUE,
@@ -159,7 +160,7 @@ async function test() {
   assert.match(complexResult.error, /too complex/);
 
   testSecretRedaction();
-  testV01DependencyAndSecretMetadata();
+  await testV01DependencyAndSecretMetadata();
   testPublicRunRateLimitHardening();
   await testSandboxDependenciesAndSecrets();
   await testSandboxErrorContainment();
@@ -693,7 +694,7 @@ function testSecretRedaction() {
   );
 }
 
-function testV01DependencyAndSecretMetadata() {
+async function testV01DependencyAndSecretMetadata() {
   assert.equal(
     validatePythonRequirementsText('requests==2.32.3\n# ok\nopenai==1.14.0\n'),
     'requests==2.32.3\nopenai==1.14.0\n'
@@ -711,24 +712,87 @@ function testV01DependencyAndSecretMetadata() {
     /exact package pins/
   );
 
-  const ownerId = 'user-123';
-  const envName = serverSecretEnvName(ownerId, 'OPENAI_API_KEY');
-  assert.equal(envName, 'FLOOM_APP_SECRET_USER_123_OPENAI_API_KEY');
-  const saved = snapshotEnv([envName]);
+  const saved = snapshotEnv(['FLOOM_SECRET_ENCRYPTION_KEY']);
+  const secretValue = 'stored-test-secret-value';
   try {
-    process.env[envName] = 'server-side-secret';
-    const resolved = resolveRuntimeSecrets(['OPENAI_API_KEY'], ownerId);
+    process.env.FLOOM_SECRET_ENCRYPTION_KEY = Buffer.alloc(32, 7).toString('base64');
+    const encrypted = encryptSecretValue(secretValue);
+    assert.doesNotMatch(encrypted, /stored-test-secret-value/);
+    assert.equal(decryptSecretValue(encrypted), secretValue);
+
+    const admin = fakeSecretAdmin([
+      { name: 'OPENAI_API_KEY', value_ciphertext: encrypted },
+    ]);
+    const resolved = await resolveRuntimeSecrets(
+      admin,
+      ['OPENAI_API_KEY'],
+      'app-123',
+      'user-123'
+    );
+    assert.equal(resolved.ok, true);
     assert.deepEqual(Object.keys(resolved.envs), ['OPENAI_API_KEY']);
-    assert.equal(resolved.envs.OPENAI_API_KEY, 'server-side-secret');
+    assert.equal(resolved.envs.OPENAI_API_KEY, secretValue);
     assert.deepEqual(resolved.missing, []);
 
-    delete process.env[envName];
-    const missing = resolveRuntimeSecrets(['OPENAI_API_KEY'], ownerId);
+    const missing = await resolveRuntimeSecrets(
+      fakeSecretAdmin([]),
+      ['OPENAI_API_KEY'],
+      'app-123',
+      'user-123'
+    );
+    assert.equal(missing.ok, true);
     assert.deepEqual(missing.envs, {});
     assert.deepEqual(missing.missing, ['OPENAI_API_KEY']);
+
+    delete process.env.FLOOM_SECRET_ENCRYPTION_KEY;
+    const unconfigured = await resolveRuntimeSecrets(
+      fakeSecretAdmin([]),
+      ['OPENAI_API_KEY'],
+      'app-123',
+      'user-123'
+    );
+    assert.deepEqual(unconfigured, { ok: false, error: 'App secrets are not configured' });
+
+    assert.deepEqual(
+      await resolveRuntimeSecrets(fakeSecretAdmin([]), [], 'app-123', 'user-123'),
+      { ok: true, envs: {}, missing: [] }
+    );
   } finally {
     restoreEnv(saved);
   }
+
+  const runRouteText = readFileSync('src/app/api/apps/[slug]/run/route.ts', 'utf8');
+  assert.match(runRouteText, /await resolveRuntimeSecrets\(/);
+  assert.match(runRouteText, /runtimeSecrets\.envs/);
+  assert.doesNotMatch(runRouteText, /FLOOM_APP_SECRET/);
+
+  const secretsRouteText = readFileSync('src/app/api/apps/[slug]/secrets/route.ts', 'utf8');
+  assert.match(secretsRouteText, /GET/);
+  assert.match(secretsRouteText, /PUT/);
+  assert.match(secretsRouteText, /DELETE/);
+  assert.match(secretsRouteText, /encryptSecretValue\(value\)/);
+  assert.match(secretsRouteText, /\.select\("name, created_at, updated_at"\)/);
+
+  const cliText = readFileSync('cli/secrets.ts', 'utf8');
+  assert.match(cliText, /readStdin/);
+  assert.match(cliText, /FLOOM_SECRET_VALUE/);
+  assert.doesNotMatch(cliText, /console\.log\(.*value/);
+
+  const migrationText = readFileSync(
+    'supabase/migrations/20260501090000_app_secrets.sql',
+    'utf8'
+  );
+  assertSqlContains(migrationText, 'create table if not exists public.app_secrets');
+  assertSqlContains(migrationText, 'value_ciphertext text not null');
+  assertSqlContains(migrationText, 'constraint app_secrets_app_owner_fkey foreign key (app_id, owner_id) references public.apps(id, owner_id) on delete cascade');
+  assertSqlContains(migrationText, 'constraint app_secrets_app_name_key unique (app_id, name)');
+  assertSqlContains(migrationText, "constraint app_secrets_name_format check (name ~ '^[A-Z][A-Z0-9_]{1,63}$')");
+  assertSqlContains(migrationText, 'alter table public.app_secrets enable row level security');
+  assertSqlContains(migrationText, 'create policy "app secrets are readable by owner"');
+  assertSqlContains(migrationText, 'create policy "owners can create app secrets"');
+  assertSqlContains(migrationText, 'create policy "owners can update app secrets"');
+  assertSqlContains(migrationText, 'create policy "owners can delete app secrets"');
+  assertSqlContains(migrationText, 'create trigger app_secrets_set_updated_at');
 }
 
 async function testMcpGuardrails() {
@@ -1050,6 +1114,37 @@ function restoreEnv(snapshot) {
       process.env[key] = value;
     }
   }
+}
+
+function fakeSecretAdmin(rows, error = null) {
+  const calls = [];
+  const builder = {
+    select(value) {
+      calls.push(['select', value]);
+      return builder;
+    },
+    eq(field, value) {
+      calls.push(['eq', field, value]);
+      return builder;
+    },
+    in(field, value) {
+      calls.push(['in', field, value]);
+      assert.deepEqual(calls, [
+        ['select', 'name, value_ciphertext'],
+        ['eq', 'app_id', 'app-123'],
+        ['eq', 'owner_id', 'user-123'],
+        ['in', 'name', ['OPENAI_API_KEY']],
+      ]);
+      return Promise.resolve({ data: rows, error });
+    },
+  };
+
+  return {
+    from(table) {
+      assert.equal(table, 'app_secrets');
+      return builder;
+    },
+  };
 }
 
 test().catch((err) => {

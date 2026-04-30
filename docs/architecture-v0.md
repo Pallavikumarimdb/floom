@@ -18,6 +18,8 @@ flowchart TD
   Publish --> Apps[apps table]
   Publish --> Versions[app_versions table]
   Publish --> Bundles[Supabase Storage app-bundles]
+  CLI -->|metadata-only secret commands| SecretsAPI[GET/PUT/DELETE /api/apps/:slug/secrets]
+  SecretsAPI --> Secrets[app_secrets encrypted values]
 
   Browser[/p/:slug] --> Run[POST /api/apps/:slug/run]
   API[REST caller] --> Run
@@ -25,6 +27,8 @@ flowchart TD
 
   Run --> Access[auth + public/private + rate limit]
   Access --> Bundles
+  Access --> Secrets
+  Secrets -->|server decrypt + names only| Run
   Run --> E2B[E2B sandbox]
   E2B --> Handler[call run(inputs)]
   Handler --> Output[JSON output]
@@ -48,13 +52,13 @@ Current v0 accepts:
 
 - `runtime: python`
 - one handler function, usually `run(inputs: dict) -> dict`
-- Python standard library only
+- Python standard library only in v0, exact-pinned dependencies in v0.1
 - public apps via `public: true`
 - private apps when `public` is omitted or false
+- manifest-declared secret names in v0.1
 
 Current v0 rejects:
 
-- `requirements.txt`
 - raw secret values
 - FastAPI/OpenAPI servers
 - TypeScript/Node apps
@@ -85,7 +89,7 @@ Verified working:
 
 ## Runtime Roadmap
 
-### v0.1: Python Dependencies + Secret Names
+### v0.1: Python Dependencies + Self-Serve Secret Storage
 
 Goal: unlock useful `input -> API/AI call -> output` apps.
 
@@ -93,11 +97,11 @@ Separate branch scope:
 
 - exact-pinned `requirements.txt` packages via `dependencies.python: ./requirements.txt`
 - manifest-declared secret names
-- operator-provisioned server env injection into E2B
-- no raw secret values in source, manifest, logs, MCP output, or docs
+- owner-managed encrypted secret values in `app_secrets`
+- server-only decryption and E2B env injection at run time
+- no raw secret values in source, manifest, logs, MCP output, API responses, app versions, executions, bundle storage, or docs
 
-Encrypted user-managed secret value storage is not implemented in this branch.
-That remains a blocker for self-serve v0.1 secrets.
+`FLOOM_SECRET_ENCRYPTION_KEY` is a server-only base64-encoded 32-byte key. Secret list responses contain only `name`, `created_at`, and `updated_at` metadata.
 
 Branch: `v0.1-deps-secrets`
 
