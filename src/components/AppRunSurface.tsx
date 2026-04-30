@@ -29,12 +29,12 @@ export function AppRunSurface({
   onRun,
 }: AppRunSurfaceProps) {
   return (
-    <div className="overflow-hidden rounded-2xl border border-[#ded8cc] bg-white shadow-xl shadow-neutral-200/60">
+    <div className="max-w-full overflow-hidden rounded-2xl border border-[#ded8cc] bg-white shadow-xl shadow-neutral-200/60">
       <div className="border-b border-[#ded8cc] px-6 py-4 font-mono text-xs font-bold uppercase tracking-widest text-neutral-500">
         Run ready
       </div>
-      <div className="grid min-h-[420px] md:grid-cols-[380px_1fr]">
-        <div className="border-b border-[#ded8cc] p-8 md:border-b-0 md:border-r">
+      <div className="grid min-h-[420px] min-w-0 md:grid-cols-[minmax(0,380px)_minmax(0,1fr)]">
+        <div className="min-w-0 border-b border-[#ded8cc] p-5 md:border-b-0 md:border-r md:p-8">
           <p className="mb-5 font-mono text-xs font-bold uppercase tracking-widest text-neutral-500">
             Inputs
           </p>
@@ -48,7 +48,7 @@ export function AppRunSurface({
             }
             onSubmit={onRun}
           >
-            <div className="mt-6 flex gap-3">
+            <div className="mt-6 flex flex-wrap gap-3">
               <button
                 type="submit"
                 disabled={runLoading}
@@ -67,14 +67,14 @@ export function AppRunSurface({
           </Form>
         </div>
 
-        <div className="flex min-h-[360px] flex-col p-8">
+        <div className="flex min-h-[360px] min-w-0 flex-col p-5 md:p-8">
           <p className="mb-5 font-mono text-xs font-bold uppercase tracking-widest text-neutral-500">
             Output
           </p>
           {runError && (
             <div className="rounded-xl border border-red-200 bg-red-50 p-4">
               <p className="font-medium text-red-700">Error</p>
-              <pre className="mt-1 whitespace-pre-wrap text-sm text-red-600">
+              <pre className="mt-1 max-w-full overflow-x-auto whitespace-pre-wrap break-words text-sm text-red-600">
                 {runError}
               </pre>
             </div>
@@ -91,7 +91,7 @@ export function AppRunSurface({
           )}
           {runResult && (
             <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-5">
-              <pre className="overflow-auto whitespace-pre-wrap text-sm leading-7 text-emerald-900">
+              <pre className="max-w-full overflow-x-auto whitespace-pre-wrap break-words text-sm leading-7 text-emerald-900">
                 {JSON.stringify(runResult, null, 2)}
               </pre>
             </div>

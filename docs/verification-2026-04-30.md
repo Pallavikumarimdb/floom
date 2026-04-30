@@ -24,8 +24,7 @@ Not verified for the 60-second claim yet:
 - Production shell: `https://floom-60sec.vercel.app`
 - Verified app page: `https://floom-60sec.vercel.app/p/smoke-1777538613152`
 - GitHub repo: `floomhq/floom-minimal`
-- Functional code commit verified during this pass: `40745fd`
-- Later docs-only evidence commits were deployed without changing app behavior.
+- Verified commits are tracked by GitHub `main` and the Vercel production deployment for each pass.
 
 ## Local Verification
 
@@ -168,10 +167,10 @@ Browser verification:
 
 ## Current Score
 
-Technical v0 slice: `94/100`.
+Technical v0 slice after narrowing the launch claim to single-file Python apps: `90/100`.
 
 Remaining blockers before calling the whole thing `100/100`:
 
-- More than one fixture app needs live verification.
-- Token-to-publish flow needs a public skill/CLI wrapper so the user path is one command.
-- OpenBlog/FastAPI is not in the verified scope.
+- Open production self-signup is still blocked by Supabase email rate limiting.
+- Fresh two-user live policy tests still need to be repeated after the latest deploy.
+- OpenBlog/FastAPI, TypeScript, dependencies, and multi-file apps are explicit post-v0 exclusions.

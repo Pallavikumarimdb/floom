@@ -52,7 +52,7 @@ cli/
 
 ### 1. Configure environment variables
 
-Copy `.env.local` and fill in your credentials:
+Create `.env.local` and fill in your credentials:
 
 ```bash
 # Supabase
@@ -68,25 +68,25 @@ E2B_API_KEY=your-e2b-api-key
 
 
 
-### 3. Install dependencies
+### 2. Install dependencies
 
 ```bash
 npm install
 ```
 
-### 4. Start the dev server
+### 3. Start the dev server
 
 ```bash
 npm run dev
 ```
 
-### 5. Create a Floom agent token
+### 4. Create a Floom agent token
 
 Open `/login`, sign up or sign in, then open `/tokens`.
 
 Create a token and copy it. The raw token is shown once.
 
-### 6. Register the fixture app with Supabase configured
+### 5. Register the fixture app with Supabase configured
 
 ```bash
 FLOOM_TOKEN=YOUR_FLOOM_AGENT_TOKEN FLOOM_API_URL=http://localhost:3000 npx tsx cli/deploy.ts ./fixtures/python-simple

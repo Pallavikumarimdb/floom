@@ -109,7 +109,7 @@ export default function AppPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#faf9f5] text-[#11110f]">
+    <main className="min-h-screen overflow-x-hidden bg-[#faf9f5] text-[#11110f]">
       <style jsx global>{`
         .floom-run-form .form-group {
           margin-bottom: 1rem;
@@ -156,11 +156,11 @@ export default function AppPage() {
       `}</style>
       <SiteHeader />
 
-      <section className="mx-auto max-w-6xl px-5 py-10">
-        <p className="mb-5 text-sm text-neutral-500">Apps / {app.name}</p>
+      <section className="mx-auto max-w-6xl px-4 py-10 sm:px-5">
+        <p className="mb-5 break-words text-sm text-neutral-500">Apps / {app.name}</p>
         <div className="mb-8">
           <div>
-            <h1 className="text-4xl font-black tracking-tight">{app.name}</h1>
+            <h1 className="break-words text-3xl font-black tracking-tight sm:text-4xl">{app.name}</h1>
             <p className="mt-2 max-w-2xl text-neutral-600">
               Run this Floom app from the browser. Inputs are validated with JSON
               Schema and executed in an isolated sandbox.
