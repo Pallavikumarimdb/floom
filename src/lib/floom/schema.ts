@@ -56,8 +56,16 @@ export function validateJsonSchemaValue(
   return { ok: true, schema: value as JsonObject };
 }
 
+export function redactSecretValue(valueSchema: unknown, value: unknown): unknown {
+  return redactSuspiciousKeys(redactBySchema(valueSchema, value, valueSchema, new Set()));
+}
+
+export function redactSecretInput(inputSchema: unknown, input: unknown): unknown {
+  return redactSecretValue(inputSchema, input);
+}
+
 export function redactSecretOutput(outputSchema: unknown, output: unknown): unknown {
-  return redactSuspiciousKeys(redactBySchema(outputSchema, output, outputSchema, new Set()));
+  return redactSecretValue(outputSchema, output);
 }
 
 function getJsonComplexity(value: unknown): { ok: true } | { ok: false } {

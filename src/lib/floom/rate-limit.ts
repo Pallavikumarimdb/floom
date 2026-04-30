@@ -8,6 +8,10 @@ export function getPublicRunRateLimitKey(appId: string, callerKey = PUBLIC_ANONY
   return `public-run:${safeRateLimitPart(appId)}:${safeRateLimitPart(callerKey)}`;
 }
 
+export function getPublicRunAppRateLimitKey(appId: string) {
+  return `public-run-app:${safeRateLimitPart(appId)}`;
+}
+
 export function getPublicRunCallerKey(headers: Headers) {
   const forwardedFor = headers.get("x-forwarded-for")?.split(",")[0]?.trim();
   const directIp = forwardedFor || headers.get("x-real-ip") || headers.get("cf-connecting-ip");

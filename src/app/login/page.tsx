@@ -16,6 +16,7 @@ export default function LoginPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
 
   useEffect(() => {
     const supabase = createClient();
@@ -58,6 +59,26 @@ export default function LoginPage() {
     }
 
     setMessage("Check your email to finish signing in.");
+  }
+
+  async function signInWithGoogle() {
+    setGoogleLoading(true);
+    setError(null);
+    setMessage(null);
+
+    const supabase = createClient();
+    const redirectTo = `${window.location.origin}/auth/callback?next=/tokens`;
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo,
+      },
+    });
+
+    if (error) {
+      setGoogleLoading(false);
+      setError(error.message);
+    }
   }
 
   return (
@@ -107,10 +128,25 @@ export default function LoginPage() {
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || googleLoading}
             className="mt-6 w-full rounded-lg bg-emerald-700 px-5 py-3 font-semibold text-white disabled:opacity-50"
           >
             {loading ? "Working..." : mode === "signin" ? "Sign in" : "Create account"}
+          </button>
+
+          <div className="my-5 flex items-center gap-3 text-xs font-semibold uppercase text-neutral-400">
+            <span className="h-px flex-1 bg-[#ded8cc]" />
+            or
+            <span className="h-px flex-1 bg-[#ded8cc]" />
+          </div>
+
+          <button
+            type="button"
+            onClick={signInWithGoogle}
+            disabled={loading || googleLoading}
+            className="w-full rounded-lg border border-[#cfc7b8] bg-white px-5 py-3 font-semibold text-[#11110f] shadow-sm disabled:opacity-50"
+          >
+            {googleLoading ? "Redirecting..." : "Continue with Google"}
           </button>
         </form>
 

@@ -7,6 +7,7 @@ import { execFileSync } from 'node:child_process';
 import { Sandbox } from 'e2b';
 import { runInSandbox, runInSandboxContained } from '../src/lib/e2b/runner.ts';
 import {
+  getPublicRunAppRateLimitKey,
   getPublicRunCallerKey,
   getPublicRunRateLimitKey,
   getRunCallerKey,
@@ -18,6 +19,7 @@ import {
 } from '../src/lib/floom/manifest.ts';
 import {
   REDACTED_OUTPUT_VALUE,
+  redactSecretInput,
   redactSecretOutput,
   validateJsonSchemaValue,
 } from '../src/lib/floom/schema.ts';
@@ -51,10 +53,17 @@ async function test() {
     'find_candidate_apps',
     'get_app',
     'run_app',
-    'create_agent_token',
   ]) {
     assert.ok(toolNames.includes(toolName), `missing MCP tool: ${toolName}`);
   }
+  assert.ok(!toolNames.includes('create_agent_token'), 'MCP must not mint agent tokens');
+  const disabledTokenTool = await callFloomTool(
+    'create_agent_token',
+    { name: 'blocked' },
+    { baseUrl: 'http://localhost:3000', authorization: 'Bearer user-jwt' }
+  );
+  assert.equal(disabledTokenTool.isError, true);
+  assert.match(parseToolResult(disabledTokenTool).error, /Unknown tool/);
 
   if (isSafePythonEntrypoint('my-app.py')) {
     throw new Error('hyphenated Python entrypoint accepted');
@@ -131,7 +140,7 @@ async function test() {
   assert.equal(complexResult.ok, false);
   assert.match(complexResult.error, /too complex/);
 
-  testSecretOutputRedaction();
+  testSecretRedaction();
   testPublicRunRateLimitHardening();
   await testSandboxErrorContainment();
 
@@ -471,8 +480,8 @@ function testMcpOriginResolution() {
   }
 }
 
-function testSecretOutputRedaction() {
-  const outputSchema = {
+function testSecretRedaction() {
+  const schema = {
     type: 'object',
     $defs: {
       SecretString: { type: 'string', secret: true },
@@ -528,7 +537,7 @@ function testSecretOutputRedaction() {
       },
     },
   };
-  outputSchema.$defs.RefRow = {
+  schema.$defs.RefRow = {
     type: 'object',
     properties: {
       name: { type: 'string' },
@@ -536,7 +545,7 @@ function testSecretOutputRedaction() {
     },
   };
 
-  const output = {
+  const value = {
     answer: 'ok',
     token: 'secret-token',
     ref_token: 'ref-private',
@@ -562,7 +571,7 @@ function testSecretOutputRedaction() {
     },
   };
 
-  assert.deepEqual(redactSecretOutput(outputSchema, output), {
+  const expectedRedacted = {
     answer: 'ok',
     token: REDACTED_OUTPUT_VALUE,
     ref_token: REDACTED_OUTPUT_VALUE,
@@ -586,9 +595,20 @@ function testSecretOutputRedaction() {
       credential: REDACTED_OUTPUT_VALUE,
       authorization: REDACTED_OUTPUT_VALUE,
     },
-  });
-  assert.equal(output.token, 'secret-token');
-  assert.equal(output.rows[0].row_secret, 'row-private');
+  };
+
+  assert.deepEqual(redactSecretOutput(schema, value), expectedRedacted);
+  assert.deepEqual(redactSecretInput(schema, value), expectedRedacted);
+  assert.equal(value.token, 'secret-token');
+  assert.equal(value.rows[0].row_secret, 'row-private');
+
+  const routeText = readFileSync('src/app/api/apps/[slug]/run/route.ts', 'utf8');
+  assert.match(routeText, /redactSecretInput\(latestVersion\.input_schema \?\? \{\}, inputs\)/);
+  assert.match(routeText, /input: redactedInputs/);
+  assert.ok(
+    routeText.indexOf('redactSecretInput') < routeText.indexOf('.from("executions")'),
+    'execution inputs must be redacted before insert'
+  );
 }
 
 function testPublicRunRateLimitHardening() {
@@ -599,6 +619,7 @@ function testPublicRunRateLimitHardening() {
   );
 
   assert.equal(getPublicRunRateLimitKey('app_123'), 'public-run:app_123:anonymous');
+  assert.equal(getPublicRunAppRateLimitKey('app/123'), 'public-run-app:app-123');
   const callerA = getPublicRunCallerKey(new Headers({
     'x-forwarded-for': '203.0.113.8, 10.0.0.1',
     'user-agent': 'ua-a',
@@ -634,6 +655,18 @@ function testPublicRunRateLimitHardening() {
   assert.match(routeText, /getRunCallerKey\(caller, req\.headers\)/);
   assert.doesNotMatch(routeText, /if \(!caller && isPublic\)/);
   assert.match(routeText, /getPublicRunRateLimitKey\(appId, callerKey\)/);
+  assert.match(routeText, /getPublicRunAppRateLimitKey\(appId\)/);
+  assert.match(routeText, /FLOOM_PUBLIC_RUN_APP_RATE_LIMIT_MAX/);
+  assert.ok(
+    routeText.indexOf('getPublicRunRateLimitKey(appId, callerKey)') <
+      routeText.indexOf('getPublicRunAppRateLimitKey(appId)'),
+    'caller-derived rate limit must be checked before the app-level rate limit'
+  );
+  assert.ok(
+    routeText.indexOf('const rateLimit = await checkPublicRunRateLimit') <
+      routeText.indexOf('runInSandboxContained('),
+    'all run rate limits must run before sandbox execution'
+  );
   assert.match(routeText, /Run rate limit check failed/);
   assert.match(routeText, /redactSecretOutput/);
   assert.match(routeText, /output: redactedOutput/);

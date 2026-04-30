@@ -95,12 +95,14 @@ Pass criteria:
 - Confirm token list shows prefix/metadata but not the raw token.
 - Revoke the token.
 - Confirm revoked token is no longer usable.
+- Confirm token creation happens through `/tokens`; MCP must not expose a token-creation tool.
 
 Pass criteria:
 
 - Token create/copy/list/revoke works in browser.
 - Raw token is hidden after refresh.
 - Revoked token fails publish/run.
+- MCP cannot mint or return raw agent tokens.
 
 ### 4. CLI Publish With Token
 
@@ -213,6 +215,7 @@ curl -sS "$FLOOM_API_URL/mcp"
 Pass criteria:
 
 - MCP endpoint is reachable.
+- MCP does not list or execute `create_agent_token`.
 - `get_app_contract` returns the v0 manifest, app.py, input/output schemas, and unsupported cases.
 - `list_app_templates` returns useful v0-safe templates.
 - `get_app_template` returns copy-paste bundles for invoice calculator, UTM URL builder, CSV stats, and meeting action item extraction.
@@ -227,6 +230,7 @@ Collect evidence without exposing secrets:
 - `apps` row exists for each slug.
 - `app_versions` row exists for each publish.
 - `executions` row exists for each run.
+- Persisted execution input redacts fields marked `secret: true` or named like token/secret/password/api_key/private_key/credential/authorization.
 - `agent_tokens` row exists with prefix/hash metadata only.
 - `app-bundles` storage object exists under owner-scoped path.
 - Public/private flags match the manifests.
@@ -235,7 +239,7 @@ Collect evidence without exposing secrets:
 Pass criteria:
 
 - Database state matches the UI/API behavior.
-- No raw token or raw source credential is stored in public tables.
+- No raw token, raw source credential, or raw secret-like execution input is stored in public tables.
 
 ### 11. E2B Execution Evidence
 
