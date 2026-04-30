@@ -1,11 +1,59 @@
-"use client";
+'use client';
+/**
+ * LandingV17Page — marketing home `/` — MVP variant.
+ *
+ * TODO(v5-port): Literal port of floom@main/pages/LandingV17Page.tsx
+ * (variant="mvp" code paths only — `!isMvp` blocks dropped).
+ * Mechanical fixes applied:
+ *   1. 'use client' added (uses hooks)
+ *   2. react-router-dom → next/link + next/navigation
+ *   3. <Link to={x}> → <Link href={x}>
+ *   4. useDeployEnabled, readDeployEnabled, waitlistHref stubs below
+ *   5. api.getHub() → fetch('/api/hub').then(r=>r.json())
+ *   6. HubApp type defined inline
+ *   7. publicHubApps → inline no-op (all apps treated as public)
+ * See docs/v5-port-stubs.md for full stub list.
+ */
+import { useEffect, useState } from 'react';
+import Link from 'next/link';
+import { Code2, Rocket, Share2 } from 'lucide-react';
 
-import { useState } from "react";
-import Link from "next/link";
-import { SiteHeader } from "@/components/SiteHeader";
-import { FloomFooter } from "@/components/FloomFooter";
+import { SiteHeader } from '@/components/SiteHeader';
+import { FloomFooter } from '@/components/FloomFooter';
+import { AppStripe } from '@/components/public/AppStripe';
+import { AppGrid } from '@/components/public/AppGrid';
+import { ShowcaseCard, SHOWCASE_ENTRIES } from '@/components/public/AppShowcaseRow';
+import { FeedbackButton } from '@/components/FeedbackButton';
 
-const NPX_CMD = "npx @floomhq/cli@latest setup";
+import { WorksWithBelt } from '@/components/home/WorksWithBelt';
+import { HeroDemo } from '@/components/home/HeroDemo';
+import { SectionEyebrow } from '@/components/home/SectionEyebrow';
+import { DiscordCta } from '@/components/home/DiscordCta';
+
+import { useSession } from '@/hooks/useSession';
+
+// TODO(v5-port): HubApp type from floom@main/lib/types.ts.
+// Stubbed with the fields LandingV17Page actually uses.
+interface HubApp {
+  slug: string;
+  name: string;
+  description: string;
+  category?: string;
+  runs_7d?: number;
+}
+
+// TODO(v5-port): publicHubApps from floom@main/lib/hub-filter.ts.
+// In floom@main this filters out unlisted/private apps.
+// In floom-minimal v0, treat all apps as public.
+function publicHubApps(apps: HubApp[]): HubApp[] {
+  return apps;
+}
+
+// MVP hero install — R7.6 (2026-04-28): hero composition cut to 4 elements
+// (eyebrow, H1, sub, npx command). Caption + MCP/CLI popover removed —
+// Federico's "the landing page hero header still looks a bit overwhelming".
+// Advanced install paths (MCP config, CLI snippet) live on /home and /docs.
+const NPX_SETUP_COMMAND = 'npx @floomhq/cli@latest setup';
 
 async function copyText(text: string) {
   try {
@@ -13,327 +61,809 @@ async function copyText(text: string) {
       await navigator.clipboard.writeText(text);
       return;
     }
-  } catch {
-    /* fall through */
-  }
-  const ta = document.createElement("textarea");
+  } catch { /* fall through */ }
+  const ta = document.createElement('textarea');
   ta.value = text;
-  ta.style.position = "fixed";
-  ta.style.left = "-9999px";
+  ta.style.position = 'fixed';
+  ta.style.left = '-9999px';
   document.body.appendChild(ta);
   ta.select();
-  document.execCommand("copy");
+  document.execCommand('copy');
   document.body.removeChild(ta);
 }
 
-// ── Hero ─────────────────────────────────────────────────────────────────────
-
-function Eyebrow() {
-  return (
-    <div className="flex flex-col items-center gap-2.5">
-      <div className="inline-flex items-center gap-2 text-sm font-semibold text-emerald-700">
-        <span aria-hidden="true" className="inline-block h-2 w-2 rounded-full bg-emerald-500" />
-        Works with any MCP client
-      </div>
-      <div className="font-mono text-[11px] uppercase tracking-widest text-neutral-400">
-        e.g. <span className="text-neutral-600">Claude Code</span> ·{" "}
-        <span className="text-neutral-600">Cursor</span> ·{" "}
-        <span className="text-neutral-600">Codex CLI</span>
-      </div>
-    </div>
-  );
+interface MvpHeroInstallProps {
+  /**
+   * R15 UI-6 (2026-04-28): hero trust signals. Total live apps + sum of
+   * runs_7d across visible apps. Both can be 0 on cold launch — when
+   * apps>0 we render "<N> apps live"; when runs_7d sum > 0 we append
+   * "<N> runs this week". Stars come from GitHubStarsBadge which fetches
+   * its own data. When all 3 stats are 0/missing, the strip hides
+   * entirely (no empty placeholder).
+   */
+  appsCount: number;
+  runs7dSum: number;
 }
 
-function HeroSection() {
+function MvpHeroInstall({ appsCount, runs7dSum }: MvpHeroInstallProps) {
   const [copied, setCopied] = useState(false);
 
   async function handleCopy() {
-    await copyText(NPX_CMD);
+    await copyText(NPX_SETUP_COMMAND);
     setCopied(true);
     window.setTimeout(() => setCopied(false), 1500);
   }
 
-  return (
-    <section className="mx-auto max-w-5xl px-5 pb-12 pt-16 text-center">
-      <Eyebrow />
+  // R7.6 (2026-04-28): MCP/CLI snippet popover removed from hero.
+  // Federico's brief: cut hero to 4 elements. Advanced install paths
+  // (MCP config, CLI snippet) live on /home and /docs — not in the
+  // first viewport.
 
-      <h1 className="mx-auto mt-7 max-w-4xl text-5xl font-black leading-[0.95] tracking-tight sm:text-7xl">
-        Ship AI apps <span className="text-emerald-700">fast</span>.
-      </h1>
-      <p className="mx-auto mt-5 max-w-xl text-lg text-neutral-600">
-        Localhost to live in 60 seconds.{" "}
-        <Link
-          href="/login?mode=signup"
-          className="font-semibold text-[#0e0e0c] underline decoration-[1.5px] underline-offset-[3px] hover:text-emerald-700"
+  return (
+    <div style={{ maxWidth: 540, margin: '20px auto 0', textAlign: 'left' }}>
+      {/* R7.6 (2026-04-28): caption "One command. Sets up MCP, mints a token,
+          you're live." removed — redundant with the npx command beneath it.
+          Federico's brief: cut hero to 4 elements (eyebrow, H1, sub, command). */}
+      <div style={{ position: 'relative' }}>
+        <pre
+          data-testid="hero-npx-command"
+          style={{
+            fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+            fontSize: 14,
+            background: 'var(--studio, #f5f4f0)',
+            color: 'var(--ink)',
+            border: '1px solid var(--line)',
+            borderRadius: 10,
+            padding: '14px 90px 14px 18px',
+            overflowX: 'auto',
+            whiteSpace: 'pre',
+            lineHeight: 1.5,
+            margin: 0,
+            display: 'flex',
+            alignItems: 'center',
+          }}
         >
-          Sign up to publish.
+          <span style={{ color: 'var(--muted)', userSelect: 'none', marginRight: 10 }}>$</span>
+          {NPX_SETUP_COMMAND}
+        </pre>
+        <button
+          type="button"
+          data-testid="hero-npx-copy-btn"
+          onClick={() => void handleCopy()}
+          style={{
+            position: 'absolute',
+            top: '50%',
+            transform: 'translateY(-50%)',
+            right: 10,
+            fontSize: 12,
+            fontWeight: 600,
+            color: copied ? '#fff' : 'var(--accent)',
+            background: copied ? 'var(--accent)' : 'var(--card)',
+            border: `1px solid ${copied ? 'var(--accent)' : 'rgba(4,120,87,0.35)'}`,
+            borderRadius: 6,
+            padding: '6px 14px',
+            cursor: 'pointer',
+            fontFamily: 'inherit',
+            letterSpacing: '0.03em',
+          }}
+          aria-label={copied ? 'Copied' : 'Copy command'}
+        >
+          {copied ? 'Copied' : 'Copy'}
+        </button>
+      </div>
+      {/* R10 (2026-04-28): complementary "Try a live app" CTA. Gemini
+          baseline scored landing 6/10 partly because the only first-
+          step action was "copy this command and paste in your terminal".
+          Adding a 1-click path to a live app gives non-CLI visitors a
+          way to feel the product without installing anything. */}
+      <div
+        style={{
+          marginTop: 12,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          fontSize: 13,
+          color: 'var(--muted)',
+        }}
+      >
+        <span>or</span>
+        <Link
+          href="/p/competitor-lens"
+          data-testid="hero-try-live-app"
+          style={{
+            color: 'var(--accent)',
+            fontWeight: 600,
+            textDecoration: 'none',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 4,
+          }}
+        >
+          try a live app in your browser
+          <span aria-hidden="true">→</span>
         </Link>
-      </p>
-
-      {/* Install snippet */}
-      <div className="mx-auto mt-7 max-w-[540px] text-left">
-        <div className="relative">
-          <pre
-            data-testid="hero-npx-command"
-            className="overflow-x-auto rounded-[10px] border border-[#e4ded3] bg-[#f5f4f0] px-[18px] py-[14px] pr-[90px] font-mono text-[14px] leading-relaxed text-[#0e0e0c] whitespace-pre"
-          >
-            <span className="mr-2.5 select-none text-neutral-400">$</span>
-            {NPX_CMD}
-          </pre>
-          <button
-            type="button"
-            onClick={() => void handleCopy()}
-            className={`absolute right-2.5 top-1/2 -translate-y-1/2 rounded-md border px-3.5 py-1.5 text-[12px] font-semibold leading-none transition-all ${
-              copied
-                ? "border-emerald-700 bg-emerald-700 text-white"
-                : "border-emerald-700/35 bg-white text-emerald-700"
-            }`}
-            aria-label={copied ? "Copied" : "Copy command"}
-          >
-            {copied ? "Copied" : "Copy"}
-          </button>
-        </div>
-
-        <div className="mt-3 flex items-center gap-1.5 text-[13px] text-neutral-500">
-          <span>or</span>
-          <Link
-            href="/p/demo-app"
-            className="inline-flex items-center gap-1 font-semibold text-emerald-700 no-underline transition-colors hover:text-emerald-800"
-          >
-            try a live app in your browser
-            <span aria-hidden="true">→</span>
-          </Link>
-        </div>
-
-        <div className="mt-3.5 text-[12.5px] text-neutral-400">
-          1 app live · 0 runs this week · ★ open source
-        </div>
       </div>
-    </section>
-  );
-}
-
-// ── Visual demo: BUILD / DEPLOY / RUN tile ───────────────────────────────────
-
-type Stage = "build" | "deploy" | "run";
-
-const FILES: Record<Stage, ReadonlyArray<{ name: string; active?: boolean }>> = {
-  build: [
-    { name: "handler.py", active: true },
-    { name: "floom.yaml" },
-    { name: "README.md" },
-  ],
-  deploy: [
-    { name: "handler.py" },
-    { name: "floom.yaml", active: true },
-    { name: "README.md" },
-  ],
-  run: [{ name: "/p/pitch-coach", active: true }],
-};
-
-const CODE: Record<Stage, ReadonlyArray<{ n: number; html: React.ReactNode }>> = {
-  build: [
-    { n: 1, html: <><span className="text-rose-700">def</span> <span className="text-amber-700">handler</span>(inputs):</> },
-    { n: 2, html: <>    pitch = inputs[<span className="text-emerald-700">&quot;pitch&quot;</span>]</> },
-    { n: 3, html: <>    feedback = coach(pitch)</> },
-    { n: 4, html: <>    <span className="text-rose-700">return</span> {`{`}<span className="text-emerald-700">&quot;result&quot;</span>: feedback{`}`}</> },
-  ],
-  deploy: [
-    { n: 1, html: <>name: pitch-coach</> },
-    { n: 2, html: <>runtime: python</> },
-    { n: 3, html: <>entrypoint: handler.py</> },
-    { n: 4, html: <>handler: handler</> },
-    { n: 5, html: <>public: <span className="text-emerald-700">true</span></> },
-  ],
-  run: [
-    { n: 1, html: <><span className="text-neutral-400">→</span> POST /api/run</> },
-    { n: 2, html: <><span className="text-neutral-400">{"{"}</span></> },
-    { n: 3, html: <>{"  "}<span className="text-emerald-700">&quot;result&quot;</span>: <span className="text-rose-700">&quot;Strong premise…&quot;</span></> },
-    { n: 4, html: <><span className="text-neutral-400">{"}"}</span></> },
-    { n: 5, html: <><span className="text-emerald-700">200 OK · 412ms</span></> },
-  ],
-};
-
-const STAGE_LABELS: Record<Stage, string> = {
-  build: "BUILD",
-  deploy: "DEPLOY",
-  run: "RUN",
-};
-
-const STAGE_ORDER: Stage[] = ["build", "deploy", "run"];
-
-function HeroDemoTile() {
-  const [stage, setStage] = useState<Stage>("build");
-  const files = FILES[stage];
-  const code = CODE[stage];
-
-  return (
-    <section id="demo" className="mx-auto max-w-5xl px-5 pb-20">
-      <div className="overflow-hidden rounded-3xl border border-[#e4ded3] bg-[#f1eee7] text-left shadow-2xl shadow-neutral-200/80">
-        {/* Stage tracker */}
-        <div className="grid grid-cols-3 gap-2 border-b border-[#e4ded3] bg-[#ebe7df] px-4 py-4 text-center font-mono text-[11px] font-bold uppercase tracking-widest text-neutral-500 sm:px-10 sm:text-xs">
-          {STAGE_ORDER.map((s, i) => {
-            const isActive = stage === s;
-            return (
-              <button
-                key={s}
-                type="button"
-                onClick={() => setStage(s)}
-                aria-current={isActive ? "step" : undefined}
-                className={`relative inline-flex items-center justify-center gap-2 rounded-md py-2 transition-colors ${
-                  isActive ? "bg-white text-[#0e0e0c] shadow-sm" : "hover:text-[#0e0e0c]"
-                }`}
-              >
-                <span className="text-neutral-400">0{i + 1}</span> {STAGE_LABELS[s]}
-                {isActive && (
-                  <span
-                    aria-hidden="true"
-                    className="absolute -bottom-[18px] left-1/2 h-1.5 w-1.5 -translate-x-1/2 rounded-full bg-emerald-500"
-                  />
-                )}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Body */}
-        <div className="grid min-h-[320px] md:grid-cols-[200px_1fr]">
-          <aside className="border-b border-[#e4ded3] bg-[#e9e5dc] p-5 font-mono text-[11px] uppercase tracking-widest text-neutral-500 md:border-b-0 md:border-r">
-            <p className="mb-4 truncate font-semibold text-neutral-700">pitch-coach</p>
-            <ul className="space-y-1">
-              {files.map((f) => (
-                <li
-                  key={f.name}
-                  className={`truncate rounded px-2 py-1.5 ${
-                    f.active ? "bg-[#f4f1eb] text-[#0e0e0c]" : ""
-                  }`}
-                >
-                  {f.name}
-                </li>
-              ))}
-            </ul>
-          </aside>
-
-          <div className="min-w-0 overflow-x-auto bg-[#fbfaf7] p-5 font-mono text-[14px] leading-8 sm:p-8">
-            {code.map((line) => (
-              <div key={line.n} className="flex items-start gap-3 whitespace-pre">
-                <span className="select-none text-neutral-400">{line.n}</span>
-                <span>{line.html}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-// ── How it works ─────────────────────────────────────────────────────────────
-
-const HOW_IT_WORKS = [
-  {
-    num: "01",
-    label: "Write a Python function",
-    body: "One file, one handler, one JSON Schema for inputs. No new framework.",
-    mono: "handler.py · floom.yaml",
-    icon: (
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        className="h-5 w-5"
-        fill="none"
-        viewBox="0 0 24 24"
-        stroke="currentColor"
-        strokeWidth={1.6}
-        aria-hidden="true"
-      >
-        <polyline points="16 18 22 12 16 6" />
-        <polyline points="8 6 2 12 8 18" />
-      </svg>
-    ),
-  },
-  {
-    num: "02",
-    label: "Publish from the CLI",
-    body: "Sign in, mint a token, run one command. Floom hosts the UI, the REST endpoint, and the MCP tool.",
-    mono: "floom publish ./my-app",
-    icon: (
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        className="h-5 w-5"
-        fill="none"
-        viewBox="0 0 24 24"
-        stroke="currentColor"
-        strokeWidth={1.6}
-        aria-hidden="true"
-      >
-        <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
-      </svg>
-    ),
-  },
-  {
-    num: "03",
-    label: "Share the link",
-    body: "Anyone hits /p/your-app in a browser, your REST endpoint with curl, or your MCP tool from Claude or Cursor.",
-    mono: "/p/your-app",
-    icon: (
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        className="h-5 w-5"
-        fill="none"
-        viewBox="0 0 24 24"
-        stroke="currentColor"
-        strokeWidth={1.6}
-        aria-hidden="true"
-      >
-        <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-        <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
-      </svg>
-    ),
-  },
-];
-
-function HowItWorksSection() {
-  return (
-    <section className="mx-auto max-w-5xl px-5 pb-24">
-      <div className="mb-12 text-center">
-        <p className="mb-2 font-mono text-xs font-bold uppercase tracking-widest text-emerald-700">
-          How it works
-        </p>
-        <h2 className="text-3xl font-black tracking-tight sm:text-4xl">
-          From idea to shipped app in 3 steps.
-        </h2>
-      </div>
-      <div className="grid gap-8 sm:grid-cols-3">
-        {HOW_IT_WORKS.map((step) => (
-          <div key={step.num} className="flex flex-col gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700">
-              {step.icon}
-            </div>
-            <p className="font-mono text-xs font-bold uppercase tracking-widest text-emerald-700">
-              Step {step.num}
-            </p>
-            <h3 className="text-base font-bold leading-snug">{step.label}</h3>
-            <p className="text-sm leading-relaxed text-neutral-600">{step.body}</p>
-            <p className="font-mono text-xs text-neutral-400">{step.mono}</p>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-// ── Page ─────────────────────────────────────────────────────────────────────
-
-export default function Home() {
-  return (
-    <div className="min-h-screen overflow-x-hidden bg-[#faf9f5] text-[#11110f]">
-      <SiteHeader />
-      <main>
-        <HeroSection />
-        <HeroDemoTile />
-        <HowItWorksSection />
-      </main>
-      <FloomFooter />
+      {/* R15 UI-6 (2026-04-28): hero trust-signals strip. Real numbers
+          sourced from /api/hub (apps count + runs_7d sum) and
+          GitHubStarsBadge's /api/gh-stars cache. Renders as one quiet
+          gray line below the npx + "try live app" CTAs. Each stat hides
+          when it's zero/missing so a cold launch never shows "0 runs". */}
+      <HeroTrustSignals appsCount={appsCount} runs7dSum={runs7dSum} />
     </div>
   );
 }
+
+/**
+ * R15 UI-6 (2026-04-28): trust-signal strip for the MVP hero. Reads the
+ * apps + runs_7d totals as props (LandingV17Page already fetches /api/hub
+ * for the showcase, so we pass the data down rather than re-fetching).
+ * GitHub stars come from `/api/gh-stars` via the same cache key the
+ * GitHubStarsBadge uses — we read the cache synchronously and refresh
+ * it in the background.
+ */
+function HeroTrustSignals({
+  appsCount,
+  runs7dSum,
+}: {
+  appsCount: number;
+  runs7dSum: number;
+}) {
+  const [stars, setStars] = useState<number | null>(() => {
+    // Cheap synchronous read of the GitHubStarsBadge cache. Same key.
+    try {
+      const raw = window.localStorage?.getItem('floom:gh-stars');
+      if (!raw) return null;
+      const parsed = JSON.parse(raw) as { count?: number; ts?: number };
+      if (typeof parsed.count === 'number') return parsed.count;
+    } catch {
+      /* ignore */
+    }
+    return null;
+  });
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/gh-stars', { headers: { Accept: 'application/json' } })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { count?: number } | null) => {
+        if (cancelled || !d || typeof d.count !== 'number') return;
+        setStars(d.count);
+      })
+      .catch(() => {
+        /* keep cached/null fallback */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Build the visible parts. Each stat hides when its value isn't
+  // meaningful so a cold launch reads as "10 apps live · ★ 6 stars"
+  // rather than "10 apps live · 0 runs this week · ★ 6 stars".
+  const parts: string[] = [];
+  if (appsCount > 0) {
+    parts.push(`${appsCount} app${appsCount === 1 ? '' : 's'} live`);
+  }
+  if (runs7dSum > 0) {
+    parts.push(`${runs7dSum} run${runs7dSum === 1 ? '' : 's'} this week`);
+  }
+  if (stars && stars > 0) {
+    parts.push(`★ ${stars} star${stars === 1 ? '' : 's'}`);
+  }
+
+  // Hide entirely when nothing meaningful to show (would render as
+  // empty whitespace otherwise).
+  if (parts.length === 0) return null;
+
+  return (
+    <div
+      data-testid="hero-trust-signals"
+      style={{
+        marginTop: 14,
+        fontSize: 12.5,
+        color: 'var(--muted)',
+        lineHeight: 1.5,
+      }}
+    >
+      {parts.join(' · ')}
+    </div>
+  );
+}
+
+interface Stripe {
+  slug: string;
+  name: string;
+  description: string;
+  category?: string;
+}
+
+// Same showcase roster as CreatorHeroPage (P0 launch curation #253).
+// 2026-04-25 roster swap: bounded <5s demos replaced the heavy originals.
+const PREFERRED_SLUGS = ['competitor-lens', 'ai-readiness-audit', 'pitch-coach'] as const;
+
+// Fallback descriptions rendered if /api/hub is slow or empty on cold
+// visits. Match the 2026-04-25 launch roster. Keep tight + benefit-led.
+const FALLBACK_STRIPES: Stripe[] = [
+  {
+    slug: 'competitor-lens',
+    name: 'Competitor Lens',
+    description: 'Paste 2 URLs (yours + a competitor). Get a positioning, pricing, and angle diff in under 5 seconds.',
+    category: 'research',
+  },
+  {
+    slug: 'ai-readiness-audit',
+    name: 'AI Readiness Audit',
+    description: 'Paste one URL. Get a readiness score 0-10, three risks, three opportunities, and one concrete next step.',
+    category: 'research',
+  },
+  {
+    slug: 'pitch-coach',
+    name: 'Pitch Coach',
+    description: 'Paste a startup pitch. Get three direct critiques, three angle-specific rewrites, and a one-line TL;DR.',
+    category: 'writing',
+  },
+];
+
+function pickStripes(apps: HubApp[]): Stripe[] {
+  if (apps.length === 0) return FALLBACK_STRIPES;
+  const bySlug = new Map(apps.map((app) => [app.slug, app]));
+  const picked: Stripe[] = [];
+  for (const slug of PREFERRED_SLUGS) {
+    const hit = bySlug.get(slug);
+    if (hit) picked.push({ slug: hit.slug, name: hit.name, description: hit.description, category: hit.category ?? undefined });
+  }
+  if (picked.length === PREFERRED_SLUGS.length) return picked;
+  return picked.length >= 3 ? picked : FALLBACK_STRIPES;
+}
+
+export default function LandingV17PageMvp() {
+  const [, setStripes] = useState<Stripe[]>(FALLBACK_STRIPES);
+  // R8 #25 (2026-04-28): full HubApp[] for the AppGrid card variant.
+  // AppShowcaseCard didn't render the sample-output preview chip;
+  // AppGrid does (matches floom.dev's richer card style).
+  const [showcaseHubApps, setShowcaseHubApps] = useState<HubApp[]>([]);
+  // G9 (2026-04-28): inline directory grid on MVP landing. Next 6 apps
+  // after the 3 curated showcase slugs, plus a "Browse all <N> apps" CTA.
+  // Federico: "we should still, on the MVP Floom, have the app store
+  // visible, right?"
+  const [directoryApps, setDirectoryApps] = useState<Stripe[]>([]);
+  const [directoryHubApps, setDirectoryHubApps] = useState<HubApp[]>([]);
+  const [totalAppsCount, setTotalAppsCount] = useState<number>(0);
+  // R15 UI-6 (2026-04-28): sum of runs_7d across all visible apps.
+  // Renders into the hero trust-signals strip ("47 runs this week").
+  // Drops to 0 on cold launch — HeroTrustSignals hides the stat then.
+  const [runs7dSum, setRuns7dSum] = useState<number>(0);
+  // v26 §3 option C: logged-in-aware landing.
+  // When authenticated user hits "/", show a "Resume in {workspaceName} →" banner.
+  const { data: session, isAuthenticated } = useSession();
+  // r39 (2026-04-29): "Run in your AI tool" CTA removed per Federico's comment —
+  // non-technical visitors don't understand it. Dominant CTA is now "Browse live
+  // apps" → /apps. The /install-in-claude route is still live for developer
+  // visitors who find it via docs or TopBar; it's just not promoted in the hero.
+
+  useEffect(() => {
+    document.title = 'Ship AI apps fast · Floom';
+    // TODO(v5-port): api.getHub() replaced with fetch('/api/hub').
+    // floom-minimal's /api/hub returns apps from Supabase.
+    fetch('/api/hub', { headers: { Accept: 'application/json' } })
+      .then((r) => (r.ok ? r.json() : []))
+      .then((rawApps: unknown) => {
+        const apps = Array.isArray(rawApps) ? (rawApps as HubApp[]) : [];
+        const visible = publicHubApps(apps);
+        if (visible.length > 0) {
+          setStripes(pickStripes(visible));
+          setTotalAppsCount(visible.length);
+          // R15 UI-6: sum runs_7d across visible apps for hero trust strip.
+          // HubApp.runs_7d is optional; missing/undefined coerces to 0.
+          const totalRuns7d = visible.reduce(
+            (acc, app) => acc + (typeof app.runs_7d === 'number' ? app.runs_7d : 0),
+            0,
+          );
+          setRuns7dSum(totalRuns7d);
+          // R8 #25: keep full HubApp shape for AppGrid (sample-output
+          // preview chip needs thumbnail + manifest + sample data).
+          const curatedSlugs = new Set<string>(PREFERRED_SLUGS as readonly string[]);
+          const showcaseFull = visible.filter((a) => curatedSlugs.has(a.slug));
+          setShowcaseHubApps(
+            // Order to match PREFERRED_SLUGS so the editorial pick stays stable.
+            PREFERRED_SLUGS.map((slug) => showcaseFull.find((a) => a.slug === slug)).filter(
+              (a): a is HubApp => Boolean(a),
+            ),
+          );
+          // Pick the next 6 apps that aren't already in the curated showcase.
+          const rest = visible
+            .filter((app) => !curatedSlugs.has(app.slug))
+            .slice(0, 6)
+            .map((app) => ({
+              slug: app.slug,
+              name: app.name,
+              description: app.description,
+              category: app.category ?? undefined,
+            }));
+          setDirectoryApps(rest);
+          setDirectoryHubApps(
+            visible.filter((app) => !curatedSlugs.has(app.slug)).slice(0, 6),
+          );
+        }
+      })
+      .catch(() => {
+        // Keep static roster on failure.
+      });
+  }, []);
+
+  return (
+    <div
+      className="page-root landing-v17"
+      data-testid="landing-v17"
+      style={{ minHeight: '100vh', background: 'var(--bg)' }}
+    >
+      <SiteHeader />
+
+      {/* v26 §3 option C: resume banner for authenticated users.
+          G1 (2026-04-28): slimmed to a 1-line stripe so it doesn't
+          compete with the hero. Federico: "the composition still is
+          a bit overwhelming". */}
+      {isAuthenticated && session && (
+        <div
+          data-testid="landing-resume-banner"
+          style={{
+            background: 'var(--studio, #f5f4f0)',
+            borderBottom: '1px solid var(--line)',
+            padding: '6px 24px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 8,
+            fontSize: 12.5,
+            lineHeight: 1.4,
+          }}
+        >
+          <span style={{ color: 'var(--muted)' }}>
+            You&apos;re signed in.
+          </span>
+          <Link
+            href="/me"
+            data-testid="landing-resume-cta"
+            style={{
+              fontWeight: 600,
+              color: 'var(--accent)',
+              textDecoration: 'none',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 4,
+            }}
+          >
+            {/* TODO(v5-port): session.active_workspace not available in floom-minimal.
+                Using generic label. Original: session.active_workspace?.name */}
+            Resume in your workspace →
+          </Link>
+        </div>
+      )}
+
+      <main id="main" style={{ display: 'block' }}>
+        {/* HERO — wireframe: .hero-shell > .hero
+            Cursor-style layout (Federico 2026-04-23 — "the visual demo
+            doesn't have to fit on the hero in full"). Above the fold at
+            1440x900: eyebrow + H1 + sub + CTA + top ~120-150px of the
+            HeroDemo canvas. The rest of the demo extends below the fold and
+            reveals on scroll — no min-height:100vh forcing fit, no squished
+            demo. Top padding trimmed (40 -> 24) to give the canvas more room
+            inside the first viewport. */}
+        <section
+          data-testid="hero"
+          style={{
+            position: 'relative',
+            padding: '64px 24px 56px',
+            borderBottom: '1px solid var(--line)',
+            background:
+              'linear-gradient(180deg, var(--card) 0%, var(--bg) 100%)',
+          }}
+        >
+          <div
+            style={{
+              maxWidth: 980,
+              margin: '0 auto',
+              textAlign: 'center',
+            }}
+          >
+            {/* G1 (2026-04-28): hero composition. Federico said the hero
+                still felt overwhelming. Solution:
+                - Lift "Backed by Founders Inc" ABOVE H1 as a quiet eyebrow
+                  (positions the product, doesn't compete with the H1)
+                - Add vertical breathing room around H1 + sub
+                - Demote WorksWithBelt to a soft caption under the snippet
+                - Resume banner slimmed to a 1-line stripe (above) */}
+            {/* MVP eyebrow: WorksWithBelt above H1 — agent-agnostic
+                positioning ("Works with any MCP client" + 3 logos) is
+                more useful than a Founders Inc credential here. Founders
+                Inc cohort credit stays in footer + WhosBehind. Federico
+                2026-04-28: hero eyebrow should be product positioning,
+                not investor proof. */}
+            <div data-testid="hero-eyebrow-belt" style={{ marginBottom: 32 }}>
+              <WorksWithBelt />
+            </div>
+
+            {/* H1 — locked copy. Wireframe ships 64px desktop, balance wrap.
+                F10 (2026-04-28): "fast" coloured with brand green for emphasis. */}
+            <h1
+              className="hero-headline"
+              style={{
+                fontFamily: 'var(--font-display)',
+                fontWeight: 800,
+                fontSize: 64,
+                lineHeight: 1.02,
+                letterSpacing: '-0.025em',
+                color: 'var(--ink)',
+                margin: '0 0 20px',
+                textWrap: 'balance' as unknown as 'balance',
+              }}
+            >
+              Ship AI apps <span style={{ color: 'var(--accent)' }}>fast</span>.
+            </h1>
+
+            {/* R38 (2026-04-29): quiet honest qualifier under the H1.
+                Surfaces "Localhost to live in 60 seconds" claim from
+                the LinkedIn/HN launch post, plus the waitlist context
+                so visitors landing via the post know what to expect.
+                Both variants (mvp + full) get this line. */}
+            <p
+              data-testid="hero-waitlist-qualifier"
+              style={{
+                fontFamily: "'Inter', system-ui, sans-serif",
+                fontSize: 16,
+                lineHeight: 1.5,
+                fontWeight: 400,
+                color: 'var(--muted)',
+                margin: '-4px 0 20px',
+              }}
+            >
+              Localhost to live in 60 seconds.{' '}
+              <Link
+                href="/waitlist"
+                data-testid="hero-waitlist-qualifier-link"
+                style={{
+                  color: 'var(--muted)',
+                  textDecoration: 'underline',
+                  textUnderlineOffset: 3,
+                  fontWeight: 500,
+                }}
+              >
+                Beta access via waitlist.
+              </Link>
+            </p>
+
+            {/* CTA — MVP variant: inline MCP setup snippet. */}
+            <MvpHeroInstall
+              appsCount={totalAppsCount}
+              runs7dSum={runs7dSum}
+            />
+            {/* WorksWithBelt moved to the eyebrow above H1 (Federico
+                2026-04-28). No longer rendered under the snippet — it
+                was a second hero element competing with H1+snippet. */}
+          </div>
+
+          {/* R7.6 followup (2026-04-28): HeroDemo lives directly under
+              the hero install snippet (above "From idea to shipped app
+              in 3 steps"). Earlier R7.6 pushed it BELOW that section
+              to calm the hero, but Federico flagged it as "too low" —
+              hero box stays clean (no demo INSIDE it) but the demo
+              should still anchor near hero so it reads as proof, not
+              filler. Full variant kept its placement here. */}
+          <HeroDemo />
+        </section>
+
+        {/* HOW IT WORKS — 3 steps */}
+        <section
+          data-testid="how-it-works"
+          style={{ padding: '72px 28px', maxWidth: 1240, margin: '0 auto' }}
+        >
+          <SectionEyebrow>How it works</SectionEyebrow>
+          <h2
+            style={{
+              fontFamily: 'var(--font-display)',
+              fontWeight: 800,
+              fontSize: 34,
+              lineHeight: 1.1,
+              letterSpacing: '-0.025em',
+              textAlign: 'center',
+              margin: '0 auto 28px',
+              maxWidth: 760,
+            }}
+          >
+            From idea to shipped app in 3 steps.
+          </h2>
+          <div
+            className="steps"
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(3, 1fr)',
+              gap: 18,
+              maxWidth: 1180,
+              margin: '0 auto',
+            }}
+          >
+            {STEPS.map((s, idx) => {
+              const Icon = idx === 0 ? Code2 : idx === 1 ? Rocket : Share2;
+              return (
+              <div
+                key={s.num}
+                className="step"
+                style={{
+                  // R11 (2026-04-28): Gemini audit — the card-shaped
+                  // border + bg made these read as text inputs. Drop the
+                  // card chrome and lean on the explicit "STEP 0X" label
+                  // and accent number to make narrative obvious.
+                  background: 'transparent',
+                  border: 'none',
+                  borderRadius: 0,
+                  padding: '6px 4px 0',
+                  position: 'relative',
+                }}
+              >
+                {/* R11: explicit "STEP 0X" eyebrow tells the visitor this
+                    is a narrative step, not an input field. */}
+                <div
+                  style={{
+                    fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+                    fontSize: 10.5,
+                    fontWeight: 700,
+                    letterSpacing: '0.12em',
+                    textTransform: 'uppercase',
+                    color: 'var(--accent, #047857)',
+                    marginBottom: 10,
+                  }}
+                >
+                  Step {s.num}
+                </div>
+                <div
+                  style={{
+                    width: 44,
+                    height: 44,
+                    borderRadius: 10,
+                    background: 'rgba(4,120,87,0.08)',
+                    border: '1px solid rgba(4,120,87,0.18)',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#047857',
+                    marginBottom: 16,
+                  }}
+                >
+                  <Icon size={22} strokeWidth={1.6} />
+                </div>
+                <div
+                  style={{
+                    fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+                    fontSize: 11,
+                    color: 'var(--muted)',
+                    letterSpacing: '0.08em',
+                    fontWeight: 600,
+                    marginBottom: 12,
+                  }}
+                >
+                  {s.kicker}
+                </div>
+                <h3
+                  style={{
+                    fontSize: 17,
+                    fontWeight: 700,
+                    margin: '0 0 8px',
+                    lineHeight: 1.3,
+                  }}
+                >
+                  {s.title}
+                </h3>
+                <p style={{ fontSize: 15, color: 'var(--muted)', lineHeight: 1.6, margin: 0 }}>
+                  {s.body}
+                </p>
+                <div
+                  style={{
+                    marginTop: 14,
+                    fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+                    fontSize: 11.5,
+                    color: 'var(--muted)',
+                  }}
+                >
+                  {s.mono}
+                </div>
+              </div>
+            );
+            })}
+          </div>
+        </section>
+
+        {/* SHOWCASE — 3 apps */}
+        <section
+          data-testid="showcase"
+          style={{
+            padding: '72px 28px',
+            maxWidth: 1240,
+            margin: '0 auto',
+            borderTop: '1px solid var(--line)',
+          }}
+        >
+          <SectionEyebrow>Showcase</SectionEyebrow>
+          <h2
+            style={{
+              fontFamily: 'var(--font-display)',
+              fontWeight: 800,
+              fontSize: 34,
+              lineHeight: 1.1,
+              letterSpacing: '-0.025em',
+              textAlign: 'center',
+              margin: '0 auto 10px',
+              maxWidth: 760,
+            }}
+          >
+            Three apps Floom already runs in production.
+          </h2>
+          <p
+            style={{
+              fontSize: 15.5,
+              color: 'var(--muted)',
+              textAlign: 'center',
+              maxWidth: 620,
+              margin: '0 auto 40px',
+            }}
+          >
+            Real AI doing real work. All three deploy from a single GitHub repo.
+          </p>
+          {/* R13.1 (2026-04-29): use the SAME ShowcaseCard component as
+              /apps featured row. AppGrid's "featured" variant rendered
+              the small horizontal AppStripe shape — Federico flagged
+              "landing showcase still sucks". Now landing matches /apps:
+              rich card with sample-output preview chip, name, description,
+              category, "Open app" CTA. Same component, same look. */}
+          <div style={{ maxWidth: 1180, margin: '0 auto' }}>
+            <div
+              className="apps-showcase-grid"
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(3, 1fr)',
+                gap: 22,
+              }}
+            >
+              {SHOWCASE_ENTRIES.map((entry) => {
+                const app = showcaseHubApps.find((a) => a.slug === entry.slug);
+                return (
+                  <ShowcaseCard
+                    key={entry.slug}
+                    entry={entry}
+                    app={app}
+                    isHero={false}
+                  />
+                );
+              })}
+            </div>
+          </div>
+        </section>
+
+        {/* G9 (2026-04-28): inline app-directory grid on MVP landing.
+            Curated showcase above is the editorial pick (3 demo-ready
+            apps). This section surfaces the rest of the directory inline
+            so visitors see the full breadth without leaving the page,
+            then a prominent CTA links to `/apps` for the full directory.
+            Federico: "we should still, on the MVP Floom, have the app
+            store visible, right? What speaks against it? Already works." */}
+        {directoryApps.length > 0 && (
+          <section
+            data-testid="mvp-directory-section"
+            style={{ padding: '24px 28px 64px', maxWidth: 1240, margin: '0 auto' }}
+          >
+            <h2
+              style={{
+                fontFamily: 'var(--font-display)',
+                fontWeight: 800,
+                fontSize: 24,
+                lineHeight: 1.15,
+                letterSpacing: '-0.025em',
+                textAlign: 'center',
+                margin: '0 auto 8px',
+                maxWidth: 760,
+              }}
+            >
+              Or browse the full directory.
+            </h2>
+            <p
+              style={{
+                fontSize: 14.5,
+                color: 'var(--muted)',
+                textAlign: 'center',
+                maxWidth: 620,
+                margin: '0 auto 32px',
+                lineHeight: 1.55,
+              }}
+            >
+              {totalAppsCount > 0
+                ? `${totalAppsCount} AI apps. Free to run on Floom's Gemini key.`
+                : "Free to run on Floom's Gemini key."}
+            </p>
+            <div
+              data-testid="mvp-directory-grid"
+              style={{
+                maxWidth: 1240,
+                margin: '0 auto 28px',
+              }}
+            >
+              {directoryHubApps.length > 0 ? (
+                <AppGrid apps={directoryHubApps} />
+              ) : (
+                directoryApps.length > 0 && (
+                  <div className="mvp-directory-grid-fallback" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+                    {directoryApps.map((app) => (
+                      <AppStripe
+                        key={app.slug}
+                        slug={app.slug}
+                        name={app.name}
+                        description={app.description}
+                        category={app.category}
+                        variant="landing"
+                      />
+                    ))}
+                  </div>
+                )
+              )}
+            </div>
+            <div style={{ textAlign: 'center' }}>
+              <Link
+                href="/apps"
+                data-testid="mvp-directory-cta"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  background: 'var(--accent)',
+                  color: '#fff',
+                  border: '1px solid var(--accent)',
+                  borderRadius: 10,
+                  padding: '11px 18px',
+                  fontSize: 13.5,
+                  fontWeight: 600,
+                  textDecoration: 'none',
+                }}
+              >
+                {totalAppsCount > 0 ? `Browse all ${totalAppsCount} apps` : 'Browse all apps'}
+                <span aria-hidden="true">→</span>
+              </Link>
+            </div>
+          </section>
+        )}
+
+        {/* DISCORD CTA — quiet chip above the footer (#613,
+            Federico 2026-04-23). Invite lives in MEMORY
+            (project_floom_discord): https://discord.gg/8fXGXjxcRz. Not
+            a second hero, just a visible path for visitors who want
+            to talk to the team or other builders. */}
+        <DiscordCta />
+      </main>
+
+      <FloomFooter />
+      <FeedbackButton />
+    </div>
+  );
+}
+
+
+const STEPS = [
+  {
+    num: '01',
+    kicker: 'BRING YOUR APP',
+    title: 'Got an idea or a GitHub link?',
+    body: 'Paste it. Floom takes care of the rest.',
+    mono: 'paste anything',
+  },
+  {
+    num: '02',
+    kicker: 'DEPLOY (BUILDERS ONLY)',
+    title: 'Join the waitlist to publish your own app',
+    body: 'Deploying your own app is rolling out to early builders. Join the waitlist — marketplace apps are already live for everyone.',
+    mono: 'publishing via waitlist',
+  },
+  {
+    num: '03',
+    kicker: 'SHARE ANYWHERE',
+    title: 'Send the link.',
+    body: 'People run your app from any MCP client, browser, or with curl.',
+    mono: 'one link, every tool',
+  },
+];

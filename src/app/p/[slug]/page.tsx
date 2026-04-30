@@ -1,524 +1,1933 @@
-"use client";
+'use client';
+// v5 port of floom@main/pages/AppPermalinkPage.tsx (2196 lines)
+// Mechanical changes only:
+//   - react-router-dom → next/link + next/navigation
+//   - <Link to={x}> → <Link href={x}>
+//   - useParams/useSearchParams from next/navigation
+//   - setSearchParams → router.replace() with URLSearchParams
+//   - getApp/getRun/shareRun → direct fetch() calls
+//   - getAppReviews → stub returning empty summary
+//   - TopBar → SiteHeader, Footer → FloomFooter
+//   - All heavy components → stubs with // TODO(v5-port): comments
+// See docs/v5-port-stubs.md for full stub list.
 
-import { useEffect, useState, useCallback } from "react";
-import { useParams } from "next/navigation";
-import Link from "next/link";
-import type { RJSFSchema } from "@rjsf/utils";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
+import { SiteHeader } from '@/components/SiteHeader';
+import { FloomFooter } from '@/components/FloomFooter';
+import { RunSurface, PastRunsDisclosure, type RunSurfaceResult } from '@/components/runner/RunSurface';
+import { AppIcon } from '@/components/AppIcon';
+import { AppReviews } from '@/components/AppReviews';
+import { FeedbackButton } from '@/components/FeedbackButton';
+import { DescriptionMarkdown } from '@/components/DescriptionMarkdown';
+import { Confetti } from '@/components/Confetti';
+import { ShareModal } from '@/components/share/ShareModal';
+import { SkillModal } from '@/components/share/SkillModal';
+import { InstallPopover } from '@/components/share/InstallPopover';
+import { Download as DownloadIcon } from 'lucide-react';
+import { ApiError } from '@/api/client';
+import { useSession } from '@/hooks/useSession';
+import type { ActionSpec, AppDetail, ReviewSummary, RunRecord } from '@/lib/types';
 import {
-  AppRunSurface,
-  type RunFormData,
-  type RunResult,
-} from "@/components/AppRunSurface";
-import { SiteHeader } from "@/components/SiteHeader";
-import { FloomFooter } from "@/components/FloomFooter";
-import { createClient } from "@/lib/supabase/client";
+  buildPublicRunPath,
+  classifyPermalinkLoadError,
+  getPermalinkLoadErrorMessage,
+  type PermalinkLoadOutcome,
+} from '@/lib/publicPermalinks';
+import {
+  consumeJustPublished,
+  hasConfettiShown,
+  markConfettiShown,
+  samplePrefill,
+} from '@/lib/onboarding';
+import { getLaunchDemoExampleTextInputs } from '@/lib/app-examples';
 
-interface AppData {
-  id: string;
-  slug: string;
-  name: string;
-  runtime: string;
-  input_schema: RJSFSchema;
-  output_schema: object;
-  public: boolean;
-  owner_id?: string;
-  created_at?: string;
-  description?: string;
-}
+// Map of known app slugs to GitHub repo URLs.
+const GITHUB_REPOS: Record<string, string> = {
+  'blast-radius': 'https://github.com/floomhq/floom/tree/main/examples/blast-radius',
+  'claude-wrapped': 'https://github.com/floomhq/floom/tree/main/examples/claude-wrapped',
+  'dep-check': 'https://github.com/floomhq/floom/tree/main/examples/dep-check',
+  'hook-stats': 'https://github.com/floomhq/floom/tree/main/examples/hook-stats',
+  'session-recall': 'https://github.com/floomhq/floom/tree/main/examples/session-recall',
+  'ig-nano-scout': 'https://github.com/floomhq/floom/tree/main/examples/ig-nano-scout',
+};
 
-function hasBrowserSupabaseConfig() {
-  return Boolean(
-    process.env.NEXT_PUBLIC_SUPABASE_URL &&
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+// R37 (2026-04-29): empty set — all slugs are runnable.
+const DOCKER_RUNTIME_COMING_SOON_SLUGS = new Set<string>([]);
+
+// v23 PR-D: per-slug hero subhead for the 3 launch demos.
+const HERO_SUBHEAD: Record<string, string> = {
+  'competitor-lens':
+    'Paste 2 URLs (yours + competitor). Get the positioning, pricing, and angle diff in under 5 seconds.',
+  'ai-readiness-audit':
+    'Paste a company URL. Get a readiness score, 3 risks, 3 opportunities, and one concrete next step.',
+  'pitch-coach':
+    'Paste a 20-500 char startup pitch. Get 3 direct critiques, 3 rewrites by angle, and a one-line TL;DR.',
+};
+
+export default function AppPermalinkPage() {
+  const params = useParams();
+  const slug = params?.slug as string | undefined;
+  const searchParams = useSearchParams();
+  const router = useRouter();
+
+  const runIdFromUrl = searchParams?.get('run') ?? null;
+  const rerunIdFromUrl = searchParams?.get('rerun') ?? null;
+  const { data: session } = useSession();
+  const sessionUserId = session?.user?.id ?? null;
+
+  const [app, setApp] = useState<AppDetail | null>(null);
+  const [summary, setSummary] = useState<ReviewSummary | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [notFound, setNotFound] = useState(false);
+  const [loadFailure, setLoadFailure] = useState<PermalinkLoadOutcome | null>(null);
+  const [shareModalOpen, setShareModalOpen] = useState(false);
+  const [shareModalUrl, setShareModalUrl] = useState<string>('');
+  const [claudeSkillModalOpen, setClaudeSkillModalOpen] = useState(false);
+  const [installPopoverOpen, setInstallPopoverOpen] = useState(false);
+
+  type PTab = 'run' | 'about' | 'install' | 'source' | 'runs';
+  const initialTab = (searchParams?.get('tab') as PTab | null) ?? 'run';
+  const [activeTab, setActiveTab] = useState<PTab>(
+    ['run', 'about', 'install', 'source', 'runs'].includes(initialTab) ? initialTab : 'run',
+  );
+
+  const [initialRun, setInitialRun] = useState<RunRecord | null>(null);
+  const [initialRunLoading, setInitialRunLoading] = useState<boolean>(!!runIdFromUrl);
+  const [rerunInputs, setRerunInputs] = useState<Record<string, unknown> | null>(null);
+  const [rerunLoading, setRerunLoading] = useState<boolean>(!!rerunIdFromUrl && !runIdFromUrl);
+  const [runNotFound, setRunNotFound] = useState(false);
+
+  const [confettiFire, setConfettiFire] = useState(false);
+  const [celebrate, setCelebrate] = useState(false);
+  const [shareCopied, setShareCopied] = useState(false);
+
+  // Helper to update URL search params without full navigation.
+  const updateSearchParams = useCallback(
+    (updater: (prev: URLSearchParams) => URLSearchParams) => {
+      const url = new URL(window.location.href);
+      const next = updater(new URLSearchParams(url.search));
+      url.search = next.toString();
+      router.replace(url.pathname + url.search, { scroll: false } as Parameters<typeof router.replace>[1]);
+    },
+    [router],
+  );
+
+  const openShareModal = useCallback(() => {
+    const resolve = async () => {
+      try {
+        const currentUrl = new URL(window.location.href);
+        const currentRunId = currentUrl.searchParams.get('run');
+        if (!currentRunId) {
+          setShareModalUrl(currentUrl.toString());
+          setShareModalOpen(true);
+          return;
+        }
+        try {
+          // TODO(v5-port): shareRun() stub — just expose current URL as share URL
+          setShareModalUrl(
+            `${window.location.origin}${buildPublicRunPath(currentRunId)}`,
+          );
+        } catch {
+          currentUrl.searchParams.delete('run');
+          setShareModalUrl(currentUrl.toString());
+        }
+        setShareModalOpen(true);
+      } catch {
+        setShareModalUrl(window.location.href);
+        setShareModalOpen(true);
+      }
+    };
+    void resolve();
+  }, []);
+
+  useEffect(() => {
+    if (!slug) {
+      setNotFound(true);
+      setLoadFailure(null);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    setNotFound(false);
+    setLoadFailure(null);
+    // Data seam: getApp(slug) → fetch('/api/apps/' + slug)
+    fetch(`/api/apps/${slug}`)
+      .then(async (res) => {
+        if (!res.ok) {
+          const err = new ApiError('App not found', res.status);
+          const outcome = classifyPermalinkLoadError(err);
+          setNotFound(outcome === 'not_found');
+          setLoadFailure(outcome === 'retryable' ? outcome : null);
+          setLoading(false);
+          return;
+        }
+        const a = await res.json() as AppDetail;
+        // Ensure manifest has required shape for the page.
+        if (!a.manifest) {
+          (a as AppDetail & { manifest: AppDetail['manifest'] }).manifest = {
+            name: a.name,
+            actions: {},
+            secrets_needed: [],
+            capabilities: {},
+          };
+        }
+        setApp(a);
+        setLoading(false);
+      })
+      .catch((err) => {
+        const outcome = classifyPermalinkLoadError(err);
+        setNotFound(outcome === 'not_found');
+        setLoadFailure(outcome === 'retryable' ? outcome : null);
+        setLoading(false);
+      });
+    // Data seam: getAppReviews(slug) → return empty summary
+    setSummary({ count: 0, avg: 0 });
+  }, [slug]);
+
+  // /p/:slug?run=<id> — fetch the run and hydrate RunSurface read-only.
+  useEffect(() => {
+    if (!slug || !runIdFromUrl) {
+      setInitialRun(null);
+      setInitialRunLoading(false);
+      setRunNotFound(false);
+      return;
+    }
+    let cancelled = false;
+    setInitialRunLoading(true);
+    setRunNotFound(false);
+    // Data seam: getRun(runIdFromUrl) → fetch('/api/runs/' + runIdFromUrl)
+    fetch(`/api/runs/${runIdFromUrl}`)
+      .then(async (res) => {
+        if (!res.ok) {
+          if (res.status === 404) throw new ApiError('Run not found', 404);
+          throw new ApiError('Run unavailable', res.status);
+        }
+        return res.json() as Promise<RunRecord>;
+      })
+      .then((run) => {
+        if (cancelled) return;
+        if (run.app_slug && run.app_slug !== slug) {
+          setInitialRun(null);
+          updateSearchParams((prev) => {
+            const next = new URLSearchParams(prev);
+            next.delete('run');
+            return next;
+          });
+          return;
+        }
+        if (['success', 'error', 'timeout'].includes(run.status)) {
+          setInitialRun(run);
+        } else {
+          setInitialRun(null);
+        }
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setInitialRun(null);
+        if (err instanceof ApiError && err.status === 404) {
+          setRunNotFound(true);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setInitialRunLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [slug, runIdFromUrl, updateSearchParams]);
+
+  useEffect(() => {
+    if (!slug || !rerunIdFromUrl || runIdFromUrl) {
+      setRerunInputs(null);
+      setRerunLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setRerunLoading(true);
+    // Data seam: getRun(rerunIdFromUrl) → fetch('/api/runs/' + rerunIdFromUrl)
+    fetch(`/api/runs/${rerunIdFromUrl}`)
+      .then(async (res) => {
+        if (!res.ok) throw new ApiError('Run not found', res.status);
+        return res.json() as Promise<RunRecord>;
+      })
+      .then((run) => {
+        if (cancelled) return;
+        if (run.app_slug && run.app_slug !== slug) {
+          setRerunInputs(null);
+          updateSearchParams((prev) => {
+            const next = new URLSearchParams(prev);
+            next.delete('rerun');
+            return next;
+          });
+          return;
+        }
+        if (run.inputs && typeof run.inputs === 'object' && !Array.isArray(run.inputs)) {
+          setRerunInputs(run.inputs as Record<string, unknown>);
+          return;
+        }
+        setRerunInputs({});
+      })
+      .catch(() => {
+        if (!cancelled) setRerunInputs(null);
+      })
+      .finally(() => {
+        if (!cancelled) setRerunLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [slug, rerunIdFromUrl, runIdFromUrl, updateSearchParams]);
+
+  const handleResetInitialRun = useCallback(() => {
+    setInitialRun(null);
+    setRunNotFound(false);
+    updateSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete('run');
+      return next;
+    });
+  }, [updateSearchParams]);
+
+  const runSurfaceRef = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    if (activeTab !== 'run') return;
+    if (runIdFromUrl || initialRun || initialRunLoading || rerunLoading) return;
+    if (!app) return;
+    const raf = requestAnimationFrame(() => {
+      const root = runSurfaceRef.current;
+      if (!root) return;
+      const target = root.querySelector<HTMLElement>(
+        'input.input-field, textarea.input-field, select.input-field',
+      );
+      if (target && typeof target.focus === 'function') {
+        target.focus({ preventScroll: true });
+      }
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [app, activeTab, runIdFromUrl, initialRun, initialRunLoading, rerunLoading]);
+
+  const initialSurfaceLoading = initialRunLoading || rerunLoading;
+
+  const headerDescription = useMemo<string>(() => {
+    if (app?.slug && HERO_SUBHEAD[app.slug]) return HERO_SUBHEAD[app.slug];
+    if (!app?.description) return '';
+    return app.description
+      .replace(/```[\s\S]*?```/g, ' ')
+      .replace(/`([^`]+)`/g, '$1')
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+      .replace(/(\*\*|__|\*|_)/g, '')
+      .replace(/^\s*(#+|[-*+]|\d+\.)\s+/gm, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }, [app?.description, app?.slug]);
+
+  const samplePrefillInputs = useMemo<Record<string, unknown> | null>(() => {
+    if (!app) return null;
+    if (runIdFromUrl || rerunIdFromUrl) return null;
+    const firstActionKey = Object.keys(app.manifest.actions)[0];
+    const action = firstActionKey ? app.manifest.actions[firstActionKey] : undefined;
+    if (!action || action.inputs.length === 0) return null;
+    const demoText = getLaunchDemoExampleTextInputs(app.slug);
+    if (demoText) {
+      const prefilled: Record<string, unknown> = {};
+      for (const spec of action.inputs) {
+        if (spec.name in demoText) {
+          prefilled[spec.name] = demoText[spec.name];
+        }
+      }
+      if (Object.keys(prefilled).length > 0) return prefilled;
+    }
+    const first = action.inputs[0];
+    const sample = samplePrefill(first);
+    if (sample == null) return null;
+    return { [first.name]: sample };
+  }, [app, runIdFromUrl, rerunIdFromUrl]);
+
+  const claudeSkillFirstInput = useMemo<string | null>(() => {
+    if (!app) return null;
+    const actions = app.manifest?.actions ?? {};
+    const primary =
+      app.manifest?.primary_action && actions[app.manifest.primary_action]
+        ? app.manifest.primary_action
+        : Object.keys(actions)[0];
+    if (!primary) return null;
+    const action = actions[primary];
+    const first = action?.inputs?.[0];
+    return first?.name ?? null;
+  }, [app]);
+
+  useEffect(() => {
+    if (!app?.slug) return;
+    if (!consumeJustPublished(app.slug)) return;
+    if (!hasConfettiShown(app.slug)) {
+      markConfettiShown(app.slug);
+      setConfettiFire(true);
+    }
+    setCelebrate(true);
+  }, [app?.slug]);
+
+  const handleRunResult = useCallback(
+    (_result: RunSurfaceResult) => {
+      if (!app) return;
+    },
+    [app],
+  );
+
+  useEffect(() => {
+    if (!app) return;
+    const docTitle = `${app.name} · Floom`;
+    document.title = docTitle;
+    const setMeta = (name: string, content: string, prop = false) => {
+      const attr = prop ? 'property' : 'name';
+      let el = document.querySelector(`meta[${attr}="${name}"]`);
+      if (!el) {
+        el = document.createElement('meta');
+        el.setAttribute(attr, name);
+        document.head.appendChild(el);
+      }
+      el.setAttribute('content', content);
+    };
+    setMeta('description', app.description);
+    setMeta('og:title', docTitle, true);
+    setMeta('og:description', app.description, true);
+    setMeta('og:url', `${window.location.origin}/p/${app.slug}`, true);
+    setMeta('og:type', 'website', true);
+    const canon = document.head.querySelector('link[rel="canonical"]') as HTMLLinkElement | null;
+    if (canon) canon.setAttribute('href', `${window.location.origin}/p/${app.slug}`);
+    setMeta('og:image', `${window.location.origin}/og/${app.slug}.svg`, true);
+    setMeta('twitter:image', `${window.location.origin}/og/${app.slug}.svg`);
+    setMeta('twitter:title', docTitle);
+    setMeta('twitter:description', app.description);
+
+    const existing = document.getElementById('jsonld-app');
+    if (existing) existing.remove();
+    const script = document.createElement('script');
+    script.id = 'jsonld-app';
+    script.type = 'application/ld+json';
+    script.textContent = JSON.stringify({
+      '@context': 'https://schema.org',
+      '@type': 'SoftwareApplication',
+      name: app.name,
+      description: app.description,
+      applicationCategory: app.category || 'UtilitiesApplication',
+      url: `${window.location.origin}/p/${app.slug}`,
+      author: {
+        '@type': 'Person',
+        name: app.author_display || app.author || 'floomhq',
+      },
+    });
+    document.head.appendChild(script);
+
+    return () => {
+      document.title = 'Floom: production layer for AI apps';
+      const s = document.getElementById('jsonld-app');
+      if (s) s.remove();
+    };
+  }, [app]);
+
+  const HOW_IT_WORKS_MAX = 6;
+  const howItWorks = useMemo<Array<{ label: string; description?: string }>>(() => {
+    if (!app) return [];
+    const entries = Object.entries(app.manifest?.actions ?? {}) as Array<[string, ActionSpec]>;
+    if (entries.length > 0) {
+      return entries.slice(0, HOW_IT_WORKS_MAX).map(([, spec]) => ({
+        label: spec.label,
+        description: spec.description,
+      }));
+    }
+    return (app.actions || []).slice(0, HOW_IT_WORKS_MAX).map((name) => ({ label: name }));
+  }, [app]);
+
+  const createdByLabel = useMemo(() => {
+    if (!app) return null;
+    if (app.author_display && app.author_display.trim()) return app.author_display.trim();
+    if (app.author) {
+      const a = app.author;
+      return a.length > 22 ? `@${a.slice(0, 20)}…` : `@${a}`;
+    }
+    return null;
+  }, [app]);
+
+  const _heroHandle = useMemo(() => {
+    if (!app) return null;
+    const raw =
+      (app.creator_handle && app.creator_handle.trim()) ||
+      (app.author_display && app.author_display.replace(/^@/, '').trim()) ||
+      (app.author && app.author.trim()) ||
+      null;
+    if (!raw) return null;
+    return raw.length > 22 ? `${raw.slice(0, 20)}…` : raw;
+  }, [app]);
+  void _heroHandle;
+
+  const capabilityChips = useMemo(() => {
+    if (!app) return [] as Array<{ key: string; label: string; mono?: boolean }>;
+    const out: Array<{ key: string; label: string; mono?: boolean }> = [];
+    const seen = new Set<string>();
+    const add = (key: string, label: string, opts?: { mono?: boolean }) => {
+      const t = label.trim();
+      if (!t || seen.has(t)) return;
+      seen.add(t);
+      out.push({ key, label: t, mono: opts?.mono });
+    };
+    const titleCaseWords = (s: string) =>
+      s
+        .replace(/[_-]+/g, ' ')
+        .split(/\s+/)
+        .filter(Boolean)
+        .map((w) => w[0]!.toUpperCase() + w.slice(1).toLowerCase())
+        .join(' ');
+    const m = app.manifest as unknown as Record<string, unknown>;
+    const caps = m?.capabilities;
+    if (caps && typeof caps === 'object' && !Array.isArray(caps)) {
+      for (const [k, v] of Object.entries(caps as Record<string, unknown>)) {
+        if (v === true) {
+          if (k === 'web_search' || k === 'network' || k === 'web') {
+            add(`cap-${k}`, 'Web search');
+          } else {
+            add(`cap-${k}`, titleCaseWords(k));
+          }
+        } else if (typeof v === 'string' && v.trim()) {
+          add(`cap-${k}`, `${titleCaseWords(k)}: ${v.trim()}`);
+        } else if (typeof v === 'number' && v !== 0) {
+          add(`cap-${k}`, `${titleCaseWords(k)}: ${v}`);
+        }
+      }
+    }
+    const rt = (app.runtime && app.runtime.trim()) || (typeof m.runtime === 'string' ? m.runtime.trim() : '');
+    if (rt) {
+      add('runtime', `Runtime: ${rt}`);
+    }
+    for (const s of app.manifest.secrets_needed ?? []) {
+      if (typeof s === 'string' && s.trim()) {
+        add(`sec-${s}`, s.trim(), { mono: true });
+      }
+    }
+    if (app.is_async) add('async', 'Async jobs');
+    if (app.upstream_host?.trim()) {
+      add('upstream', `API: ${app.upstream_host.trim()}`);
+    }
+    if (app.renderer) add('custom-renderer', 'Custom output UI');
+    return out;
+  }, [app]);
+
+  if (loading) {
+    return (
+      <div className="page-root">
+        <SiteHeader />
+        <main
+          style={{ padding: '20px 24px 80px', width: '100%', maxWidth: 1320, margin: '0 auto' }}
+          data-testid="permalink-page"
+          aria-busy="true"
+        >
+          {/* Breadcrumb placeholder */}
+          <div style={{ height: 18, marginBottom: 14, width: 180, background: 'var(--line)', opacity: 0.25, borderRadius: 4 }} />
+
+          {/* Frame card */}
+          <div
+            style={{
+              background: 'var(--card)',
+              border: '1px solid var(--line)',
+              borderRadius: 18,
+              overflow: 'hidden',
+              boxShadow: '0 1px 3px rgba(22,21,18,.04), 0 4px 20px rgba(22,21,18,.06)',
+            }}
+          >
+            {/* Compact app-header */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 14,
+                padding: '18px 24px 16px',
+                borderBottom: '1px solid var(--line)',
+              }}
+            >
+              <div
+                style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: 11,
+                  background: 'var(--bg)',
+                  border: '1px solid var(--line)',
+                  flexShrink: 0,
+                }}
+              />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ height: 18, width: '40%', borderRadius: 4, background: 'var(--line)', opacity: 0.35, marginBottom: 6 }} />
+                <div style={{ height: 12, width: '70%', borderRadius: 4, background: 'var(--line)', opacity: 0.22 }} />
+              </div>
+              <div style={{ height: 32, width: 120, borderRadius: 8, background: 'var(--line)', opacity: 0.2 }} />
+            </div>
+
+            {/* Body */}
+            <div style={{ padding: '24px', minHeight: 360, background: 'var(--card)' }}>
+              <p style={{ color: 'var(--muted)', fontSize: 13, textAlign: 'center', padding: 24 }}>
+                Loading...
+              </p>
+            </div>
+
+            {/* Chip row */}
+            <div
+              style={{
+                display: 'flex',
+                gap: 10,
+                padding: '14px 24px',
+                borderTop: '1px solid var(--line)',
+                background: 'var(--card)',
+              }}
+            >
+              {[1, 2, 3].map((i) => (
+                <div
+                  key={i}
+                  style={{ height: 28, width: 110, borderRadius: 999, background: 'var(--line)', opacity: 0.22 }}
+                />
+              ))}
+            </div>
+          </div>
+        </main>
+        <FloomFooter />
+      </div>
+    );
+  }
+
+  if (notFound || !app) {
+    const retryable = loadFailure === 'retryable';
+    return (
+      <div className="page-root">
+        <SiteHeader />
+        <main className="main" style={{ paddingTop: 80, textAlign: 'center', maxWidth: 480, margin: '0 auto' }}>
+          <h1 style={{ fontSize: 32, fontWeight: 700, margin: '0 0 12px' }}>
+            {retryable ? 'App temporarily unavailable' : '404'}
+          </h1>
+          <p style={{ color: 'var(--muted)', fontSize: 16, margin: '0 0 32px' }}>
+            {retryable ? (
+              getPermalinkLoadErrorMessage('app')
+            ) : (
+              <>
+                No app found at{' '}
+                <code style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 13 }}>/p/{slug}</code>
+              </>
+            )}
+          </p>
+          <div style={{ display: 'inline-flex', gap: 10, flexWrap: 'wrap' }}>
+            {retryable ? (
+              <button
+                type="button"
+                onClick={() => window.location.reload()}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  padding: '10px 20px',
+                  background: 'var(--accent)',
+                  color: '#fff',
+                  border: '1px solid var(--accent)',
+                  borderRadius: 8,
+                  fontSize: 14,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                }}
+              >
+                Try again
+              </button>
+            ) : null}
+            <Link
+              href="/apps"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '10px 20px',
+                background: retryable ? 'var(--card)' : 'var(--accent)',
+                color: retryable ? 'var(--ink)' : '#fff',
+                borderRadius: 8,
+                border: retryable ? '1px solid var(--line)' : '1px solid var(--accent)',
+                fontSize: 14,
+                fontWeight: 600,
+                textDecoration: 'none',
+              }}
+            >
+              Back to all apps
+            </Link>
+          </div>
+        </main>
+        <FloomFooter />
+      </div>
+    );
+  }
+
+  if (DOCKER_RUNTIME_COMING_SOON_SLUGS.has(app.slug)) {
+    return (
+      <div className="page-root">
+        <SiteHeader />
+        <main style={{ paddingTop: 80, textAlign: 'center', maxWidth: 480, margin: '0 auto', padding: '80px 24px 80px' }}>
+          <AppIcon slug={app.slug} size={56} />
+          <h1 style={{ fontSize: 26, fontWeight: 700, margin: '20px 0 10px', color: 'var(--ink)' }}>
+            {app.name}
+          </h1>
+          <p style={{ color: 'var(--muted)', fontSize: 15, margin: '0 0 28px', lineHeight: 1.6 }}>
+            {HERO_SUBHEAD[app.slug] ?? app.description}
+          </p>
+          <div
+            style={{
+              display: 'inline-block',
+              background: '#fff5e8',
+              border: '1px solid #f5cf90',
+              borderRadius: 10,
+              padding: '14px 18px',
+              fontSize: 13.5,
+              color: '#7c5400',
+              lineHeight: 1.55,
+              textAlign: 'left',
+              maxWidth: 380,
+            }}
+          >
+            <strong>Launching with Floom v1.0.</strong> This app runs inside an isolated container and will be
+            available once sandbox hardening ships. Check back soon.
+          </div>
+          <div style={{ marginTop: 24 }}>
+            <Link
+              href="/apps"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '10px 20px',
+                background: 'var(--accent)',
+                color: '#fff',
+                borderRadius: 8,
+                border: '1px solid var(--accent)',
+                fontSize: 14,
+                fontWeight: 600,
+                textDecoration: 'none',
+              }}
+            >
+              Browse live apps
+            </Link>
+          </div>
+        </main>
+        <FloomFooter />
+      </div>
+    );
+  }
+
+  const mcpEndpoint = `${typeof window !== 'undefined' ? window.location.origin : ''}/mcp/app/${app.slug}`;
+  const githubRepo = GITHUB_REPOS[app.slug];
+  const topBarCompact = Boolean(runIdFromUrl || initialRun);
+  void topBarCompact; // SiteHeader doesn't have compact prop yet — TODO(v5-port)
+
+  return (
+    <div className="page-root">
+      <SiteHeader />
+
+      <Confetti fire={confettiFire} onDone={() => setConfettiFire(false)} />
+
+      <main
+        id="main"
+        style={{ padding: '14px 24px 64px', width: '100%', maxWidth: 1320, margin: '0 auto' }}
+        data-testid="permalink-page"
+      >
+        {/* v17 breadcrumb: quiet Apps / app-name. Lives OUTSIDE the frame card. */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 12,
+            flexWrap: 'wrap',
+            marginBottom: 14,
+            fontSize: 12.5,
+            color: 'var(--muted)',
+          }}
+        >
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              flexWrap: 'wrap',
+            }}
+          >
+            <Link href="/apps" style={{ color: 'var(--muted)', textDecoration: 'none' }}>
+              Apps
+            </Link>
+            <span aria-hidden="true" style={{ color: 'var(--line)' }}>/</span>
+            <span style={{ color: 'var(--ink)', fontWeight: 500 }}>{app.name}</span>
+          </div>
+          {app.author && sessionUserId && app.author === sessionUserId && (
+            <Link
+              href={`/studio/${app.slug}`}
+              data-testid="open-in-studio"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 4,
+                color: 'var(--muted)',
+                textDecoration: 'none',
+                fontWeight: 500,
+                fontSize: 13,
+              }}
+            >
+              Open in Studio <ArrowRight />
+            </Link>
+          )}
+        </div>
+
+        {/* R10 (2026-04-28): outer wrapper card REMOVED. Hero + tabs sit directly on cream bg. */}
+        <div
+          data-testid="permalink-card"
+          style={{
+            background: 'transparent',
+          }}
+        >
+
+          {/* F2 / R10.1: compact hero row */}
+          <section
+            data-testid="permalink-hero"
+            className="permalink-hero-row"
+            style={{
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: 12,
+              padding: '4px 0 12px',
+              flexWrap: 'wrap',
+            }}
+          >
+            <div
+              style={{
+                width: 44,
+                height: 44,
+                borderRadius: 12,
+                background: 'var(--bg)',
+                border: '1px solid var(--line)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'var(--accent)',
+                flexShrink: 0,
+              }}
+            >
+              <AppIcon slug={app.slug} size={22} />
+            </div>
+            <div className="permalink-hero-title" style={{ flex: 1, minWidth: 0 }}>
+              <h1
+                style={{
+                  fontSize: 24,
+                  fontWeight: 700,
+                  color: 'var(--ink)',
+                  margin: 0,
+                  lineHeight: 1.18,
+                  letterSpacing: '-0.02em',
+                }}
+              >
+                {app.name}
+              </h1>
+              {headerDescription && (
+                <p
+                  data-testid="hero-description"
+                  title={headerDescription}
+                  style={{
+                    fontSize: 13.5,
+                    color: 'var(--muted)',
+                    margin: '4px 0 0',
+                    lineHeight: 1.45,
+                    maxWidth: 640,
+                  }}
+                >
+                  {headerDescription}
+                </p>
+              )}
+              {/* G5 / R7 U2: unified single-row pills (wrap allowed) */}
+              <div
+                data-testid="hero-version-meta"
+                className="permalink-hero-version-meta"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  flexWrap: 'wrap',
+                  marginTop: 10,
+                }}
+              >
+                {app.runs_7d != null && app.runs_7d > 0 && (
+                  <span style={{ fontSize: 11, padding: '3px 9px', borderRadius: 999, border: '1px solid var(--line)', color: 'var(--muted)', background: 'var(--bg)', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                    {app.runs_7d.toLocaleString()} runs · 7d
+                  </span>
+                )}
+                {app.category && (
+                  <span style={{ fontSize: 11, padding: '3px 9px', borderRadius: 999, border: '1px solid var(--line)', color: 'var(--muted)', background: 'var(--bg)', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                    {app.category}
+                  </span>
+                )}
+                {summary && summary.count > 0 && (
+                  <span style={{ fontSize: 11, padding: '3px 9px', borderRadius: 999, border: '1px solid var(--line)', color: 'var(--muted)', background: 'var(--bg)', display: 'inline-flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap', flexShrink: 0 }}>
+                    <StarsRow value={summary.avg} size={11} />
+                    {summary.avg.toFixed(1)}
+                  </span>
+                )}
+                {/* R16 (2026-04-28): dropped "· stable" qualifier. Just the version number. */}
+                <span data-testid="hero-version" style={{ fontSize: 11, padding: '3px 9px', borderRadius: 999, border: '1px solid var(--line)', color: 'var(--muted)', background: 'var(--bg)', fontFamily: 'JetBrains Mono, ui-monospace, monospace', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                  v{app.version ?? '0.1.0'}
+                </span>
+                {/* G5: capability chips merged inline */}
+                {capabilityChips.map((c) => (
+                  <span
+                    key={c.key}
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 500,
+                      padding: '3px 9px',
+                      borderRadius: 999,
+                      border: '1px solid var(--line)',
+                      color: 'var(--muted)',
+                      background: c.mono ? 'var(--studio, #f5f4f0)' : 'var(--bg)',
+                      letterSpacing: c.mono ? 0 : '0.02em',
+                      whiteSpace: 'nowrap',
+                      flexShrink: 0,
+                      fontFamily: c.mono
+                        ? "'JetBrains Mono', ui-monospace, monospace"
+                        : undefined,
+                    }}
+                  >
+                    {c.label}
+                  </span>
+                ))}
+              </div>
+            </div>
+            <div
+              className="permalink-hero-actions"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                flexShrink: 0,
+                flexWrap: 'wrap',
+              }}
+            >
+              {/* R7.6 (2026-04-28): unified Install button */}
+              <div style={{ position: 'relative' }}>
+                <button
+                  type="button"
+                  data-testid="cta-install"
+                  aria-label="Install"
+                  aria-haspopup="dialog"
+                  aria-expanded={installPopoverOpen}
+                  onClick={() => setInstallPopoverOpen((o) => !o)}
+                  style={{
+                    padding: '8px 14px',
+                    border: '1px solid var(--line)',
+                    borderRadius: 10,
+                    fontSize: 12.5,
+                    fontWeight: 600,
+                    color: 'var(--ink)',
+                    background: 'var(--card)',
+                    cursor: 'pointer',
+                    fontFamily: 'inherit',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                  }}
+                >
+                  <DownloadIcon size={14} aria-hidden="true" /> Install
+                </button>
+                {app && (
+                  <InstallPopover
+                    open={installPopoverOpen}
+                    onClose={() => setInstallPopoverOpen(false)}
+                    slug={app.slug}
+                    appName={app.name}
+                    isAuthenticated={!!session && session.user?.is_local !== true}
+                    hasToken={false}
+                    firstInputName={claudeSkillFirstInput}
+                  />
+                )}
+              </div>
+              <button
+                type="button"
+                data-testid="cta-share"
+                aria-label="Share link"
+                onClick={openShareModal}
+                style={{
+                  padding: '8px 12px',
+                  border: '1px solid var(--line)',
+                  borderRadius: 10,
+                  fontSize: 12.5,
+                  fontWeight: 600,
+                  color: 'var(--ink)',
+                  background: 'var(--card)',
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                }}
+              >
+                <ShareIcon /> Share
+              </button>
+            </div>
+          </section>
+
+          {/* Tab bar (#626, 2026-04-24): underlined tabs directly below hero */}
+          <div
+            role="tablist"
+            aria-label="App content"
+            data-testid="permalink-tabs"
+            style={{
+              display: 'flex',
+              alignItems: 'stretch',
+              flexWrap: 'wrap',
+              gap: 0,
+              padding: '0',
+              borderBottom: '1px solid var(--line)',
+              background: 'transparent',
+            }}
+          >
+            {([
+              { id: 'run' as PTab, label: 'Run' },
+              { id: 'about' as PTab, label: 'About' },
+              { id: 'install' as PTab, label: 'Install' },
+              { id: 'source' as PTab, label: 'Source' },
+              { id: 'runs' as PTab, label: 'Earlier runs' },
+            ]).map((t) => {
+              const isOn = activeTab === t.id;
+              return (
+                <button
+                  key={t.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={isOn}
+                  data-testid={`permalink-tab-${t.id}`}
+                  data-state={isOn ? 'active' : 'inactive'}
+                  onClick={() => {
+                    setActiveTab(t.id);
+                    updateSearchParams((prev) => {
+                      const next = new URLSearchParams(prev);
+                      if (t.id === 'run') next.delete('tab');
+                      else next.set('tab', t.id);
+                      return next;
+                    });
+                  }}
+                  style={{
+                    padding: '12px 16px',
+                    fontSize: 13,
+                    fontWeight: isOn ? 600 : 500,
+                    border: 'none',
+                    background: 'transparent',
+                    color: isOn ? 'var(--ink)' : 'var(--muted)',
+                    borderBottom: isOn
+                      ? '2px solid var(--accent)'
+                      : '2px solid transparent',
+                    marginBottom: -1,
+                    cursor: 'pointer',
+                    fontFamily: 'inherit',
+                    whiteSpace: 'nowrap',
+                    transition: 'color .12s, border-color .12s',
+                  }}
+                >
+                  {t.label}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Frame body: swappable by ?tab= */}
+          <div
+            className="app-page-body"
+            style={{
+              padding: '24px 0 36px',
+              background: 'transparent',
+            }}
+          >
+
+        {/* Run tab (DEFAULT) */}
+        {activeTab === 'run' && (
+          <section
+            id="run"
+            ref={runSurfaceRef}
+            data-testid="tab-content-run-primary"
+            data-surface="run"
+            className="run-surface"
+            style={{
+              minHeight: 320,
+            }}
+          >
+            {initialSurfaceLoading ? (
+              <div
+                data-testid="shared-run-loading"
+                style={{ color: 'var(--muted)', fontSize: 13, padding: 24, textAlign: 'center' }}
+              >
+                {runIdFromUrl ? 'Loading shared run...' : 'Loading previous inputs...'}
+              </div>
+            ) : (
+              <>
+                {/* 2026-04-20 (P2 #147): "Run not found" card for dead run-ids */}
+                {runNotFound && (
+                  <div
+                    data-testid="shared-run-not-found"
+                    role="status"
+                    style={{
+                      background: 'rgba(245, 158, 11, 0.08)',
+                      border: '1px solid rgba(245, 158, 11, 0.35)',
+                      borderRadius: 12,
+                      padding: '16px 20px',
+                      marginBottom: 20,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: 16,
+                      flexWrap: 'wrap',
+                    }}
+                  >
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink)' }}>
+                        This run isn&apos;t available
+                      </div>
+                      <div style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.5 }}>
+                        The link may have expired or the run was deleted. You
+                        can still run {app.name} with fresh inputs below.
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      data-testid="shared-run-not-found-reset"
+                      onClick={handleResetInitialRun}
+                      style={{
+                        padding: '8px 14px',
+                        background: 'var(--card)',
+                        border: '1px solid var(--line)',
+                        borderRadius: 8,
+                        fontSize: 13,
+                        fontWeight: 500,
+                        color: 'var(--ink)',
+                        cursor: 'pointer',
+                        fontFamily: 'inherit',
+                        textDecoration: 'none',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      Try this app →
+                    </button>
+                  </div>
+                )}
+                <RunSurface
+                  app={app}
+                  initialRun={initialRun}
+                  initialInputs={rerunInputs ?? samplePrefillInputs ?? undefined}
+                  onResetInitialRun={handleResetInitialRun}
+                  onResult={handleRunResult}
+                  onShare={openShareModal}
+                />
+                {/* R7.8 / R16: privacy note */}
+                <div
+                  data-testid="ap-privacy-note"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    marginTop: 20,
+                    padding: '10px 14px',
+                    border: '1px solid var(--line)',
+                    borderRadius: 10,
+                    background: 'var(--bg)',
+                    fontSize: 13,
+                    color: 'var(--ink)',
+                    lineHeight: 1.55,
+                  }}
+                >
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                    style={{ flexShrink: 0, color: 'var(--accent)' }}
+                  >
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                  </svg>
+                  <span>
+                    Your inputs are sent to {app.manifest?.name ?? app.name} to produce a result. Floom doesn&apos;t sell or share run data.{' '}
+                    <a
+                      href="/privacy"
+                      style={{ color: 'var(--accent)', textDecoration: 'underline' }}
+                    >
+                      Privacy →
+                    </a>
+                  </span>
+                </div>
+                {celebrate && (
+                  <CelebrationCard
+                    slug={app.slug}
+                    copied={shareCopied}
+                    onCopy={() => {
+                      try {
+                        navigator.clipboard.writeText(window.location.href);
+                        setShareCopied(true);
+                        window.setTimeout(() => setShareCopied(false), 1800);
+                      } catch {
+                        /* clipboard blocked */
+                      }
+                    }}
+                    onDismiss={() => setCelebrate(false)}
+                  />
+                )}
+              </>
+            )}
+          </section>
+        )}
+
+        {/* About tab. v26 parity: two-column layout */}
+        {activeTab === 'about' && (
+        <>
+        <div
+          data-testid="about-body"
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'minmax(0, 1fr) 280px',
+            gap: 32,
+          }}
+          className="about-body-grid"
+        >
+          {/* Left: prose + how-it-works + reviews */}
+          <main>
+            {/* How it works strip */}
+            {howItWorks.length > 0 && (
+              <section
+                data-testid="how-it-works"
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+                  gap: 12,
+                  marginBottom: 28,
+                }}
+              >
+                {howItWorks.map((step, idx) => (
+                  <div
+                    key={idx}
+                    style={{
+                      background: 'var(--bg)',
+                      border: '1px solid var(--line)',
+                      borderRadius: 10,
+                      padding: 16,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 8,
+                    }}
+                  >
+                    <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+                      Step {idx + 1}
+                    </div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)' }}>{step.label}</div>
+                    {step.description && (
+                      <div style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.55 }}>{step.description}</div>
+                    )}
+                  </div>
+                ))}
+              </section>
+            )}
+
+            {/* About prose */}
+            {(() => {
+              const trimmed = (app.description ?? '').trim();
+              const isDuplicateOfHero =
+                trimmed.length > 0 &&
+                trimmed === headerDescription &&
+                trimmed.length <= 160;
+              const showAboutProse = !!trimmed && !isDuplicateOfHero;
+              const hasReviews = summary && summary.count > 0;
+              if (!showAboutProse && !hasReviews) {
+                return (
+                  <section style={{ paddingBottom: 24, marginBottom: 24, borderBottom: '1px solid var(--line)' }}>
+                    <AppReviews slug={app.slug} />
+                  </section>
+                );
+              }
+              return (
+                <section style={{ paddingBottom: 24, marginBottom: 24, borderBottom: '1px solid var(--line)' }}>
+                  {showAboutProse && (
+                    <>
+                      <h2 style={{ fontSize: 18, fontWeight: 600, margin: '0 0 14px', color: 'var(--ink)', letterSpacing: '-0.01em' }}>
+                        About this app
+                      </h2>
+                      <DescriptionMarkdown
+                        description={app.description!}
+                        testId="about-description"
+                        style={{ fontSize: 14, color: 'var(--muted)', margin: 0, lineHeight: 1.65, marginBottom: 24 }}
+                      />
+                    </>
+                  )}
+                  {hasReviews && <RatingsWidget summary={summary} />}
+                  <AppReviews slug={app.slug} />
+                </section>
+              );
+            })()}
+          </main>
+
+          {/* Right: aside meta panels */}
+          <aside data-testid="about-aside">
+            {/* App meta panel */}
+            <div
+              data-testid="details-card"
+              style={{
+                background: 'var(--bg)',
+                border: '1px solid var(--line)',
+                borderRadius: 12,
+                padding: '16px 18px',
+                marginBottom: 14,
+              }}
+            >
+              <h4 style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10.5, color: 'var(--muted)', letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 600, margin: '0 0 10px' }}>
+                App meta
+              </h4>
+              <AboutMetaRow label="Slug" value={<code style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11.5 }}>{app.slug}</code>} />
+              {app.version && <AboutMetaRow label="Version" value={<code style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11.5 }}>v{app.version}</code>} />}
+              {app.manifest?.license?.trim() && (
+                <AboutMetaRow
+                  label="License"
+                  value={
+                    githubRepo ? (
+                      <a href={`${githubRepo}/blob/main/LICENSE`} target="_blank" rel="noreferrer" style={{ color: 'var(--accent)', textDecoration: 'none', fontFamily: 'JetBrains Mono, monospace', fontSize: 11.5 }}>
+                        {app.manifest.license.trim()}
+                      </a>
+                    ) : (
+                      <code style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11.5 }}>{app.manifest.license.trim()}</code>
+                    )
+                  }
+                />
+              )}
+              {app.runtime && (
+                <AboutMetaRow label="Runtime" value={<code style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11.5 }}>{app.runtime}</code>} />
+              )}
+              {app.category && <AboutMetaRow label="Category" value={app.category} />}
+              {createdByLabel && <AboutMetaRow label="Created by" value={createdByLabel} />}
+            </div>
+
+            {/* Stats panel */}
+            {(summary || app.runs_7d != null) && (
+              <div
+                data-testid="about-stats"
+                style={{
+                  background: 'var(--bg)',
+                  border: '1px solid var(--line)',
+                  borderRadius: 12,
+                  padding: '16px 18px',
+                }}
+              >
+                <h4 style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10.5, color: 'var(--muted)', letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 600, margin: '0 0 10px' }}>
+                  Stats
+                </h4>
+                {app.runs_7d != null && app.runs_7d > 0 && (
+                  <AboutMetaRow label="Runs (7d)" value={<code style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11.5 }}>{app.runs_7d.toLocaleString()}</code>} />
+                )}
+                {summary && summary.count > 0 && (
+                  <>
+                    <AboutMetaRow label="Ratings" value={<code style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11.5 }}>{summary.count}</code>} />
+                    <AboutMetaRow label="Avg rating" value={<code style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11.5, color: 'var(--accent)' }}>{summary.avg.toFixed(1)}/5</code>} />
+                  </>
+                )}
+              </div>
+            )}
+          </aside>
+        </div>
+        </>
+        )}
+
+        {/* Install tab. v26 parity: 3 install cards */}
+        {activeTab === 'install' && (
+        <section id="connectors" data-testid="connectors">
+          <div
+            style={{ display: 'flex', flexDirection: 'column', gap: 14, maxWidth: 880 }}
+            data-testid="connectors-grid"
+          >
+            <InstallCard
+              testId="connector-claude"
+              title="Claude Desktop / Claude Code"
+              desc={`Adds ${app.name} as a Skill. Run via natural language. MCP-installable via Skill add command.`}
+              snippetValue={`claude skill add ${typeof window !== 'undefined' ? window.location.origin : ''}/p/${app.slug}`}
+              copyLabel="Copy command"
+            />
+            <InstallCard
+              testId="connector-cursor"
+              title="Cursor / ChatGPT / any MCP client"
+              desc="Add to your MCP config. The endpoint is the same; only the config file differs per client."
+              snippetValue={mcpEndpoint}
+              copyLabel="Copy MCP URL"
+            />
+            <InstallCard
+              testId="connector-curl"
+              title="cURL / JSON API"
+              desc="Bearer-token auth with an Agent token. Same endpoint as the public page, just hit it programmatically."
+              snippetValue={`curl -X POST ${typeof window !== 'undefined' ? window.location.origin : ''}/api/${app.slug}/run \\\n  -H "Authorization: Bearer floom_agent_••••••" \\\n  -d '{}'`}
+              copyLabel="Copy cURL"
+              copySnippet={`curl -X POST ${typeof window !== 'undefined' ? window.location.origin : ''}/api/${app.slug}/run \\\n  -H "Authorization: Bearer YOUR_TOKEN" \\\n  -d '{}'`}
+            />
+          </div>
+          <p
+            data-testid="connectors-more"
+            style={{ marginTop: 10, fontSize: 12.5, color: 'var(--muted)', textAlign: 'center' }}
+          >
+            Need help?{' '}
+            <a
+              href="/docs"
+              data-testid="connectors-docs"
+              style={{ color: 'var(--accent)', fontWeight: 600, textDecoration: 'none' }}
+            >
+              Read the full install guide &rarr;
+            </a>
+          </p>
+        </section>
+        )}
+
+        {/* Source tab. v26 parity: repo card + spec card + self-host card */}
+        {activeTab === 'source' && (
+          <section data-testid="tab-content-source">
+            {!githubRepo && (
+              <p
+                data-testid="source-no-repo-note"
+                style={{
+                  fontSize: 12.5,
+                  color: 'var(--muted)',
+                  margin: '0 0 14px',
+                  lineHeight: 1.55,
+                }}
+              >
+                Source not publicly linked. Check with the app creator.
+              </p>
+            )}
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: githubRepo ? '1fr 1fr' : '1fr',
+                gap: 14,
+                marginBottom: 14,
+              }}
+              className="source-cards-grid"
+            >
+              {/* Repo card — hidden when no github source linked */}
+              {githubRepo && (
+                <div
+                  data-testid="source-repo-card"
+                  style={{
+                    background: 'var(--card)',
+                    border: '1px solid var(--line)',
+                    borderRadius: 12,
+                    padding: '18px 20px',
+                  }}
+                >
+                  <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10.5, color: 'var(--muted)', letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 600, marginBottom: 8 }}>
+                    Repository
+                  </div>
+                  <h3 style={{ fontSize: 14, fontWeight: 600, margin: '0 0 8px', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                    <GithubIcon /> {githubRepo.replace('https://github.com/', '')}
+                  </h3>
+                  {app.manifest?.license && (
+                    <p style={{ fontSize: 12.5, color: 'var(--muted)', margin: '0 0 14px', lineHeight: 1.5 }}>
+                      {app.manifest.license} licensed
+                      {app.version ? ` · v${app.version}` : ''}
+                    </p>
+                  )}
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                    <a
+                      href={githubRepo}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{
+                        fontSize: 12.5,
+                        fontWeight: 600,
+                        padding: '6px 12px',
+                        border: '1px solid var(--line)',
+                        borderRadius: 8,
+                        color: 'var(--ink)',
+                        textDecoration: 'none',
+                        background: 'var(--bg)',
+                      }}
+                    >
+                      View on GitHub &rarr;
+                    </a>
+                  </div>
+                </div>
+              )}
+
+              {/* Spec card */}
+              <div
+                data-testid="source-spec-card"
+                style={{
+                  background: 'var(--card)',
+                  border: '1px solid var(--line)',
+                  borderRadius: 12,
+                  padding: '18px 20px',
+                }}
+              >
+                <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10.5, color: 'var(--muted)', letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 600, marginBottom: 8 }}>
+                  Spec (floom.json)
+                </div>
+                <p style={{ fontSize: 12.5, color: 'var(--muted)', margin: '0 0 10px', lineHeight: 1.5 }}>
+                  Deterministic JSON schema for actions and inputs.
+                </p>
+                <SourceSnippet
+                  value={JSON.stringify({
+                    slug: app.slug,
+                    version: app.version ?? '0.1.0',
+                    actions: Object.keys(app.manifest?.actions ?? {}).slice(0, 2),
+                  }, null, 2)}
+                />
+                <a
+                  href={`${typeof window !== 'undefined' ? window.location.origin : ''}/api/hub/${app.slug}/openapi.json`}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{ marginTop: 10, display: 'inline-block', fontSize: 12.5, color: 'var(--accent)', fontWeight: 600, textDecoration: 'none' }}
+                >
+                  View raw spec &rarr;
+                </a>
+              </div>
+            </div>
+
+            {/* Self-host card (full width) */}
+            <div
+              data-testid="source-selfhost-card"
+              style={{
+                background: 'var(--card)',
+                border: '1px solid var(--line)',
+                borderRadius: 12,
+                padding: '18px 20px',
+              }}
+            >
+              <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10.5, color: 'var(--muted)', letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 600, marginBottom: 8 }}>
+                Self-host
+              </div>
+              <h3 style={{ fontSize: 14, fontWeight: 600, margin: '0 0 8px' }}>Run this app on your own infra.</h3>
+              <p style={{ fontSize: 13, color: 'var(--muted)', margin: '0 0 12px', lineHeight: 1.55 }}>
+                One Docker command. Bring your own API key. Yours forever.
+              </p>
+              <SourceSnippet
+                value={`docker run -e GEMINI_BYOK=$KEY -p 3000:3000 ghcr.io/floomhq/${app.slug}:latest`}
+              />
+            </div>
+          </section>
+        )}
+
+        {/* R10 (2026-04-28): Earlier runs tab */}
+        {activeTab === 'runs' && (
+          <section data-testid="tab-content-runs">
+            <div
+              style={{
+                fontFamily: 'JetBrains Mono, monospace',
+                fontSize: 10.5,
+                color: 'var(--muted)',
+                letterSpacing: '0.08em',
+                textTransform: 'uppercase',
+                fontWeight: 600,
+                marginBottom: 14,
+              }}
+            >
+              Earlier runs
+            </div>
+            <PastRunsDisclosure appSlug={app.slug} defaultOpen />
+          </section>
+        )}
+          </div>
+          {/* /frame body */}
+        </div>
+        {/* /permalink-card */}
+      </main>
+      <FloomFooter />
+      <FeedbackButton />
+
+      {app && (
+        <ShareModal
+          open={shareModalOpen}
+          onClose={() => setShareModalOpen(false)}
+          slug={app.slug}
+          appName={app.name}
+          visibility={app.visibility}
+          shareUrl={shareModalUrl || (typeof window !== 'undefined' ? window.location.href : '')}
+          isOwner={!!(app.author && sessionUserId && app.author === sessionUserId)}
+        />
+      )}
+
+      {app && (
+        <SkillModal
+          open={claudeSkillModalOpen}
+          onClose={() => setClaudeSkillModalOpen(false)}
+          slug={app.slug}
+          appName={app.name}
+          firstInputName={claudeSkillFirstInput}
+        />
+      )}
+
+    </div>
   );
 }
 
-function relativeTime(dateStr: string | undefined | null): string {
-  if (!dateStr) return "";
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const mins = Math.floor(diff / 60_000);
-  if (mins < 2) return "just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 30) return `${days}d ago`;
-  return new Date(dateStr).toLocaleDateString();
-}
+/* ----------------- small components ----------------- */
 
-type PageState =
-  | { kind: "loading" }
-  | { kind: "private-app" }
-  | { kind: "not-found"; message: string }
-  | { kind: "ready"; app: AppData };
-
-// Tab definitions — only "Run" is wired; others show stub content
-type AppTab = "run" | "about" | "install" | "source" | "earlier-runs";
-
-// Shared run-form global CSS — scoped class
-const RUN_FORM_STYLES = `
-.floom-run-form .form-group { margin-bottom: 1rem; }
-.floom-run-form label {
-  display: block; margin-bottom: 0.4rem;
-  font-size: 0.875rem; font-weight: 700; color: #26221c;
-}
-.floom-run-form input,
-.floom-run-form textarea,
-.floom-run-form select {
-  width: 100%;
-  border: 1px solid #cfc7b8;
-  border-radius: 0.5rem;
-  background: #fffdf8;
-  padding: 0.75rem 0.85rem;
-  color: #11110f;
-  outline: none;
-}
-.floom-run-form textarea { min-height: 8rem; resize: vertical; }
-.floom-run-form input:focus,
-.floom-run-form textarea:focus,
-.floom-run-form select:focus {
-  border-color: #047857;
-  box-shadow: 0 0 0 3px rgba(4,120,87,0.14);
-}
-.floom-run-form .field-description,
-.floom-run-form .help-block {
-  margin-top: 0.35rem; font-size: 0.8rem; color: #716b61;
-}
-`;
-
-export default function AppPage() {
-  const params = useParams();
-  const slug = params.slug as string;
-
-  const [pageState, setPageState] = useState<PageState>({ kind: "loading" });
-  const [activeTab, setActiveTab] = useState<AppTab>("run");
-  const [runLoading, setRunLoading] = useState(false);
-  const [runResult, setRunResult] = useState<RunResult>(null);
-  const [runError, setRunError] = useState<string | null>(null);
-  const [formData, setFormData] = useState<RunFormData>({});
-  const [runStatus, setRunStatus] = useState<
-    "idle" | "running" | "success" | "validation-error" | "runtime-error"
-  >("idle");
-
-  const fetchApp = useCallback(async () => {
-    setPageState({ kind: "loading" });
+function InstallCard({
+  testId,
+  title,
+  desc,
+  snippetValue,
+  copyLabel,
+  copySnippet,
+}: {
+  testId: string;
+  title: string;
+  desc: string;
+  snippetValue: string;
+  copyLabel: string;
+  copySnippet?: string;
+}) {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = () => {
     try {
-      const res = await fetch(`/api/apps/${slug}`);
-      if (res.status === 403) {
-        setPageState({ kind: "private-app" });
-        return;
-      }
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        setPageState({
-          kind: "not-found",
-          message: (data as { error?: string }).error ?? "App not found",
-        });
-        return;
-      }
-      const data = await res.json();
-      setPageState({ kind: "ready", app: data as AppData });
-    } catch (e: unknown) {
-      setPageState({
-        kind: "not-found",
-        message: e instanceof Error ? e.message : "Failed to load app",
+      void navigator.clipboard.writeText(copySnippet ?? snippetValue).then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1500);
       });
-    }
-  }, [slug]);
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    fetchApp();
-  }, [fetchApp]);
-
-  const handleRun = async () => {
-    setRunLoading(true);
-    setRunResult(null);
-    setRunError(null);
-    setRunStatus("running");
-
-    let token: string | undefined;
-    if (hasBrowserSupabaseConfig()) {
-      const supabase = createClient();
-      const session = await supabase.auth.getSession();
-      token = session.data.session?.access_token;
-    }
-
-    try {
-      const res = await fetch(`/api/apps/${slug}/run`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({ inputs: formData }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        const message = (data as { error?: string }).error ?? "Run failed";
-        if (
-          res.status === 422 ||
-          message.toLowerCase().includes("validation") ||
-          message.toLowerCase().includes("schema") ||
-          message.toLowerCase().includes("invalid")
-        ) {
-          setRunStatus("validation-error");
-        } else {
-          setRunStatus("runtime-error");
-        }
-        setRunError(message);
-        return;
-      }
-      setRunResult((data as { output?: RunResult }).output ?? null);
-      setRunStatus("success");
-    } catch (e: unknown) {
-      setRunError(e instanceof Error ? e.message : "Run failed");
-      setRunStatus("runtime-error");
-    } finally {
-      setRunLoading(false);
-    }
+    } catch { /* ignore */ }
   };
-
-  // ── Loading state ──────────────────────────────────────────────────────────
-  if (pageState.kind === "loading") {
-    return (
-      <div className="min-h-screen bg-[#faf9f5]">
-        <SiteHeader />
-        <div className="flex min-h-[60vh] items-center justify-center">
-          <div className="text-center">
-            <span className="inline-block h-8 w-8 animate-spin rounded-full border-2 border-neutral-200 border-t-emerald-600" />
-            <p className="mt-4 text-sm text-neutral-500">Loading app…</p>
-          </div>
-        </div>
-        <FloomFooter />
-      </div>
-    );
-  }
-
-  // ── Private app state ──────────────────────────────────────────────────────
-  if (pageState.kind === "private-app") {
-    return (
-      <div className="min-h-screen bg-[#faf9f5] text-[#11110f]">
-        <SiteHeader />
-        <div className="flex min-h-[60vh] items-center justify-center px-5">
-          <div className="max-w-md rounded-2xl border border-[#ded8cc] bg-white p-8 text-center shadow-xl shadow-neutral-200/50">
-            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full border border-neutral-200 bg-neutral-50 text-neutral-400">
-              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-              </svg>
-            </div>
-            <h1 className="text-xl font-black">Private app</h1>
-            <p className="mt-2 text-sm text-neutral-600">
-              This app is private. You need the owner&apos;s authorization to run it.
-            </p>
-            <Link
-              href="/login"
-              className="mt-6 inline-block rounded-lg bg-emerald-700 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-800"
-            >
-              Sign in
-            </Link>
-          </div>
-        </div>
-        <FloomFooter />
-      </div>
-    );
-  }
-
-  // ── Not found state ────────────────────────────────────────────────────────
-  if (pageState.kind === "not-found") {
-    return (
-      <div className="min-h-screen bg-[#faf9f5] text-[#11110f]">
-        <SiteHeader />
-        <div className="flex min-h-[60vh] items-center justify-center px-5">
-          <div className="max-w-md text-center">
-            <p className="font-mono text-sm text-neutral-400">404</p>
-            <h1 className="mt-2 text-2xl font-black">App not found</h1>
-            <p className="mt-2 text-neutral-600">{pageState.message}</p>
-            <Link href="/" className="mt-6 inline-block text-sm font-semibold text-emerald-700 underline">
-              Back to home
-            </Link>
-          </div>
-        </div>
-        <FloomFooter />
-      </div>
-    );
-  }
-
-  // ── Ready ──────────────────────────────────────────────────────────────────
-  const { app } = pageState;
-
-  const TABS: { id: AppTab; label: string }[] = [
-    { id: "run", label: "Run" },
-    { id: "about", label: "About" },
-    { id: "install", label: "Install" },
-    { id: "source", label: "Source" },
-    { id: "earlier-runs", label: "Earlier runs" },
-  ];
-
   return (
-    <div className="min-h-screen overflow-x-hidden bg-[#faf9f5] text-[#11110f]">
-      <style jsx global>{RUN_FORM_STYLES}</style>
-      <SiteHeader />
+    <div
+      data-testid={testId}
+      style={{
+        background: 'var(--card)',
+        border: '1px solid var(--line)',
+        borderRadius: 14,
+        padding: '18px 20px',
+      }}
+    >
+      <h3 style={{ fontSize: 15, fontWeight: 600, margin: '0 0 4px', color: 'var(--ink)' }}>{title}</h3>
+      <p style={{ fontSize: 13, color: 'var(--muted)', margin: '0 0 12px', lineHeight: 1.55 }}>{desc}</p>
+      {/* R7 U5: light tinted --studio bg (matches SourceSnippet + global "no black copy boxes" rule) */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          background: 'var(--studio, #f5f4f0)',
+          border: '1px solid var(--line)',
+          borderRadius: 8,
+          padding: '8px 10px',
+        }}
+      >
+        <span
+          style={{
+            flex: 1,
+            fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+            fontSize: 12,
+            color: 'var(--ink)',
+            whiteSpace: 'pre-wrap',
+            wordBreak: 'break-all',
+          }}
+          dangerouslySetInnerHTML={{ __html: snippetValue.replace(/\n/g, '<br/>') }}
+        />
+        <button
+          type="button"
+          onClick={handleCopy}
+          style={{
+            background: 'var(--card)',
+            color: copied ? 'var(--muted)' : 'var(--accent)',
+            border: `1px solid ${copied ? 'var(--line)' : 'rgba(4,120,87,0.35)'}`,
+            borderRadius: 6,
+            padding: '5px 10px',
+            fontSize: 11,
+            fontWeight: 600,
+            fontFamily: 'inherit',
+            cursor: 'pointer',
+            flexShrink: 0,
+          }}
+        >
+          {copied ? 'Copied' : copyLabel}
+        </button>
+      </div>
+    </div>
+  );
+}
 
-      <main className="mx-auto max-w-6xl px-4 py-8 sm:px-5">
-        {/* Breadcrumb */}
-        <nav className="mb-5 flex items-center gap-2 text-sm text-neutral-400">
-          <Link href="/" className="transition-colors hover:text-neutral-600">
-            Apps
-          </Link>
-          <span>/</span>
-          <span className="truncate text-neutral-600">{app.name}</span>
-        </nav>
+function SourceSnippet({ value }: { value: string }) {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = () => {
+    try {
+      void navigator.clipboard.writeText(value).then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1500);
+      });
+    } catch { /* ignore */ }
+  };
+  return (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'flex-start',
+        gap: 8,
+        background: 'var(--studio, #f5f4f0)',
+        border: '1px solid var(--line)',
+        borderRadius: 8,
+        padding: '8px 10px',
+        marginTop: 8,
+      }}
+    >
+      <pre
+        style={{
+          flex: 1,
+          fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+          fontSize: 11.5,
+          color: 'var(--ink)',
+          margin: 0,
+          whiteSpace: 'pre-wrap',
+          wordBreak: 'break-all',
+          lineHeight: 1.55,
+        }}
+      >
+        {value}
+      </pre>
+      <button
+        type="button"
+        onClick={handleCopy}
+        style={{
+          background: 'var(--card)',
+          color: copied ? 'var(--muted)' : 'var(--accent)',
+          border: `1px solid ${copied ? 'var(--line)' : 'rgba(4,120,87,0.35)'}`,
+          borderRadius: 6,
+          padding: '5px 10px',
+          fontSize: 11,
+          fontWeight: 600,
+          fontFamily: 'inherit',
+          cursor: 'pointer',
+          flexShrink: 0,
+        }}
+      >
+        {copied ? 'Copied' : 'Copy'}
+      </button>
+    </div>
+  );
+}
 
-        {/* App header card */}
-        <div className="mb-0 rounded-2xl border border-[#ded8cc] bg-white px-6 py-5 shadow-sm">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <div className="flex items-center gap-4">
-              {/* App icon */}
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-emerald-700 text-sm font-black text-white">
-                {app.name.slice(0, 2).toUpperCase()}
-              </div>
-              <div>
-                <h1 className="text-2xl font-black tracking-tight sm:text-3xl">
-                  {app.name}
-                </h1>
-                {app.description && (
-                  <p className="mt-1 max-w-2xl text-sm text-neutral-600">
-                    {app.description}
-                  </p>
-                )}
-                {/* Tag pills */}
-                <div className="mt-2 flex flex-wrap items-center gap-2">
-                  {app.public && (
-                    <span className="rounded-full bg-neutral-100 px-2.5 py-1 font-mono text-[10px] font-semibold uppercase tracking-widest text-neutral-500">
-                      public
-                    </span>
-                  )}
-                  {!app.public && (
-                    <span className="rounded-full bg-neutral-100 px-2.5 py-1 font-mono text-[10px] font-semibold uppercase tracking-widest text-neutral-500">
-                      private
-                    </span>
-                  )}
-                  <span className="rounded-full bg-neutral-100 px-2.5 py-1 font-mono text-[10px] text-neutral-500">
-                    v0.1.0
-                  </span>
-                  <span className="rounded-full bg-neutral-100 px-2.5 py-1 font-mono text-[10px] text-neutral-500">
-                    Runtime: {app.runtime}
-                  </span>
-                  {app.created_at && (
-                    <span className="font-mono text-[10px] text-neutral-400">
-                      published {relativeTime(app.created_at)}
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
+function AboutMetaRow({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div
+      style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        padding: '6px 0',
+        borderBottom: '1px solid var(--line)',
+        fontSize: 12.5,
+      }}
+    >
+      <span style={{ color: 'var(--muted)' }}>{label}</span>
+      <span style={{ color: 'var(--ink)', fontWeight: 500, textAlign: 'right' }}>{value}</span>
+    </div>
+  );
+}
 
-            {/* Action buttons */}
-            <div className="flex shrink-0 items-center gap-2">
-              <button
-                type="button"
-                className="inline-flex items-center gap-1.5 rounded-lg border border-[#ded8cc] bg-white px-3 py-2 text-[13px] font-semibold text-neutral-600 transition-colors hover:bg-neutral-50"
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                  <polyline points="7 10 12 15 17 10" />
-                  <line x1="12" y1="15" x2="12" y2="3" />
-                </svg>
-                Install
-              </button>
-              <button
-                type="button"
-                className="inline-flex items-center gap-1.5 rounded-lg border border-[#ded8cc] bg-white px-3 py-2 text-[13px] font-semibold text-neutral-600 transition-colors hover:bg-neutral-50"
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <circle cx="18" cy="5" r="3" />
-                  <circle cx="6" cy="12" r="3" />
-                  <circle cx="18" cy="19" r="3" />
-                  <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
-                  <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
-                </svg>
-                Share
-              </button>
-            </div>
-          </div>
+function ArrowRight() {
+  return (
+    <svg width={12} height={12} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M5 12h14M13 5l7 7-7 7"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function ShareIcon() {
+  return (
+    <svg width={14} height={14} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <circle cx={18} cy={5} r={3} stroke="currentColor" strokeWidth="1.8" />
+      <circle cx={6} cy={12} r={3} stroke="currentColor" strokeWidth="1.8" />
+      <circle cx={18} cy={19} r={3} stroke="currentColor" strokeWidth="1.8" />
+      <path
+        d="M8.59 13.51l6.83 3.98M15.41 6.51l-6.82 3.98"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function GithubIcon() {
+  return (
+    <svg width={12} height={12} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M12 0C5.373 0 0 5.373 0 12c0 5.302 3.438 9.8 8.207 11.387.6.113.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0112 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z" />
+    </svg>
+  );
+}
+
+function StarsRow({ value, size = 14 }: { value: number; size?: number }) {
+  return (
+    <div style={{ display: 'inline-flex', gap: 1, color: '#f2b100' }}>
+      {[1, 2, 3, 4, 5].map((n) => (
+        <svg
+          key={n}
+          width={size}
+          height={size}
+          viewBox="0 0 24 24"
+          fill={n <= Math.round(value) ? 'currentColor' : 'none'}
+          stroke="currentColor"
+          strokeWidth="1.5"
+        >
+          <path
+            d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14l-5-4.87 6.91-1.01L12 2z"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      ))}
+    </div>
+  );
+}
+
+function RatingsWidget({ summary }: { summary: ReviewSummary }) {
+  return (
+    <div
+      data-testid="ratings-widget"
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 24,
+        marginBottom: 28,
+        paddingBottom: 24,
+        borderBottom: '1px solid var(--line)',
+      }}
+    >
+      <div>
+        <div
+          style={{
+            fontSize: 52,
+            fontWeight: 700,
+            lineHeight: 1,
+            color: 'var(--ink)',
+            letterSpacing: '-0.02em',
+          }}
+        >
+          {summary.avg.toFixed(1)}
         </div>
-
-        {/* Action tabs row */}
-        <div className="mb-0 mt-0 border-b border-[#ded8cc] bg-white">
-          <div className="flex items-end gap-0 overflow-x-auto">
-            {TABS.map((tab) => (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => setActiveTab(tab.id)}
-                className={`shrink-0 border-b-2 px-4 py-3 text-[13px] font-semibold transition-colors ${
-                  activeTab === tab.id
-                    ? "border-emerald-700 text-emerald-700"
-                    : "border-transparent text-neutral-500 hover:text-neutral-700"
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
+        <div style={{ marginTop: 8 }}>
+          <StarsRow value={summary.avg} size={16} />
         </div>
-
-        {/* Gemini usage strip — stubbed */}
-        <div className="mt-4 flex items-center justify-between gap-4 rounded-lg border border-[#e4ded3] bg-white px-4 py-2.5">
-          <div className="flex items-center gap-2.5 text-[13px] text-neutral-600">
-            <span className="text-emerald-600">✦</span>
-            <span>Gemini on us</span>
-            <span className="text-neutral-400">·</span>
-            <span className="font-semibold">5 of 5 free runs left today</span>
-            <div className="ml-1 h-1.5 w-24 overflow-hidden rounded-full bg-neutral-100">
-              <div className="h-full w-full rounded-full bg-emerald-600" />
-            </div>
-          </div>
-          <button
-            type="button"
-            className="text-[12px] font-semibold text-neutral-500 transition-colors hover:text-neutral-800"
-          >
-            Use your own key
-          </button>
+        <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>
+          {summary.count} rating{summary.count === 1 ? '' : 's'}
         </div>
+      </div>
+    </div>
+  );
+}
 
-        {/* Tab content */}
-        <div className="mt-4">
-          {activeTab === "run" && (
-            <>
-              {/* Run surface */}
-              <AppRunSurface
-                inputSchema={app.input_schema}
-                formData={formData}
-                runError={runError}
-                runLoading={runLoading}
-                runResult={runResult}
-                onFormDataChange={setFormData}
-                onReset={() => {
-                  setFormData({});
-                  setRunResult(null);
-                  setRunError(null);
-                  setRunStatus("idle");
-                }}
-                onRun={handleRun}
-              />
-
-              {/* Privacy note */}
-              <div className="mt-4 flex items-start gap-2 rounded-lg border border-[#e4ded3] bg-white px-4 py-3 text-[13px] text-neutral-500">
-                <svg
-                  className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                  aria-hidden="true"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
-                </svg>
-                <span>
-                  Your inputs are sent to <strong className="font-semibold text-neutral-700">{app.name}</strong> to produce a result. Floom doesn&apos;t sell or share run data.{" "}
-                  <a href="https://floom.dev/privacy" target="_blank" rel="noreferrer" className="font-semibold text-emerald-700 no-underline hover:underline">
-                    Privacy →
-                  </a>
-                </span>
-              </div>
-            </>
-          )}
-
-          {activeTab === "about" && (
-            <div className="rounded-2xl border border-[#ded8cc] bg-white p-6">
-              <h2 className="text-lg font-black">About {app.name}</h2>
-              {app.description ? (
-                <p className="mt-3 text-sm leading-relaxed text-neutral-600">{app.description}</p>
-              ) : (
-                <p className="mt-3 text-sm text-neutral-400">No description provided.</p>
-              )}
-              <div className="mt-6 grid gap-3 text-sm sm:grid-cols-2">
-                <div className="rounded-lg border border-[#e4ded3] p-3">
-                  <p className="font-mono text-[10px] uppercase tracking-widest text-neutral-400">Runtime</p>
-                  <p className="mt-1 font-semibold">{app.runtime}</p>
-                </div>
-                <div className="rounded-lg border border-[#e4ded3] p-3">
-                  <p className="font-mono text-[10px] uppercase tracking-widest text-neutral-400">Visibility</p>
-                  <p className="mt-1 font-semibold capitalize">{app.public ? "Public" : "Private"}</p>
-                </div>
-                {app.created_at && (
-                  <div className="rounded-lg border border-[#e4ded3] p-3">
-                    <p className="font-mono text-[10px] uppercase tracking-widest text-neutral-400">Published</p>
-                    <p className="mt-1 font-semibold">{relativeTime(app.created_at)}</p>
-                  </div>
-                )}
-                <div className="rounded-lg border border-[#e4ded3] p-3">
-                  <p className="font-mono text-[10px] uppercase tracking-widest text-neutral-400">Slug</p>
-                  <p className="mt-1 font-mono text-[13px]">{app.slug}</p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {activeTab === "install" && (
-            <div className="rounded-2xl border border-[#ded8cc] bg-white p-6">
-              <h2 className="text-lg font-black">Install</h2>
-              <p className="mt-2 text-sm text-neutral-500">Coming soon — install as MCP tool or via CLI.</p>
-            </div>
-          )}
-
-          {activeTab === "source" && (
-            <div className="rounded-2xl border border-[#ded8cc] bg-white p-6">
-              <h2 className="text-lg font-black">Source</h2>
-              <p className="mt-2 text-sm text-neutral-500">Coming soon — view the app source on GitHub.</p>
-            </div>
-          )}
-
-          {activeTab === "earlier-runs" && (
-            <div className="rounded-2xl border border-[#ded8cc] bg-white p-6">
-              <h2 className="text-lg font-black">Earlier runs</h2>
-              <p className="mt-2 text-sm text-neutral-500">Coming soon — browse past run outputs.</p>
-            </div>
-          )}
+function CelebrationCard({
+  slug,
+  copied,
+  onCopy,
+  onDismiss,
+}: {
+  slug: string;
+  copied: boolean;
+  onCopy: () => void;
+  onDismiss: () => void;
+}) {
+  return (
+    <div
+      role="status"
+      data-testid="celebration-card"
+      style={{
+        marginTop: 18,
+        padding: '18px 20px',
+        borderRadius: 14,
+        border: '1px solid var(--accent, #10b981)',
+        background: 'rgba(16, 185, 129, 0.06)',
+        display: 'flex',
+        flexWrap: 'wrap',
+        gap: 12,
+        alignItems: 'center',
+        justifyContent: 'space-between',
+      }}
+    >
+      <div style={{ minWidth: 0, flex: 1 }}>
+        <strong style={{ fontSize: 15, color: 'var(--ink, #0f172a)' }}>
+          Your app is live
+        </strong>
+        <p style={{ margin: '4px 0 8px', color: 'var(--muted, #64748b)', fontSize: 13 }}>
+          This link works for anyone — send it to coworkers, Twitter, anywhere.
+        </p>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: 7,
+            background: '#fff5e8',
+            border: '1px solid #f5cf90',
+            borderRadius: 8,
+            padding: '8px 11px',
+            fontSize: 12,
+            color: '#7c5400',
+            lineHeight: 1.5,
+          }}
+        >
+          <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 1 }} aria-hidden="true"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg>
+          <span><strong>Floom is in public beta</strong> — please don&rsquo;t put production secrets in apps you publish here. We&rsquo;re hardening secret isolation and will lift this when sandboxing is GA.</span>
         </div>
-
-        {/* Run status badge */}
-        {runStatus !== "idle" && (
-          <div className="mt-4 flex items-center gap-2">
-            <span
-              className={`rounded-full border px-3 py-1 text-xs font-semibold ${
-                runStatus === "running"
-                  ? "border-yellow-200 bg-yellow-50 text-yellow-700"
-                  : runStatus === "success"
-                  ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                  : "border-red-200 bg-red-50 text-red-700"
-              }`}
-            >
-              {runStatus === "running"
-                ? "Running…"
-                : runStatus === "success"
-                ? "Success"
-                : runStatus === "validation-error"
-                ? "Validation error"
-                : "Runtime error"}
-            </span>
-          </div>
-        )}
-
-        {/* Footer links */}
-        <div className="mt-8 flex flex-wrap items-center gap-4 text-sm text-neutral-500">
-          <span className="font-mono text-xs">{app.slug}</span>
-          <span>·</span>
-          <Link href="/" className="transition-colors hover:text-emerald-700">
-            Browse all apps
-          </Link>
-          <span>·</span>
-          <Link href="/tokens" className="transition-colors hover:text-emerald-700">
-            Publish your own
-          </Link>
-        </div>
-      </main>
-
-      <FloomFooter />
+      </div>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignSelf: 'flex-start' }}>
+        <button
+          type="button"
+          data-testid="celebration-copy"
+          onClick={onCopy}
+          style={{
+            padding: '8px 14px',
+            borderRadius: 8,
+            background: 'var(--accent, #10b981)',
+            color: '#fff',
+            border: 'none',
+            fontSize: 13,
+            fontWeight: 600,
+            cursor: 'pointer',
+          }}
+        >
+          {copied ? 'Copied!' : 'Copy share link'}
+        </button>
+        <Link
+          href="/studio/build"
+          data-testid="celebration-make-another"
+          style={{
+            padding: '8px 14px',
+            borderRadius: 8,
+            background: 'var(--card, #fff)',
+            color: 'var(--ink, #0f172a)',
+            border: '1px solid var(--line, #e5e7eb)',
+            fontSize: 13,
+            fontWeight: 500,
+            textDecoration: 'none',
+          }}
+        >
+          Make another
+        </Link>
+        <button
+          type="button"
+          onClick={onDismiss}
+          aria-label={`Dismiss celebration for ${slug}`}
+          style={{
+            padding: '8px 10px',
+            borderRadius: 8,
+            background: 'transparent',
+            color: 'var(--muted, #64748b)',
+            border: 'none',
+            fontSize: 13,
+            cursor: 'pointer',
+          }}
+        >
+          Dismiss
+        </button>
+      </div>
     </div>
   );
 }
