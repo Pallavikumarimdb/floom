@@ -195,7 +195,7 @@ function MvpHeroInstall({ appsCount, runs7dSum }: MvpHeroInstallProps) {
       >
         <span>or</span>
         <Link
-          href="/p/competitor-lens"
+          href="/p/demo-app"
           data-testid="hero-try-live-app"
           style={{
             color: 'var(--accent)',
@@ -449,7 +449,7 @@ export default function LandingV17PageMvp() {
             You&apos;re signed in.
           </span>
           <Link
-            href="/me"
+            href="/tokens"
             data-testid="landing-resume-cta"
             style={{
               fontWeight: 600,
@@ -546,7 +546,7 @@ export default function LandingV17PageMvp() {
             >
               Localhost to live in 60 seconds.{' '}
               <Link
-                href="/waitlist"
+                href="/login?mode=signup"
                 data-testid="hero-waitlist-qualifier-link"
                 style={{
                   color: 'var(--muted)',
@@ -703,162 +703,11 @@ export default function LandingV17PageMvp() {
           </div>
         </section>
 
-        {/* SHOWCASE — 3 apps */}
-        <section
-          data-testid="showcase"
-          style={{
-            padding: '72px 28px',
-            maxWidth: 1240,
-            margin: '0 auto',
-            borderTop: '1px solid var(--line)',
-          }}
-        >
-          <SectionEyebrow>Showcase</SectionEyebrow>
-          <h2
-            style={{
-              fontFamily: 'var(--font-display)',
-              fontWeight: 800,
-              fontSize: 34,
-              lineHeight: 1.1,
-              letterSpacing: '-0.025em',
-              textAlign: 'center',
-              margin: '0 auto 10px',
-              maxWidth: 760,
-            }}
-          >
-            Three apps Floom already runs in production.
-          </h2>
-          <p
-            style={{
-              fontSize: 15.5,
-              color: 'var(--muted)',
-              textAlign: 'center',
-              maxWidth: 620,
-              margin: '0 auto 40px',
-            }}
-          >
-            Real AI doing real work. All three deploy from a single GitHub repo.
-          </p>
-          {/* R13.1 (2026-04-29): use the SAME ShowcaseCard component as
-              /apps featured row. AppGrid's "featured" variant rendered
-              the small horizontal AppStripe shape — Federico flagged
-              "landing showcase still sucks". Now landing matches /apps:
-              rich card with sample-output preview chip, name, description,
-              category, "Open app" CTA. Same component, same look. */}
-          <div style={{ maxWidth: 1180, margin: '0 auto' }}>
-            <div
-              className="apps-showcase-grid"
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(3, 1fr)',
-                gap: 22,
-              }}
-            >
-              {SHOWCASE_ENTRIES.map((entry) => {
-                const app = showcaseHubApps.find((a) => a.slug === entry.slug);
-                return (
-                  <ShowcaseCard
-                    key={entry.slug}
-                    entry={entry}
-                    app={app}
-                    isHero={false}
-                  />
-                );
-              })}
-            </div>
-          </div>
-        </section>
-
-        {/* G9 (2026-04-28): inline app-directory grid on MVP landing.
-            Curated showcase above is the editorial pick (3 demo-ready
-            apps). This section surfaces the rest of the directory inline
-            so visitors see the full breadth without leaving the page,
-            then a prominent CTA links to `/apps` for the full directory.
-            Federico: "we should still, on the MVP Floom, have the app
-            store visible, right? What speaks against it? Already works." */}
-        {directoryApps.length > 0 && (
-          <section
-            data-testid="mvp-directory-section"
-            style={{ padding: '24px 28px 64px', maxWidth: 1240, margin: '0 auto' }}
-          >
-            <h2
-              style={{
-                fontFamily: 'var(--font-display)',
-                fontWeight: 800,
-                fontSize: 24,
-                lineHeight: 1.15,
-                letterSpacing: '-0.025em',
-                textAlign: 'center',
-                margin: '0 auto 8px',
-                maxWidth: 760,
-              }}
-            >
-              Or browse the full directory.
-            </h2>
-            <p
-              style={{
-                fontSize: 14.5,
-                color: 'var(--muted)',
-                textAlign: 'center',
-                maxWidth: 620,
-                margin: '0 auto 32px',
-                lineHeight: 1.55,
-              }}
-            >
-              {totalAppsCount > 0
-                ? `${totalAppsCount} AI apps. Free to run on Floom's Gemini key.`
-                : "Free to run on Floom's Gemini key."}
-            </p>
-            <div
-              data-testid="mvp-directory-grid"
-              style={{
-                maxWidth: 1240,
-                margin: '0 auto 28px',
-              }}
-            >
-              {directoryHubApps.length > 0 ? (
-                <AppGrid apps={directoryHubApps} />
-              ) : (
-                directoryApps.length > 0 && (
-                  <div className="mvp-directory-grid-fallback" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
-                    {directoryApps.map((app) => (
-                      <AppStripe
-                        key={app.slug}
-                        slug={app.slug}
-                        name={app.name}
-                        description={app.description}
-                        category={app.category}
-                        variant="landing"
-                      />
-                    ))}
-                  </div>
-                )
-              )}
-            </div>
-            <div style={{ textAlign: 'center' }}>
-              <Link
-                href="/apps"
-                data-testid="mvp-directory-cta"
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 8,
-                  background: 'var(--accent)',
-                  color: '#fff',
-                  border: '1px solid var(--accent)',
-                  borderRadius: 10,
-                  padding: '11px 18px',
-                  fontSize: 13.5,
-                  fontWeight: 600,
-                  textDecoration: 'none',
-                }}
-              >
-                {totalAppsCount > 0 ? `Browse all ${totalAppsCount} apps` : 'Browse all apps'}
-                <span aria-hidden="true">→</span>
-              </Link>
-            </div>
-          </section>
-        )}
+        {/* v7 (2026-05-01): showcase + directory sections REMOVED.
+            Federico flagged: floom-minimal v0 only has demo-app, and
+            the showcase + directory cards link to floom.dev/p/<slug>
+            which violates the self-contained rule. The cards return
+            in v0.1 once floom-minimal has its own apps table populated. */}
 
         {/* DISCORD CTA — quiet chip above the footer (#613,
             Federico 2026-04-23). Invite lives in MEMORY

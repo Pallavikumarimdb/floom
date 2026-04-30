@@ -486,7 +486,7 @@ function MobileStackedDemo({ reducedMotion: _reducedMotion }: { reducedMotion: b
               <span style={MOBILE_LIVE_DOT_CORE} />
             </span>
             <div style={MOBILE_DEPLOY_URL_TEXT}>
-              <div style={MOBILE_DEPLOY_URL_MAIN}>floom.dev/p/ai-readiness-audit</div>
+              <div style={MOBILE_DEPLOY_URL_MAIN}>/p/demo-app</div>
               <div style={MOBILE_DEPLOY_URL_META}>Deployed in 1.2s · HTTPS · edge</div>
             </div>
           </div>
@@ -834,7 +834,7 @@ function DeploySurface({
               <span style={LIVE_DOT_CORE} />
             </span>
             <div style={DEPLOY_URL_TEXT_WRAP}>
-              <div style={DEPLOY_URL_MAIN}>floom.dev/p/ai-readiness-audit</div>
+              <div style={DEPLOY_URL_MAIN}>/p/demo-app</div>
               <div style={DEPLOY_URL_META_CARD}>Beta publisher preview &middot; HTTPS &middot; edge</div>
             </div>
           </div>
@@ -950,7 +950,7 @@ function RunSurfaceDemo({
             Beta preview from <code style={RUN_CONTEXT_CODE}>publisher access</code>
           </span>
           <span style={RUN_CONTEXT_SEP} aria-hidden="true">·</span>
-          <span style={RUN_CONTEXT_URL}>floom.dev/p/ai-readiness-audit</span>
+          <span style={RUN_CONTEXT_URL}>/p/demo-app</span>
         </div>
 
         {/* 2026-04-28: Federico feedback "the use page looks empty and

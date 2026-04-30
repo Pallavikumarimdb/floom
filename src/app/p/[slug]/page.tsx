@@ -666,7 +666,7 @@ export default function AppPermalinkPage() {
               </button>
             ) : null}
             <Link
-              href="/apps"
+              href="/"
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
@@ -721,7 +721,7 @@ export default function AppPermalinkPage() {
           </div>
           <div style={{ marginTop: 24 }}>
             <Link
-              href="/apps"
+              href="/"
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
@@ -745,7 +745,8 @@ export default function AppPermalinkPage() {
     );
   }
 
-  const mcpEndpoint = `${typeof window !== 'undefined' ? window.location.origin : ''}/mcp/app/${app.slug}`;
+  // floom-minimal serves a single MCP endpoint at /mcp; per-app routing is handled internally.
+  const mcpEndpoint = `${typeof window !== 'undefined' ? window.location.origin : ''}/mcp`;
   const githubRepo = GITHUB_REPOS[app.slug];
   const topBarCompact = Boolean(runIdFromUrl || initialRun);
   void topBarCompact; // SiteHeader doesn't have compact prop yet — TODO(v5-port)
@@ -782,7 +783,7 @@ export default function AppPermalinkPage() {
               flexWrap: 'wrap',
             }}
           >
-            <Link href="/apps" style={{ color: 'var(--muted)', textDecoration: 'none' }}>
+            <Link href="/" style={{ color: 'var(--muted)', textDecoration: 'none' }}>
               Apps
             </Link>
             <span aria-hidden="true" style={{ color: 'var(--line)' }}>/</span>
@@ -1394,22 +1395,22 @@ export default function AppPermalinkPage() {
               testId="connector-curl"
               title="cURL / JSON API"
               desc="Bearer-token auth with an Agent token. Same endpoint as the public page, just hit it programmatically."
-              snippetValue={`curl -X POST ${typeof window !== 'undefined' ? window.location.origin : ''}/api/${app.slug}/run \\\n  -H "Authorization: Bearer floom_agent_••••••" \\\n  -d '{}'`}
+              snippetValue={`curl -X POST ${typeof window !== 'undefined' ? window.location.origin : ''}/api/apps/${app.slug}/run \\\n  -H "Authorization: Bearer floom_agent_••••••" \\\n  -H "Content-Type: application/json" \\\n  -d '{"inputs":{}}'`}
               copyLabel="Copy cURL"
-              copySnippet={`curl -X POST ${typeof window !== 'undefined' ? window.location.origin : ''}/api/${app.slug}/run \\\n  -H "Authorization: Bearer YOUR_TOKEN" \\\n  -d '{}'`}
+              copySnippet={`curl -X POST ${typeof window !== 'undefined' ? window.location.origin : ''}/api/apps/${app.slug}/run \\\n  -H "Authorization: Bearer YOUR_TOKEN" \\\n  -H "Content-Type: application/json" \\\n  -d '{"inputs":{}}'`}
             />
           </div>
           <p
             data-testid="connectors-more"
             style={{ marginTop: 10, fontSize: 12.5, color: 'var(--muted)', textAlign: 'center' }}
           >
-            Need help?{' '}
+            Need a token?{' '}
             <a
-              href="/docs"
-              data-testid="connectors-docs"
+              href="/tokens"
+              data-testid="connectors-tokens"
               style={{ color: 'var(--accent)', fontWeight: 600, textDecoration: 'none' }}
             >
-              Read the full install guide &rarr;
+              Mint one &rarr;
             </a>
           </p>
         </section>

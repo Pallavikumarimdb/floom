@@ -105,7 +105,7 @@ export function ThreeSurfacesDiagram() {
           <SurfaceRect
             y={20}
             label="WEB PAGE"
-            title="floom.dev/p/your-app"
+            title="/p/your-app"
             hint="Shareable URL. No signup."
           />
           {/* Surface: MCP endpoint */}

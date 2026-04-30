@@ -403,12 +403,8 @@ export function SiteHeader({ compact = false, onStudioMenuOpen }: Props = {}) {
               overflowY: 'auto',
             }}
           >
-            <nav style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 24 }}>
-              <Link href="/apps" onClick={() => setMenuOpen(false)} style={{ ...menuItemStyle, fontSize: 15 }}>Apps</Link>
-              <Link href="/docs" onClick={() => setMenuOpen(false)} style={{ ...menuItemStyle, fontSize: 15 }}>Docs</Link>
-              <Link href="/pricing" onClick={() => setMenuOpen(false)} style={{ ...menuItemStyle, fontSize: 15 }}>Pricing</Link>
-              <Link href="/changelog" onClick={() => setMenuOpen(false)} style={{ ...menuItemStyle, fontSize: 15 }}>Changelog</Link>
-            </nav>
+            {/* v7: floom-minimal v0 mobile menu has no Apps/Docs/Pricing/
+                Changelog routes — strip to prevent dead links. */}
             {!isAuthenticated && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 <Link
