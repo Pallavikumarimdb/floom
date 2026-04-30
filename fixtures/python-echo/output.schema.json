@@ -1,0 +1,11 @@
+{
+  "type": "object",
+  "required": ["brief"],
+  "additionalProperties": false,
+  "properties": {
+    "brief": {
+      "type": "string",
+      "example": "Direct brief for busy operator: ship the smallest real proof."
+    }
+  }
+}

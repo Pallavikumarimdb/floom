@@ -1,0 +1,11 @@
+name: python-echo
+version: 0.1.0
+runtime:
+  kind: python
+  entrypoint: main.py
+  command: python3 main.py
+schemas:
+  input: input.schema.json
+  output: output.schema.json
+runner:
+  timeoutMs: 5000

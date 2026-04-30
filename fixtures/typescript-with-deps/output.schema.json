@@ -1,0 +1,8 @@
+{
+  "type": "object",
+  "properties": {
+    "upper": { "type": "string" }
+  },
+  "required": ["upper"],
+  "additionalProperties": false
+}

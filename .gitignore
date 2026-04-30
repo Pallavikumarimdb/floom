@@ -1,0 +1,7 @@
+node_modules/
+.next/
+.tmp/
+.floom-venv/
+**/.floom-venv/
+tsconfig.tsbuildinfo
+npm-debug.log*

@@ -1,0 +1,11 @@
+name: typescript-with-deps
+version: 0.1.0
+runtime:
+  kind: typescript
+  entrypoint: main.ts
+  command: node main.js
+schemas:
+  input: input.schema.json
+  output: output.schema.json
+runner:
+  timeoutMs: 5000
