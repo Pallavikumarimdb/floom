@@ -177,13 +177,25 @@ export default function AppPermalinkPage() {
         // undefined deeper in the render tree.
         if (!a.manifest) {
           const handlerKey = a.handler ?? 'run';
+          // Convert input_schema.properties → manifest.actions[].inputs.
+          // Required for samplePrefillInputs lookup, claudeSkillFirstInput,
+          // and any v5 chrome that iterates over action.inputs.
+          const schema = (a.input_schema ?? null) as
+            | { properties?: Record<string, { type?: string; title?: string; description?: string }>; required?: ReadonlyArray<string> }
+            | null;
+          const inputs = schema?.properties
+            ? Object.entries(schema.properties).map(([name, prop]) => ({
+                name,
+                type: prop.type ?? 'string',
+              }))
+            : [];
           (a as AppDetail & { manifest: AppDetail['manifest'] }).manifest = {
             name: a.name,
             actions: {
               [handlerKey]: {
                 label: a.name,
                 description: a.description ?? '',
-                inputs: [],
+                inputs,
               },
             },
             primary_action: handlerKey,
