@@ -42,8 +42,8 @@
  *     - Cursor blink during code typing in Build.
  *     - `/floomit` TYPES at Deploy — don't clear Build output, append.
  *     - Micro tension 280ms after Run button "press" before result reveal.
- *     - Score COUNTS UP 0 -> 87 (requestAnimationFrame) — no fade-in number.
- *     - Tag ("Strong fit") fades in AFTER the score lands.
+ *     - Count COUNTS UP 0 -> 8 (requestAnimationFrame) — no fade-in number.
+ *     - Tag ("actions") fades in AFTER the count lands.
  *     - 6px vertical shift + 180ms light fade on state transitions.
  *     - Tracker dot animates horizontally between active pills.
  *     - Subtle "just deployed via /floomit" cue inside Use state.
@@ -128,7 +128,13 @@ def extract(notes: str):
         model="gemini-2.5-flash-lite",
         contents=prompt,
     )
-    return {"actions": [], "summary": "..."}
+    return {
+        "actions": [
+            {"owner": "Sarah", "task": "write migration docs", "due": "EOW"},
+            {"owner": "Marcus", "task": "fix /reports 500", "due": "by lunch"},
+        ],
+        "summary": "2 action items found",
+    }
 `;
 
 /** Slash command typed at Deploy. See header comment re: `/floomit` vs
@@ -950,8 +956,8 @@ function RunSurfaceDemo({
     /* eslint-enable react-hooks/set-state-in-effect */
   }, [active, cycle, reducedMotion]);
 
-  // Readiness score is 0-10 on ai-readiness-audit. 8 keeps it in the
-  // "real but not cherry-picked" zone that reads honest.
+  // meeting-action-items: count-up to 8 action items found. Matches the
+  // sample standup (Sarah + Marcus items) shown in the input field.
   const score = useCountUp(8, resultReady, 700, reducedMotion);
 
   // 2026-04-29 #664: drop the bright white override that made RUN look
