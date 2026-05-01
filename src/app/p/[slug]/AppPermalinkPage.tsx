@@ -1430,7 +1430,7 @@ export default function AppPermalinkPage() { // exported as default so the serve
         </section>
         )}
 
-        {/* Source tab. v26 parity: repo card + spec card + self-host card */}
+        {/* Source tab. v0.1 contract: repo card, manifest card, API automation card. */}
         {activeTab === 'source' && (
           <section data-testid="tab-content-source">
             {!githubRepo && (
@@ -1511,17 +1511,22 @@ export default function AppPermalinkPage() { // exported as default so the serve
                 }}
               >
                 <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10.5, color: 'var(--muted)', letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 600, marginBottom: 8 }}>
-                  Spec (floom.json)
+                  Spec (floom.yaml)
                 </div>
                 <p style={{ fontSize: 12.5, color: 'var(--muted)', margin: '0 0 10px', lineHeight: 1.5 }}>
-                  Deterministic JSON schema for actions and inputs.
+                  v0.1 apps use one Python entrypoint, one handler, JSON schemas, optional hash-locked dependencies, and owner-managed secrets.
                 </p>
                 <SourceSnippet
-                  value={JSON.stringify({
-                    slug: app.slug,
-                    version: app.version ?? '0.1.0',
-                    actions: Object.keys(app.manifest?.actions ?? {}).slice(0, 2),
-                  }, null, 2)}
+                  value={[
+                    `name: ${app.name}`,
+                    `slug: ${app.slug}`,
+                    'runtime: python',
+                    'entrypoint: app.py',
+                    'handler: run',
+                    `public: ${app.public ? 'true' : 'false'}`,
+                    'input_schema: input.schema.json',
+                    'output_schema: output.schema.json',
+                  ].join('\n')}
                 />
                 <a
                   href={`${typeof window !== 'undefined' ? window.location.origin : ''}/api/apps/${app.slug}`}
@@ -1529,14 +1534,14 @@ export default function AppPermalinkPage() { // exported as default so the serve
                   rel="noreferrer"
                   style={{ marginTop: 10, display: 'inline-block', fontSize: 12.5, color: 'var(--accent)', fontWeight: 600, textDecoration: 'none' }}
                 >
-                  View raw spec &rarr;
+                  View app metadata &rarr;
                 </a>
               </div>
             </div>
 
-            {/* Self-host card (full width) */}
+            {/* API automation card (full width) */}
             <div
-              data-testid="source-selfhost-card"
+              data-testid="source-api-card"
               style={{
                 background: 'var(--card)',
                 border: '1px solid var(--line)',
@@ -1545,14 +1550,14 @@ export default function AppPermalinkPage() { // exported as default so the serve
               }}
             >
               <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10.5, color: 'var(--muted)', letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 600, marginBottom: 8 }}>
-                Self-host
+                API
               </div>
-              <h3 style={{ fontSize: 14, fontWeight: 600, margin: '0 0 8px' }}>Run this app on your own infra.</h3>
+              <h3 style={{ fontSize: 14, fontWeight: 600, margin: '0 0 8px' }}>Run this app from HTTP clients.</h3>
               <p style={{ fontSize: 13, color: 'var(--muted)', margin: '0 0 12px', lineHeight: 1.55 }}>
-                One Docker command. Bring your own API key. Yours forever.
+                Public apps can be called anonymously. Private apps need an owner agent token.
               </p>
               <SourceSnippet
-                value={`docker run -e GEMINI_BYOK=$KEY -p 3000:3000 ghcr.io/floomhq/${app.slug}:latest`}
+                value={`curl -X POST ${typeof window !== 'undefined' ? window.location.origin : ''}/api/apps/${app.slug}/run \\\n  -H "Authorization: Bearer YOUR_FLOOM_AGENT_TOKEN" \\\n  -H "Content-Type: application/json" \\\n  -d '{"inputs":{}}'`}
               />
             </div>
           </section>
