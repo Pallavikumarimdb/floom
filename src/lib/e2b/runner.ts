@@ -75,7 +75,7 @@ export async function runInSandbox(
 
     runSbx = await Sandbox.create(
       "base",
-      sandboxOptions({ allowInternetAccess: hasPythonRequirements && !hasRuntimeSecrets })
+      sandboxOptions({ allowInternetAccess: true })
     );
 
     await runSbx.files.write(`/home/user/${entrypoint}`, source);

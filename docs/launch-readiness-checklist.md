@@ -99,7 +99,7 @@ evidence store.
 | Encrypted secrets | secret names in manifest are accepted for private apps and values are encrypted at rest | Needs current evidence |
 | Secret injection | runtime receives secrets only at execution time | Needs current evidence |
 | Secret redaction | secret-like output fields are redacted | Needs current evidence |
-| Network isolation | dependency install sandbox has internet and no secrets; secret runtime sandbox has secrets and no internet | Pre-merge evidence exists; needs current evidence |
+| Network isolation | dependency install sandbox runs separately from the secret-backed execution sandbox; public-secret apps now rely on runtime isolation plus rate limits, not no-egress execution | Pre-merge evidence exists; needs current evidence |
 | Missing secret failure | missing required secret fails before user code runs | Needs current evidence |
 | Public secret app rejection | secret-backed apps cannot be public | Needs current evidence |
 | YAML contract matrix | documented valid manifests publish; documented invalid fields (`runtime`, `actions`, inline schemas, multi-file entrypoints, public secrets) fail with clear copy | Needs current evidence |
