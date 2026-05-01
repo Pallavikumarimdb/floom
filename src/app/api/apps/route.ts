@@ -33,14 +33,21 @@ export async function POST(req: NextRequest) {
   }
 
   const form = await req.formData();
-  const manifestFile = form.get("manifest") as File | null;
-  const bundleFile = form.get("bundle") as File | null;
-  const inputSchemaFile = form.get("input_schema") as File | null;
-  const outputSchemaFile = form.get("output_schema") as File | null;
-  const requirementsFile = form.get("requirements") as File | null;
+  const manifestFile = getUploadedFile(form, "manifest");
+  const bundleFile = getUploadedFile(form, "bundle");
+  const inputSchemaFile = getUploadedFile(form, "input_schema");
+  const outputSchemaFile = getUploadedFile(form, "output_schema");
+  const requirementsFile = getUploadedFile(form, "requirements");
 
   if (!manifestFile || !bundleFile) {
     return NextResponse.json({ error: "Missing manifest or bundle" }, { status: 400 });
+  }
+
+  if (!inputSchemaFile || !outputSchemaFile) {
+    return NextResponse.json(
+      { error: "Missing input_schema or output_schema upload" },
+      { status: 400 }
+    );
   }
 
   if (manifestFile.size > MAX_SCHEMA_BYTES) {
@@ -94,30 +101,23 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Slug already exists" }, { status: 409 });
   }
 
-  let inputSchema = {};
-  let outputSchema = {};
-
-  if (inputSchemaFile) {
-    const inputResult = parseAndValidateJsonSchemaText(
-      await inputSchemaFile.text(),
-      "input_schema"
-    );
-    if (!inputResult.ok) {
-      return NextResponse.json({ error: inputResult.error }, { status: 400 });
-    }
-    inputSchema = inputResult.schema;
+  const inputResult = parseAndValidateJsonSchemaText(
+    await inputSchemaFile.text(),
+    "input_schema"
+  );
+  if (!inputResult.ok) {
+    return NextResponse.json({ error: inputResult.error }, { status: 400 });
   }
+  const inputSchema = inputResult.schema;
 
-  if (outputSchemaFile) {
-    const outputResult = parseAndValidateJsonSchemaText(
-      await outputSchemaFile.text(),
-      "output_schema"
-    );
-    if (!outputResult.ok) {
-      return NextResponse.json({ error: outputResult.error }, { status: 400 });
-    }
-    outputSchema = outputResult.schema;
+  const outputResult = parseAndValidateJsonSchemaText(
+    await outputSchemaFile.text(),
+    "output_schema"
+  );
+  if (!outputResult.ok) {
+    return NextResponse.json({ error: outputResult.error }, { status: 400 });
   }
+  const outputSchema = outputResult.schema;
 
   let pythonRequirements: string | undefined;
   if (manifest.dependencies?.python) {
@@ -265,4 +265,9 @@ async function rollbackPublish(
   }
 
   await admin.storage.from("app-bundles").remove([bundlePath]);
+}
+
+function getUploadedFile(form: FormData, field: string): File | null {
+  const value = form.get(field);
+  return value instanceof File ? value : null;
 }

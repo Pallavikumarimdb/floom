@@ -18,6 +18,8 @@ import {
 } from "@/lib/floom/schema";
 import Ajv from "ajv";
 
+export const maxDuration = 60;
+
 const ajv = new Ajv({ strict: false });
 const DEFAULT_PUBLIC_RUN_RATE_LIMIT_MAX = 20;
 const DEFAULT_PUBLIC_RUN_APP_RATE_LIMIT_MAX = 100;

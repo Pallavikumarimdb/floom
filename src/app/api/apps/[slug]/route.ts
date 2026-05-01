@@ -110,17 +110,6 @@ export async function DELETE(
     )
   );
 
-  if (bundlePaths.length > 0) {
-    const { error: storageError } = await admin
-      .storage
-      .from("app-bundles")
-      .remove(bundlePaths);
-
-    if (storageError) {
-      return NextResponse.json({ error: "Failed to delete app bundles" }, { status: 500 });
-    }
-  }
-
   const { data: deletedRows, error: deleteError } = await admin
     .from("apps")
     .delete()
@@ -134,6 +123,22 @@ export async function DELETE(
 
   if (!deletedRows || deletedRows.length !== 1) {
     return NextResponse.json({ error: "App not found" }, { status: 404 });
+  }
+
+  if (bundlePaths.length > 0) {
+    const { error: storageError } = await admin
+      .storage
+      .from("app-bundles")
+      .remove(bundlePaths);
+
+    if (storageError) {
+      console.error("Failed to clean up app bundles after app deletion", {
+        slug,
+        appId: deletableApp.id,
+        bundlePaths,
+        storageError,
+      });
+    }
   }
 
   return NextResponse.json({ deleted: true, slug });

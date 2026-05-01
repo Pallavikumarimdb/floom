@@ -201,6 +201,7 @@ async function test() {
   assert.match(complexResult.error, /too complex/);
 
   testSecretRedaction();
+  testApiCompatibilityRoutes();
   await testV01DependencyAndSecretMetadata();
   testPublicRunRateLimitHardening();
   testAppDeleteRoute();
@@ -229,9 +230,9 @@ async function test() {
   assert.ok(contract.accepted_manifest_keys.includes('secrets'));
   assert.ok(contract.accepted_manifest_keys.includes('description'));
   assert.equal(contract.use_this_first.includes('get_app_contract'), true);
-  assert.equal(contract.limits.max_source_bytes, 64 * 1024);
-  assert.equal(contract.limits.max_input_bytes, 16 * 1024);
-  assert.equal(contract.limits.max_output_bytes, 64 * 1024);
+  assert.equal(contract.limits.max_source_bytes, 256 * 1024);
+  assert.equal(contract.limits.max_input_bytes, 256 * 1024);
+  assert.equal(contract.limits.max_output_bytes, 1024 * 1024);
   assert.match(contract.limits.public_run_rate_limit, /20 runs per caller/);
   assert.match(contract.auth_and_access.public_apps, /including secret-backed runs/);
   assert.match(contract.auth_and_access.secrets, /schema secret fields are redacted from output/);
@@ -768,6 +769,15 @@ function testSecretRedaction() {
   assert.equal(value.rows[0].row_secret, 'row-private');
 
   const routeText = readFileSync('src/app/api/apps/[slug]/run/route.ts', 'utf8');
+  const limitsText = readFileSync('src/lib/floom/limits.ts', 'utf8');
+  assert.match(limitsText, /MAX_REQUEST_BYTES = 2 \* 1024 \* 1024/);
+  assert.match(limitsText, /MAX_SOURCE_BYTES = 256 \* 1024/);
+  assert.match(limitsText, /MAX_INPUT_BYTES = 256 \* 1024/);
+  assert.match(limitsText, /MAX_OUTPUT_BYTES = 1024 \* 1024/);
+  assert.match(limitsText, /SANDBOX_TIMEOUT_MS = 60_000/);
+  assert.match(limitsText, /COMMAND_TIMEOUT_MS = 45_000/);
+  assert.match(limitsText, /REQUEST_TIMEOUT_MS = 55_000/);
+  assert.match(routeText, /export const maxDuration = 60/);
   assert.match(routeText, /redactSecretInput\(latestVersion\.input_schema \?\? \{\}, inputs\)/);
   assert.match(routeText, /redactExactSecretValues\(/);
   assert.match(routeText, /Object\.values\(runtimeSecrets\.envs\)/);
@@ -775,11 +785,24 @@ function testSecretRedaction() {
   assert.equal(routeText.includes('Secret-backed apps require owner authentication'), false);
   const publishRouteText = readFileSync('src/app/api/apps/route.ts', 'utf8');
   assert.doesNotMatch(publishRouteText, /Secret-backed apps must be private/);
+  assert.match(publishRouteText, /getUploadedFile\(form, "input_schema"\)/);
+  assert.match(publishRouteText, /getUploadedFile\(form, "output_schema"\)/);
+  assert.match(publishRouteText, /Missing input_schema or output_schema upload/);
+  assert.doesNotMatch(publishRouteText, /let inputSchema = \{\}/);
+  assert.doesNotMatch(publishRouteText, /let outputSchema = \{\}/);
   assert.match(routeText, /input: redactedInputs/);
   assert.ok(
     routeText.indexOf('redactSecretInput') < routeText.indexOf('.from("executions")'),
     'execution inputs must be redacted before insert'
   );
+}
+
+function testApiCompatibilityRoutes() {
+  const directRunRouteText = readFileSync('src/app/api/[slug]/run/route.ts', 'utf8');
+  const hubRouteText = readFileSync('src/app/api/hub/[slug]/route.ts', 'utf8');
+
+  assert.match(directRunRouteText, /export \{ POST \} from "@\/app\/api\/apps\/\[slug\]\/run\/route"/);
+  assert.match(hubRouteText, /export \{ DELETE, GET \} from "@\/app\/api\/apps\/\[slug\]\/route"/);
 }
 
 async function testV01DependencyAndSecretMetadata() {
@@ -924,7 +947,7 @@ async function testMcpGuardrails() {
 
   const largeManifest = await callFloomTool(
     'validate_manifest',
-    { manifest: 'x'.repeat(40 * 1024) },
+    { manifest: 'x'.repeat(80 * 1024) },
     { baseUrl: 'http://localhost:3000' }
   );
   assert.equal(largeManifest.isError, true);
@@ -932,7 +955,7 @@ async function testMcpGuardrails() {
 
   const largeRun = await callFloomTool(
     'run_app',
-    { slug: 'pitch-coach', inputs: { text: 'x'.repeat(20 * 1024) } },
+    { slug: 'pitch-coach', inputs: { text: 'x'.repeat(280 * 1024) } },
     { baseUrl: 'http://localhost:3000' }
   );
   assert.equal(largeRun.isError, true);
@@ -1163,9 +1186,11 @@ function testAppDeleteRoute() {
   assert.match(routeText, /\.eq\("owner_id", caller\.userId\)/);
   assert.match(routeText, /data: deletedRows/);
   assert.match(routeText, /deletedRows\.length !== 1/);
+  assert.match(routeText, /Failed to clean up app bundles after app deletion/);
+  assert.doesNotMatch(routeText, /Failed to delete app bundles/);
   assert.ok(
-    routeText.indexOf('.remove(bundlePaths)') < routeText.indexOf('.from("apps")\n    .delete()'),
-    'bundle cleanup must happen before deleting the app row'
+    routeText.indexOf('.from("apps")\n    .delete()') < routeText.indexOf('.remove(bundlePaths)'),
+    'app row deletion must happen before best-effort bundle cleanup'
   );
   assert.match(routeText, /return NextResponse\.json\(\{ deleted: true, slug \}\)/);
 }

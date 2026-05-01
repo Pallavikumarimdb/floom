@@ -26,7 +26,7 @@ Out of scope: third-party services Floom depends on (Supabase, E2B, Vercel) — 
 ## Floom v0.1 security primitives
 
 - Each app run executes in an **isolated E2B sandbox** — no shared filesystem or process state across runs
-- All traffic over **HTTPS** with strict CSP, HSTS, X-Frame-Options, and Permissions-Policy headers
+- All traffic over **HTTPS** with CSP, HSTS, X-Frame-Options, and Permissions-Policy headers
 - **Public-run rate limiting** by caller and app (defaults: 20 caller runs / 60s and 100 app runs / 60s)
 - **Agent tokens** are stored only as HMAC-SHA256 hashes with `AGENT_TOKEN_PEPPER`; the raw token is shown once at creation and never persisted
 - Output fields marked `secret` in the app's output schema are **redacted** in API and MCP responses (`[REDACTED]`)
