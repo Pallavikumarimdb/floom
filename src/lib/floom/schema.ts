@@ -275,7 +275,14 @@ function redactSuspiciousKeys(value: unknown): unknown {
 
 function redactExactValues(value: unknown, secretValues: Set<string>): unknown {
   if (typeof value === "string") {
-    return secretValues.has(value) ? REDACTED_OUTPUT_VALUE : value;
+    let redacted = value;
+    for (const secretValue of secretValues) {
+      if (redacted === secretValue) {
+        return REDACTED_OUTPUT_VALUE;
+      }
+      redacted = redacted.split(secretValue).join(REDACTED_OUTPUT_VALUE);
+    }
+    return redacted;
   }
 
   if (Array.isArray(value)) {

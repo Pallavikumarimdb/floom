@@ -1,0 +1,19 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["result", "secret_present", "secret_length", "message"],
+  "properties": {
+    "result": {
+      "type": "string"
+    },
+    "secret_present": {
+      "type": "boolean"
+    },
+    "secret_length": {
+      "type": "integer"
+    },
+    "message": {
+      "type": "string"
+    }
+  }
+}

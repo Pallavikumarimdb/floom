@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { Sandbox } from 'e2b';
+import yaml from 'js-yaml';
 import { runInSandbox, runInSandboxContained } from '../src/lib/e2b/runner.ts';
 import {
   getPublicRunAppRateLimitKey,
@@ -34,6 +35,9 @@ import {
 } from '../src/lib/floom/schema.ts';
 import { resolveMcpForwardOrigin } from '../src/lib/mcp/origin.ts';
 import { callFloomTool, floomTools } from '../src/lib/mcp/tools.ts';
+
+const REQUESTS_HASHED = 'requests==2.32.3 --hash=sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+const OPENAI_HASHED = 'openai==1.14.0 --hash=sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
 
 function parseToolResult(result) {
   return JSON.parse(result.content[0].text);
@@ -131,6 +135,7 @@ async function test() {
   const inputSchemaText = readFileSync('fixtures/python-simple/input.schema.json', 'utf8');
   const outputSchemaText = readFileSync('fixtures/python-simple/output.schema.json', 'utf8');
   const sourceText = readFileSync('fixtures/python-simple/app.py', 'utf8');
+  testV01LaunchFixtures();
 
   const validManifest = await callFloomTool(
     'validate_manifest',
@@ -270,7 +275,7 @@ async function test() {
         'deps/app.py': 'def run(inputs):\n    return {"ok": True}\n',
         'deps/input.schema.json': '{}',
         'deps/output.schema.json': '{}',
-        'deps/requirements.txt': 'requests==2.32.3\n',
+        'deps/requirements.txt': `${REQUESTS_HASHED}\n`,
       },
     },
     { baseUrl: 'http://localhost:3000' }
@@ -342,7 +347,7 @@ async function test() {
     assert.match(publishedManifest, /python: requirements\.txt/);
     assert.match(publishedManifest, /secrets:/);
     assert.match(publishedManifest, /OPENAI_API_KEY/);
-    assert.equal(await form.get('requirements').text(), 'requests==2.32.3\n');
+    assert.equal(await form.get('requirements').text(), `${REQUESTS_HASHED}\n`);
     return new Response(JSON.stringify({ app: { slug: 'deps-app' } }), {
       status: 200,
       headers: { 'content-type': 'application/json' },
@@ -367,7 +372,7 @@ async function test() {
         source: 'def run(inputs):\n    return {"ok": True}\n',
         input_schema: '{}',
         output_schema: '{}',
-        requirements: 'requests==2.32.3\n',
+        requirements: `${REQUESTS_HASHED}\n`,
       },
       { baseUrl: 'http://localhost:3000', authorization: 'Bearer test-token' }
     );
@@ -685,10 +690,18 @@ function testSecretRedaction() {
   assert.deepEqual(redactSecretInput(schema, value), expectedRedacted);
   assert.deepEqual(
     redactExactSecretValues(
-      { result: 'runtime-secret-value', nested: ['ok', 'runtime-secret-value'] },
+      {
+        result: 'runtime-secret-value',
+        embedded: 'prefix runtime-secret-value suffix',
+        nested: ['ok', 'runtime-secret-value'],
+      },
       ['runtime-secret-value']
     ),
-    { result: REDACTED_OUTPUT_VALUE, nested: ['ok', REDACTED_OUTPUT_VALUE] }
+    {
+      result: REDACTED_OUTPUT_VALUE,
+      embedded: `prefix ${REDACTED_OUTPUT_VALUE} suffix`,
+      nested: ['ok', REDACTED_OUTPUT_VALUE],
+    }
   );
   assert.equal(value.token, 'secret-token');
   assert.equal(value.rows[0].row_secret, 'row-private');
@@ -697,6 +710,7 @@ function testSecretRedaction() {
   assert.match(routeText, /redactSecretInput\(latestVersion\.input_schema \?\? \{\}, inputs\)/);
   assert.match(routeText, /redactExactSecretValues\(/);
   assert.match(routeText, /Object\.values\(runtimeSecrets\.envs\)/);
+  assert.match(routeText, /Secret-backed apps require owner authentication/);
   assert.match(routeText, /input: redactedInputs/);
   assert.ok(
     routeText.indexOf('redactSecretInput') < routeText.indexOf('.from("executions")'),
@@ -706,24 +720,28 @@ function testSecretRedaction() {
 
 async function testV01DependencyAndSecretMetadata() {
   assert.equal(
-    validatePythonRequirementsText('requests==2.32.3\n# ok\nopenai==1.14.0\n'),
-    'requests==2.32.3\nopenai==1.14.0\n'
+    validatePythonRequirementsText(`${REQUESTS_HASHED}\n# ok\n${OPENAI_HASHED}\n`),
+    `${REQUESTS_HASHED}\n${OPENAI_HASHED}\n`
   );
   assert.throws(
     () => validatePythonRequirementsText('openai>=1.0\n'),
-    /exact package pins/
+    /sha256 hashes/
   );
   assert.throws(
     () => validatePythonRequirementsText('requests==2.*\n'),
-    /exact package pins/
+    /sha256 hashes/
+  );
+  assert.throws(
+    () => validatePythonRequirementsText('requests==2.32.3\n'),
+    /sha256 hashes/
   );
   assert.throws(
     () => validatePythonRequirementsText('--extra-index-url https://example.com\nrequests\n'),
-    /exact package pins/
+    /sha256 hashes/
   );
   assert.throws(
     () => validatePythonRequirementsText('git+https://example.com/repo.git\n'),
-    /exact package pins/
+    /sha256 hashes/
   );
 
   const saved = snapshotEnv(['FLOOM_SECRET_ENCRYPTION_KEY']);
@@ -881,12 +899,13 @@ async function testSandboxDependenciesAndSecrets() {
       'python',
       'app.py',
       'run',
-      { python_requirements: 'requests==2.32.3\n' },
+      { python_requirements: `${REQUESTS_HASHED}\n` },
       { OPENAI_API_KEY: 'runtime-secret' }
     );
     assert.deepEqual(result, { output: { ok: true } });
-    assert.equal(writes.get('/home/user/requirements.txt'), 'requests==2.32.3\n');
+    assert.equal(writes.get('/home/user/requirements.txt'), `${REQUESTS_HASHED}\n`);
     assert.match(commands[0].command, /pip install/);
+    assert.match(commands[0].command, /--require-hashes/);
     assert.match(commands[1].command, /runner\.py/);
     assert.deepEqual(commands[1].runOpts.envs, { OPENAI_API_KEY: 'runtime-secret' });
     assert.match(writes.get('/home/user/runner.py'), /\/home\/user\/\.deps/);
@@ -1044,7 +1063,7 @@ function testCliRejectsUnsupportedV0Shapes(manifestText, inputSchemaText, output
       `${manifestText}\ndependencies:\n  python: ./requirements.txt\n`
     );
     writeFileSync(join(appDir, 'requirements.txt'), 'https://example.com/pkg.whl\n');
-    expectCliFailure(appDir, /exact package pins/);
+    expectCliFailure(appDir, /sha256 hashes/);
   } finally {
     rmSync(appDir, { recursive: true, force: true });
   }
@@ -1071,6 +1090,22 @@ function expectCliFailure(appDir, pattern) {
     ].join('\n');
     assert.match(output, pattern);
   }
+}
+
+function testV01LaunchFixtures() {
+  const requirementsManifest = readFileSync('fixtures/python-requirements/floom.yaml', 'utf8');
+  const requirementsText = readFileSync('fixtures/python-requirements/requirements.txt', 'utf8');
+  const requirementsSource = readFileSync('fixtures/python-requirements/app.py', 'utf8');
+  const parsedRequirementsManifest = parseManifest(yaml.load(requirementsManifest));
+  assert.deepEqual(parsedRequirementsManifest.dependencies, { python: 'requirements.txt' });
+  assert.match(validatePythonRequirementsText(requirementsText), /humanize==4\.9\.0 --hash=sha256:/);
+  validatePythonSourceForManifest(requirementsSource, parsedRequirementsManifest);
+
+  const secretManifest = readFileSync('fixtures/python-secret/floom.yaml', 'utf8');
+  const secretSource = readFileSync('fixtures/python-secret/app.py', 'utf8');
+  const parsedSecretManifest = parseManifest(yaml.load(secretManifest));
+  assert.deepEqual(parsedSecretManifest.secrets, ['FLOOM_TEST_SECRET']);
+  validatePythonSourceForManifest(secretSource, parsedSecretManifest);
 }
 
 async function testSandboxErrorContainment() {

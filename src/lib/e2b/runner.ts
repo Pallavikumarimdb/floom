@@ -63,7 +63,7 @@ export async function runInSandbox(
     if (hasPythonRequirements && dependencies.python_requirements) {
       await sbx.files.write("/home/user/requirements.txt", dependencies.python_requirements);
       await sbx.commands.run(
-        "python3 -m pip install --disable-pip-version-check --no-input --target /home/user/.deps -r /home/user/requirements.txt",
+        "python3 -m pip install --disable-pip-version-check --no-input --require-hashes --target /home/user/.deps -r /home/user/requirements.txt",
         {
           timeoutMs: COMMAND_TIMEOUT_MS,
           requestTimeoutMs: REQUEST_TIMEOUT_MS,

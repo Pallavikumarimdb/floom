@@ -130,7 +130,7 @@ The REST surface is `GET`, `PUT`, and `DELETE /api/apps/:slug/secrets`. `PUT` ac
 The mainline v0 path is intentionally narrow:
 
 - Account setup and agent-token creation happen before the 60sec timer.
-- Apps use one `app.py` file with Python stdlib only, plus exact-pinned dependencies in the v0.1 branch.
+- Apps use one `app.py` file with Python stdlib only, plus exact-pinned and hash-locked dependencies in the v0.1 branch.
 - Inputs and outputs are declared with JSON Schema.
 - Publish uses `FLOOM_TOKEN` and the CLI.
 - Public apps can be read and run anonymously.
@@ -138,7 +138,7 @@ The mainline v0 path is intentionally narrow:
 
 Not part of the v0 launch claim: TypeScript apps, Java apps, OpenAPI/FastAPI apps, multi-file bundles, background workers, and arbitrary web servers.
 
-The v0.1 branch claim is separate: it adds exact-pinned Python dependencies and self-serve encrypted app secret storage. v0.1 is not covered by the v0 60-second launch claim until it receives its own end-to-end launch verification.
+The v0.1 branch claim is separate: it adds exact-pinned, hash-locked Python dependencies and self-serve encrypted app secret storage. v0.1 is not covered by the v0 60-second launch claim until it receives its own end-to-end launch verification.
 
 ## App Contract
 
@@ -214,7 +214,7 @@ Each template includes `floom.yaml`, `app.py`, `input.schema.json`, and `output.
 
 v0.1 adds two capabilities without turning Floom into broad web hosting:
 
-- Python dependency installation from an exact-pinned `requirements.txt` declared as `dependencies.python`.
+- Python dependency installation from an exact-pinned, hash-locked `requirements.txt` declared as `dependencies.python`.
 - Secret names in `floom.yaml`, with owner-scoped encrypted values injected only into the E2B runtime.
 
 v0.1 does not claim arbitrary HTTP servers, FastAPI/OpenAPI apps, TypeScript apps, background workers, or full repo hosting. Those stay post-v0.1 until the runtime, auth, limits, and UI contracts are verified end to end.

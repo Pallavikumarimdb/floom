@@ -96,9 +96,18 @@ export async function POST(
 
   const isOwner = userId === app.owner_id;
   const isPublic = app.public;
+  const hasRuntimeSecrets =
+    Array.isArray(latestVersion.secrets) && latestVersion.secrets.length > 0;
 
   if (!isOwner && !isPublic) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  if (hasRuntimeSecrets && !isOwner) {
+    return NextResponse.json(
+      { error: "Secret-backed apps require owner authentication" },
+      { status: 403 }
+    );
   }
 
   if (caller?.kind === "agent_token" && !callerHasScope(caller, "run")) {

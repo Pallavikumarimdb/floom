@@ -406,7 +406,7 @@ function getAppContract(): McpToolResult {
     unsupported: [
       {
         case: "requirements.txt or pyproject.toml",
-        reason: "v0.1 supports exact-pinned requirements.txt packages only when floom.yaml declares dependencies.python.",
+        reason: "v0.1 supports exact-pinned requirements.txt packages with sha256 hashes only when floom.yaml declares dependencies.python.",
       },
       {
         case: "openapi.json, FastAPI, Flask, or HTTP servers",

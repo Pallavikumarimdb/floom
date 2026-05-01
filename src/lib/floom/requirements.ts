@@ -1,8 +1,8 @@
 import { MAX_REQUIREMENTS_BYTES } from "./limits";
 
 const UNSAFE_REQUIREMENT = /(^\s*-)|:\/\/|(^|\s)(git\+|file:|\.{1,2}\/)/i;
-const EXACT_PINNED_REQUIREMENT_LINE =
-  /^[A-Za-z0-9_.-]+(\[[A-Za-z0-9_,.-]+\])?==[A-Za-z0-9_.!+-]+(\s*;[A-Za-z0-9_ ."'()<>=!-]+)?$/;
+const HASHED_EXACT_PINNED_REQUIREMENT_LINE =
+  /^[A-Za-z0-9_.-]+(\[[A-Za-z0-9_,.-]+\])?==[A-Za-z0-9_.!+-]+(\s+--hash=sha256:[a-f0-9]{64})+$/i;
 
 export type RuntimeDependencies = {
   python_requirements?: string;
@@ -27,8 +27,8 @@ export function validatePythonRequirementsText(text: string): string {
   }
 
   for (const line of normalizedLines) {
-    if (UNSAFE_REQUIREMENT.test(line) || !EXACT_PINNED_REQUIREMENT_LINE.test(line)) {
-      throw new Error("requirements.txt only supports exact package pins like package==1.2.3");
+    if (UNSAFE_REQUIREMENT.test(line) || !HASHED_EXACT_PINNED_REQUIREMENT_LINE.test(line)) {
+      throw new Error("requirements.txt only supports exact package pins with sha256 hashes like package==1.2.3 --hash=sha256:<64 hex>");
     }
   }
 

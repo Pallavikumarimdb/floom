@@ -52,7 +52,7 @@ Current v0 accepts:
 
 - `runtime: python`
 - one handler function, usually `run(inputs: dict) -> dict`
-- Python standard library only in v0, exact-pinned dependencies in v0.1
+- Python standard library only in v0, exact-pinned and hash-locked dependencies in v0.1
 - public apps via `public: true`
 - private apps when `public` is omitted or false
 - manifest-declared secret names in v0.1
@@ -95,7 +95,7 @@ Goal: unlock useful `input -> API/AI call -> output` apps.
 
 Separate branch scope:
 
-- exact-pinned `requirements.txt` packages via `dependencies.python: ./requirements.txt`
+- exact-pinned and hash-locked `requirements.txt` packages via `dependencies.python: ./requirements.txt`
 - manifest-declared secret names
 - owner-managed encrypted secret values in `app_secrets`
 - server-only decryption and E2B env injection at run time

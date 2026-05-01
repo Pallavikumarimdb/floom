@@ -181,12 +181,12 @@ export default function DocsPage() {
 
         <Section title="v0.1 scope">
           <p>
-            v0.1 adds exact-pinned dependencies and owner-managed encrypted
+            v0.1 adds exact-pinned, hash-locked dependencies and owner-managed encrypted
             app secrets without changing Floom into broad app hosting.
           </p>
           <ul className="list-disc space-y-3 pl-5">
             <li>
-              Exact-pinned Python dependency installation from{" "}
+              Exact-pinned, hash-locked Python dependency installation from{" "}
               <code>requirements.txt</code>.
             </li>
             <li>
