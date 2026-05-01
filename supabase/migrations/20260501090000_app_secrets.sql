@@ -18,19 +18,69 @@ $$;
 create table if not exists public.app_secrets (
   id uuid primary key default gen_random_uuid(),
   app_id uuid not null,
-  owner_id uuid not null references auth.users(id) on delete cascade,
+  owner_id uuid not null,
   name text not null,
   value_ciphertext text not null,
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
-  constraint app_secrets_app_owner_fkey
-    foreign key (app_id, owner_id)
-    references public.apps(id, owner_id)
-    on delete cascade,
-  constraint app_secrets_app_name_key unique (app_id, name),
-  constraint app_secrets_name_format check (name ~ '^[A-Z][A-Z0-9_]{1,63}$'),
-  constraint app_secrets_ciphertext_format check (value_ciphertext ~ '^v1:[A-Za-z0-9+/=]+:[A-Za-z0-9+/=]+:[A-Za-z0-9+/=]+$')
+  updated_at timestamptz not null default now()
 );
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint
+    where conrelid = 'public.app_secrets'::regclass
+      and conname = 'app_secrets_owner_id_fkey'
+  ) then
+    alter table public.app_secrets
+      add constraint app_secrets_owner_id_fkey
+      foreign key (owner_id)
+      references auth.users(id)
+      on delete cascade;
+  end if;
+
+  if not exists (
+    select 1 from pg_constraint
+    where conrelid = 'public.app_secrets'::regclass
+      and conname = 'app_secrets_app_owner_fkey'
+  ) then
+    alter table public.app_secrets
+      add constraint app_secrets_app_owner_fkey
+      foreign key (app_id, owner_id)
+      references public.apps(id, owner_id)
+      on delete cascade;
+  end if;
+
+  if not exists (
+    select 1 from pg_constraint
+    where conrelid = 'public.app_secrets'::regclass
+      and conname = 'app_secrets_app_name_key'
+  ) then
+    alter table public.app_secrets
+      add constraint app_secrets_app_name_key unique (app_id, name);
+  end if;
+
+  if not exists (
+    select 1 from pg_constraint
+    where conrelid = 'public.app_secrets'::regclass
+      and conname = 'app_secrets_name_format'
+  ) then
+    alter table public.app_secrets
+      add constraint app_secrets_name_format
+      check (name ~ '^[A-Z][A-Z0-9_]{1,63}$');
+  end if;
+
+  if not exists (
+    select 1 from pg_constraint
+    where conrelid = 'public.app_secrets'::regclass
+      and conname = 'app_secrets_ciphertext_format'
+  ) then
+    alter table public.app_secrets
+      add constraint app_secrets_ciphertext_format
+      check (value_ciphertext ~ '^v1:[A-Za-z0-9+/=]+:[A-Za-z0-9+/=]+:[A-Za-z0-9+/=]+$');
+  end if;
+end;
+$$;
 
 alter table public.app_secrets enable row level security;
 

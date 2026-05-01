@@ -65,6 +65,8 @@ const HERO_SUBHEAD: Record<string, string> = {
     'Paste a company URL. Get a readiness score, 3 risks, 3 opportunities, and one concrete next step.',
   'pitch-coach':
     'Paste a 20-500 char startup pitch. Get 3 direct critiques, 3 rewrites by angle, and a one-line TL;DR.',
+  'meeting-action-items':
+    'Paste meeting notes. Get action items with owners and due dates.',
 };
 
 export default function AppPermalinkPage() { // exported as default so the server page can dynamic-import without renaming

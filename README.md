@@ -146,8 +146,8 @@ Not part of the v0.1 launch claim: TypeScript apps, Java apps, OpenAPI/FastAPI a
 `floom.yaml`:
 
 ```yaml
-name: Pitch Coach
-slug: pitch-coach
+name: Meeting Action Items
+slug: meeting-action-items
 runtime: python
 entrypoint: app.py
 handler: run

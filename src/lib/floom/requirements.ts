@@ -45,5 +45,5 @@ export function readRuntimeDependencies(value: unknown): RuntimeDependencies {
     return {};
   }
 
-  return { python_requirements: pythonRequirements };
+  return { python_requirements: validatePythonRequirementsText(pythonRequirements) };
 }

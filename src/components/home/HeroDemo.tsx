@@ -112,23 +112,20 @@ const STATE_DURATION: Record<DemoState, number> = {
 /**
  * The Python handler body typed character-by-character during Build. Kept
  * deliberately sparse: 70% whitespace so a newcomer can read it, 20% the
- * actual model call, 10% chrome. Matches the real ai-readiness-audit app's
- * shape (examples/ai-readiness-audit/main.py) so the demo is truthful.
+ * actual extraction logic, 10% chrome. Matches the meeting-action-items demo
+ * shape so the hero and live CTA point at the same product surface.
  */
 const HANDLER_CODE = `from floom import App, action
-from google import genai
 
-app = App("ai-readiness-audit")
-gem = genai.Client()
+app = App("meeting-action-items")
 
-@app.action("audit")
-def audit(url: str):
-    prompt = f"Score {url} for AI readiness."
-    resp = gem.models.generate_content(
-        model="gemini-2.5-flash-lite",
-        contents=prompt,
-    )
-    return {"score": 8, "tier": "Ready to ship"}
+@app.action("extract")
+def extract(notes: str):
+    items = []
+    for line in notes.splitlines():
+        if "action" in line.lower():
+            items.append({"owner": "Sarah", "task": line, "due": "Friday"})
+    return {"count": len(items), "items": items}
 `;
 
 /** Slash command typed at Deploy. See header comment re: `/floomit` vs
@@ -445,8 +442,8 @@ function DesktopMorphDemo({ reducedMotion }: { reducedMotion: boolean }) {
 //                     visible (font-size 11px, monospace).
 //   02  Deploy card — `$ /floomit` line, 4 step checks (all ✓), final
 //                     "Deployed" URL chip.
-//   03  Use card    — score (8/10), "Ready to ship" tag, 3 reason
-//                     bullets, "Also available as API · MCP · Analytics".
+//   03  Use card    — action-item count, owner/due bullets,
+//                     "Also available as API · MCP · Analytics".
 // -----------------------------------------------------------------------------
 function MobileStackedDemo({ reducedMotion: _reducedMotion }: { reducedMotion: boolean }) {
   const tokens = useMemo(() => tokenizePython(HANDLER_CODE), []);
@@ -506,7 +503,7 @@ function MobileStackedDemo({ reducedMotion: _reducedMotion }: { reducedMotion: b
               <span style={MOBILE_LIVE_DOT_CORE} />
             </span>
             <div style={MOBILE_DEPLOY_URL_TEXT}>
-              <div style={MOBILE_DEPLOY_URL_MAIN}>/p/pitch-coach</div>
+              <div style={MOBILE_DEPLOY_URL_MAIN}>/p/meeting-action-items</div>
               <div style={MOBILE_DEPLOY_URL_META}>Deployed in 1.2s · HTTPS · edge</div>
             </div>
           </div>
@@ -518,30 +515,30 @@ function MobileStackedDemo({ reducedMotion: _reducedMotion }: { reducedMotion: b
         <header style={MOBILE_CARD_HEADER}>
           <span style={MOBILE_STEP_NUM}>03</span>
           <span style={MOBILE_STEP_LABEL} id="hd-mob-run-title">Use</span>
-          <span style={MOBILE_STEP_HINT}>AI Readiness Audit</span>
+          <span style={MOBILE_STEP_HINT}>Meeting Action Items</span>
         </header>
         <div style={MOBILE_RUN_BODY}>
           <div style={MOBILE_RUN_INPUT_ROW}>
-            <span style={MOBILE_RUN_INPUT_LABEL}>Company URL</span>
-            <div style={MOBILE_RUN_INPUT_BOX}>stripe.com</div>
+            <span style={MOBILE_RUN_INPUT_LABEL}>Meeting notes</span>
+            <div style={MOBILE_RUN_INPUT_BOX}>Action: Sarah sends launch notes by Friday</div>
           </div>
           <div style={MOBILE_SCORE_ROW}>
-            <span style={MOBILE_SCORE_BIG}>8</span>
-            <span style={MOBILE_SCORE_OF}>/ 10</span>
-            <span style={MOBILE_TIER_PILL}>Ready to ship</span>
+            <span style={MOBILE_SCORE_BIG}>3</span>
+            <span style={MOBILE_SCORE_OF}>items</span>
+            <span style={MOBILE_TIER_PILL}>actions</span>
           </div>
           <ul style={MOBILE_REASONS_LIST}>
             <li style={MOBILE_REASON_ITEM}>
               <span style={MOBILE_REASON_BULLET} aria-hidden="true" />
-              Clear AI story across docs, ship-ready positioning.
+              Sarah owns launch notes by Friday.
             </li>
             <li style={MOBILE_REASON_ITEM}>
               <span style={MOBILE_REASON_BULLET} aria-hidden="true" />
-              Surfaces real evals + customer case studies publicly.
+              Mike owns beta checklist tomorrow.
             </li>
             <li style={MOBILE_REASON_ITEM}>
               <span style={MOBILE_REASON_BULLET} aria-hidden="true" />
-              Risk: no published latency / error guardrails yet.
+              Priya owns demo QA before launch.
             </li>
           </ul>
           <div style={MOBILE_RUN_SECONDARY}>
@@ -664,7 +661,7 @@ function EditorSurface({ active, cycle, reducedMotion }: EditorProps) {
           <div style={TERMINAL_PANE}>
             <div style={TERMINAL_LINE}>
               <span style={PROMPT_SIGN}>&gt;</span>
-              <span style={{ color: '#8b8680' }}>claude code &middot; pitch-coach</span>
+              <span style={{ color: '#8b8680' }}>claude code &middot; meeting-action-items</span>
             </div>
             {active && !reducedMotion && codeCap >= HANDLER_CODE.length && (
               <div style={{ ...TERMINAL_LINE, color: '#8b8680' }}>
@@ -857,7 +854,7 @@ function DeploySurface({
               <span style={LIVE_DOT_CORE} />
             </span>
             <div style={DEPLOY_URL_TEXT_WRAP}>
-              <div style={DEPLOY_URL_MAIN}>/p/pitch-coach</div>
+              <div style={DEPLOY_URL_MAIN}>/p/meeting-action-items</div>
               <div style={DEPLOY_URL_META_CARD}>Live preview &middot; HTTPS &middot; edge</div>
             </div>
           </div>
@@ -950,9 +947,8 @@ function RunSurfaceDemo({
     /* eslint-enable react-hooks/set-state-in-effect */
   }, [active, cycle, reducedMotion]);
 
-  // Readiness score is 0-10 on ai-readiness-audit. 8 keeps it in the
-  // "real but not cherry-picked" zone that reads honest.
-  const score = useCountUp(8, resultReady, 700, reducedMotion);
+  // Count lands after the run completes so the output reads like the live app.
+  const score = useCountUp(3, resultReady, 700, reducedMotion);
 
   // 2026-04-29 #664: drop the bright white override that made RUN look
   // like a different product grafted in. Let RUN share the same cream
@@ -977,10 +973,10 @@ function RunSurfaceDemo({
         <div style={RUN_CONTEXT}>
           <span style={RUN_CONTEXT_DOT} aria-hidden="true" />
           <span>
-            Live preview · <code style={RUN_CONTEXT_CODE}>pitch-coach</code>
+            Live preview · <code style={RUN_CONTEXT_CODE}>meeting-action-items</code>
           </span>
           <span style={RUN_CONTEXT_SEP} aria-hidden="true">·</span>
-          <span style={RUN_CONTEXT_URL}>/p/pitch-coach</span>
+          <span style={RUN_CONTEXT_URL}>/p/meeting-action-items</span>
         </div>
 
         {/* 2026-04-28: Federico feedback "the use page looks empty and
@@ -991,7 +987,7 @@ function RunSurfaceDemo({
             input 2fr left, output 3fr right. Mirror it here so the demo
             is honest about the product shape. The left panel carries the
             app chrome + input fields + primary Run button; the right
-            panel carries the score card + reasoning bullets. Both panels
+            panel carries the extracted action-item list. Both panels
             remain mounted across run states so the surface never flashes
             blank. */}
         <div data-hd="use-grid" style={RUN_GRID}>
@@ -1000,23 +996,23 @@ function RunSurfaceDemo({
             <div style={RUN_APP_HEADER}>
               <div style={RUN_APP_BADGE} aria-hidden="true">AR</div>
               <div>
-                <div style={RUN_TITLE}>AI Readiness Audit</div>
-                <div style={RUN_SUB}>Score a company&apos;s AI readiness</div>
+                <div style={RUN_TITLE}>Meeting Action Items</div>
+                <div style={RUN_SUB}>Pull owned tasks out of meeting notes</div>
               </div>
             </div>
 
             <div style={RUN_FIELDS}>
               <label style={RUN_FIELD}>
-                <span style={RUN_FIELD_LABEL}>Company URL</span>
+                <span style={RUN_FIELD_LABEL}>Meeting notes</span>
                 <div style={RUN_FIELD_INPUT}>
-                  <span style={RUN_FIELD_INPUT_TEXT}>stripe.com</span>
+                  <span style={RUN_FIELD_INPUT_TEXT}>Action: Sarah sends launch notes by Friday</span>
                 </div>
               </label>
             </div>
 
             <button
               type="button"
-              aria-label="Run AI readiness audit"
+              aria-label="Run meeting action item extractor"
               style={{
                 ...RUN_BUTTON,
                 transform: pressed ? 'scale(0.98)' : 'scale(1)',
@@ -1054,14 +1050,14 @@ function RunSurfaceDemo({
                     <span style={{ ...DOT, animationDelay: '.15s' }} />
                     <span style={{ ...DOT, animationDelay: '.3s' }} />
                   </div>
-                  <div style={RUN_THINKING_LABEL}>Auditing AI readiness&hellip;</div>
+                  <div style={RUN_THINKING_LABEL}>Extracting action items&hellip;</div>
                 </div>
               )}
               {resultReady && (
                 <div style={RUN_RESULT}>
                   <div style={SCORE_ROW}>
                     <span style={SCORE_BIG}>{score}</span>
-                    <span style={SCORE_OF}>/ 10</span>
+                    <span style={SCORE_OF}>items</span>
                     <span
                       style={{
                         ...TIER_PILL,
@@ -1072,7 +1068,7 @@ function RunSurfaceDemo({
                           : 'opacity .25s ease, transform .25s ease',
                       }}
                     >
-                      Ready to ship
+                      actions
                     </span>
                   </div>
 
@@ -1088,19 +1084,19 @@ function RunSurfaceDemo({
                         : 'opacity .3s ease .1s, transform .3s ease .1s',
                     }}
                   >
-                    <div style={RUN_REASONS_TITLE}>Why this score</div>
+                    <div style={RUN_REASONS_TITLE}>Action items</div>
                     <ul style={RUN_REASONS_LIST}>
                       <li style={RUN_REASON_ITEM}>
                         <span style={RUN_REASON_BULLET} aria-hidden="true" />
-                        Clear AI story across docs, ship-ready positioning.
+                        Sarah owns launch notes by Friday.
                       </li>
                       <li style={RUN_REASON_ITEM}>
                         <span style={RUN_REASON_BULLET} aria-hidden="true" />
-                        Surfaces real evals + customer case studies publicly.
+                        Mike owns beta checklist tomorrow.
                       </li>
                       <li style={RUN_REASON_ITEM}>
                         <span style={RUN_REASON_BULLET} aria-hidden="true" />
-                        Risk: no published latency / error guardrails yet.
+                        Priya owns demo QA before launch.
                       </li>
                     </ul>
                   </div>

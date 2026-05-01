@@ -19,6 +19,7 @@ import {
   validatePythonSourceForManifest,
 } from '../src/lib/floom/manifest.ts';
 import {
+  readRuntimeDependencies,
   validatePythonRequirementsText,
 } from '../src/lib/floom/requirements.ts';
 import {
@@ -754,6 +755,14 @@ async function testV01DependencyAndSecretMetadata() {
     () => validatePythonRequirementsText('git+https://example.com/repo.git\n'),
     /sha256 hashes/
   );
+  assert.deepEqual(
+    readRuntimeDependencies({ python_requirements: `${REQUESTS_HASHED}\n` }),
+    { python_requirements: `${REQUESTS_HASHED}\n` }
+  );
+  assert.throws(
+    () => readRuntimeDependencies({ python_requirements: 'requests==2.32.3\n' }),
+    /sha256 hashes/
+  );
 
   const saved = snapshotEnv(['FLOOM_SECRET_ENCRYPTION_KEY']);
   const secretValue = 'stored-test-secret-value';
@@ -827,9 +836,13 @@ async function testV01DependencyAndSecretMetadata() {
   );
   assertSqlContains(migrationText, 'create table if not exists public.app_secrets');
   assertSqlContains(migrationText, 'value_ciphertext text not null');
-  assertSqlContains(migrationText, 'constraint app_secrets_app_owner_fkey foreign key (app_id, owner_id) references public.apps(id, owner_id) on delete cascade');
-  assertSqlContains(migrationText, 'constraint app_secrets_app_name_key unique (app_id, name)');
-  assertSqlContains(migrationText, "constraint app_secrets_name_format check (name ~ '^[A-Z][A-Z0-9_]{1,63}$')");
+  assertSqlContains(migrationText, 'add constraint app_secrets_app_owner_fkey');
+  assertSqlContains(migrationText, 'foreign key (app_id, owner_id)');
+  assertSqlContains(migrationText, 'references public.apps(id, owner_id)');
+  assertSqlContains(migrationText, 'add constraint app_secrets_app_name_key unique (app_id, name)');
+  assertSqlContains(migrationText, "add constraint app_secrets_name_format");
+  assertSqlContains(migrationText, "check (name ~ '^[A-Z][A-Z0-9_]{1,63}$')");
+  assertSqlContains(migrationText, 'add constraint app_secrets_ciphertext_format');
   assertSqlContains(migrationText, 'alter table public.app_secrets enable row level security');
   assertSqlContains(migrationText, 'create policy "app secrets are not directly readable"');
   assertSqlContains(migrationText, 'using (false)');

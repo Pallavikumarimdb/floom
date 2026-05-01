@@ -2,7 +2,7 @@
 
 Purpose: give independent agents one repeatable launch-readiness test for Floom without relying on prior session context.
 
-Scope: production Floom v0 at `https://floom-60sec.vercel.app`, single-file Python function apps with JSON Schema input/output, Supabase Auth, agent tokens, CLI publish, public/private access, E2B execution, API run, MCP run, and minimal UI smoke.
+Scope: production Floom v0.1 at `https://floom.dev`, single-file Python function apps with JSON Schema input/output, exact-pinned hash-locked dependencies, encrypted app secrets, Supabase Auth, agent tokens, CLI publish, public/private access, E2B execution, API run, MCP run, and minimal UI smoke.
 
 Do not run this protocol against production until the coordinator explicitly assigns a run.
 
@@ -29,7 +29,7 @@ Tools:
 
 Environment:
 
-- `FLOOM_API_URL=https://floom-60sec.vercel.app`
+- `FLOOM_API_URL=https://floom.dev`
 - a fresh email address for signup or a coordinator-provided confirmed test user
 - no persisted browser session from previous Floom runs
 - a clean clone or working tree of `floomhq/floom-minimal`
@@ -60,7 +60,7 @@ mkdir -p /tmp/floom-virgin-qa
 
 ### 1. Fresh Signup
 
-- Open `https://floom-60sec.vercel.app/login`.
+- Open `https://floom.dev/login`.
 - Confirm the page has sign-up and sign-in paths.
 - Create a new account with email/password.
 - Record whether Supabase accepts the signup or returns an email/rate-limit error.
@@ -76,7 +76,7 @@ Pass criteria:
 
 - Open the confirmation email in a safe mailbox if available.
 - Click the confirmation link.
-- Confirm the browser lands on `https://floom-60sec.vercel.app/auth/callback` or the intended production redirect.
+- Confirm the browser lands on `https://floom.dev/auth/callback` or the intended production redirect.
 - Confirm the final page is `/tokens` or a signed-in production page.
 
 Pass criteria:
@@ -111,13 +111,13 @@ Pass criteria:
 ```bash
 mkdir -p /tmp/floom-virgin-qa/<run-id>/<app-dir>
 cd /tmp/floom-virgin-qa/<run-id>/<app-dir>
-FLOOM_API_URL=https://floom-60sec.vercel.app npx @floomhq/cli@latest init \
+FLOOM_API_URL=https://floom.dev npx @floomhq/cli@latest init \
   --name "QA App <run-id>" \
   --slug "qa-app-<unique-suffix>" \
   --description "QA app for launch verification." \
   --type custom
-FLOOM_TOKEN=<redacted> FLOOM_API_URL=https://floom-60sec.vercel.app npx @floomhq/cli@latest deploy --dry-run
-FLOOM_TOKEN=<redacted> FLOOM_API_URL=https://floom-60sec.vercel.app npx @floomhq/cli@latest deploy
+FLOOM_TOKEN=<redacted> FLOOM_API_URL=https://floom.dev npx @floomhq/cli@latest deploy --dry-run
+FLOOM_TOKEN=<redacted> FLOOM_API_URL=https://floom.dev npx @floomhq/cli@latest deploy
 ```
 
 - Record returned slug and page URL.
