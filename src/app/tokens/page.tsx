@@ -45,11 +45,6 @@ export default function TokensPage() {
   const [confirmRevoke, setConfirmRevoke] = useState<string | null>(null);
   const nameInputRef = useRef<HTMLInputElement | null>(null);
 
-  function focusCreateForm() {
-    nameInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    window.setTimeout(() => nameInputRef.current?.focus(), 350);
-  }
-
   const origin =
     typeof window === "undefined" ? PRODUCTION_FLOOM_URL : window.location.origin;
 
@@ -321,17 +316,13 @@ export default function TokensPage() {
         ) : (
           /* When tokens exist: table leads, create form demoted */
           <>
-            {/* Token table */}
+            {/* Token table — '+ New token' button removed; the Create card
+                below is the single token-minting affordance. Two buttons in
+                close visual proximity doing the same thing read as
+                duplication. */}
             <div style={{ marginTop: 32, ...cardStyle }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
+              <div style={{ marginBottom: 18 }}>
                 <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0, letterSpacing: '-0.015em' }}>Agent tokens</h2>
-                <button
-                  type="button"
-                  onClick={focusCreateForm}
-                  className="btn-primary sm"
-                >
-                  + New token
-                </button>
               </div>
               <div style={{ overflowX: 'auto' }}>
                 <table style={{ width: '100%', minWidth: 640, borderCollapse: 'collapse', fontSize: 13, textAlign: 'left' }}>
@@ -496,17 +487,9 @@ export default function TokensPage() {
           </>
         )}
 
-        <p style={{ marginTop: 32, fontSize: 12.5, color: 'var(--muted)' }}>
-          Production URL:{" "}
-          <a
-            href={PRODUCTION_FLOOM_URL}
-            style={{ fontWeight: 600, color: 'var(--muted)', textDecoration: 'underline', textUnderlineOffset: 2 }}
-            target="_blank"
-            rel="noreferrer"
-          >
-            {PRODUCTION_FLOOM_URL}
-          </a>
-        </p>
+        {/* "Production URL: floom-60sec.vercel.app" line removed — the user
+            is already on that URL; showing it as a link opens-in-new-tab to
+            the same page is noise, not signal. */}
       </section>
       <FloomFooter />
     </div>
