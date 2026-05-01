@@ -1,15 +1,15 @@
 {
   "type": "object",
   "additionalProperties": false,
-  "required": ["result", "secret_present", "secret_length", "message"],
+  "required": ["result", "env_present", "env_length", "message"],
   "properties": {
     "result": {
       "type": "string"
     },
-    "secret_present": {
+    "env_present": {
       "type": "boolean"
     },
-    "secret_length": {
+    "env_length": {
       "type": "integer"
     },
     "message": {

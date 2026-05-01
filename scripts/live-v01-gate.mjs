@@ -403,8 +403,8 @@ function assertSecretRunResult(data, label) {
   assertNoSecret(data, label);
   check(data.status === 'success', `${label} did not succeed`);
   check(data.output?.result === '[REDACTED]', `${label} did not redact result`);
-  check(data.output?.secret_present === true, `${label} did not observe injected secret`);
-  check(data.output?.secret_length === secretValue.length, `${label} returned wrong secret length`);
+  check(data.output?.env_present === true, `${label} did not observe injected secret`);
+  check(data.output?.env_length === secretValue.length, `${label} returned wrong secret length`);
 }
 
 async function mcpTool(name, args, authToken = token) {
