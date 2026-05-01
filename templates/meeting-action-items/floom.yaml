@@ -1,0 +1,8 @@
+slug: meeting-action-items
+name: Meeting → Action Items
+runtime: python
+entrypoint: app.py
+handler: run
+public: true
+input_schema: input.schema.json
+output_schema: output.schema.json

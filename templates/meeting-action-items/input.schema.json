@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "title": "Meeting notes",
+  "properties": {
+    "notes": {
+      "type": "string",
+      "title": "Meeting notes",
+      "description": "Paste raw meeting notes, transcript, or chat log. We'll pull out who owes what.",
+      "minLength": 20,
+      "maxLength": 8000
+    }
+  },
+  "required": ["notes"]
+}
