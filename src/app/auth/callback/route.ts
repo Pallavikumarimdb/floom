@@ -1,27 +1,42 @@
 import { NextRequest, NextResponse } from "next/server";
+import type { EmailOtpType } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 
 const AUTH_CALLBACK_ERROR = "oauth_callback";
 const AUTH_CALLBACK_ERROR_MESSAGE = "Authentication failed. Please try again.";
+const EMAIL_OTP_TYPES = new Set<EmailOtpType>([
+  "signup",
+  "invite",
+  "magiclink",
+  "recovery",
+  "email_change",
+  "email",
+]);
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const code = searchParams.get("code");
+  const tokenHash = searchParams.get("token_hash");
+  const type = searchParams.get("type");
   const next = searchParams.get("next") ?? "/";
   const safeNext = next.startsWith("/") && !next.startsWith("//") ? next : "/";
 
-  if (!code) {
-    return redirectToLoginWithAuthError(req);
-  }
-
   const supabase = await createClient();
-  const { error } = await supabase.auth.exchangeCodeForSession(code);
+  const { error } = code
+    ? await supabase.auth.exchangeCodeForSession(code)
+    : tokenHash && isEmailOtpType(type)
+      ? await supabase.auth.verifyOtp({ token_hash: tokenHash, type })
+      : { error: new Error("Missing auth callback verifier") };
 
   if (error) {
     return redirectToLoginWithAuthError(req);
   }
 
   return NextResponse.redirect(new URL(safeNext, resolvePublicOrigin(req)));
+}
+
+function isEmailOtpType(type: string | null): type is EmailOtpType {
+  return Boolean(type && EMAIL_OTP_TYPES.has(type as EmailOtpType));
 }
 
 function redirectToLoginWithAuthError(req: NextRequest) {

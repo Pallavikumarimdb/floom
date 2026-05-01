@@ -1133,17 +1133,20 @@ function testOAuthCallbackErrorHandling() {
 
   assert.match(routeText, /AUTH_CALLBACK_ERROR = "oauth_callback"/);
   assert.match(routeText, /AUTH_CALLBACK_ERROR_MESSAGE = "Authentication failed\. Please try again\."/);
-  assert.match(routeText, /if \(!code\)/);
-  assert.match(routeText, /redirectToLoginWithAuthError\(req\)/);
-  assert.match(routeText, /const \{ error \} = await supabase\.auth\.exchangeCodeForSession\(code\)/);
+  assert.match(routeText, /tokenHash = searchParams\.get\("token_hash"\)/);
+  assert.match(routeText, /type = searchParams\.get\("type"\)/);
+  assert.match(routeText, /const \{ error \} = code/);
+  assert.match(routeText, /await supabase\.auth\.exchangeCodeForSession\(code\)/);
+  assert.match(routeText, /await supabase\.auth\.verifyOtp\(\{ token_hash: tokenHash, type \}\)/);
+  assert.match(routeText, /function isEmailOtpType\(type: string \| null\): type is EmailOtpType/);
   assert.match(routeText, /if \(error\)/);
   assert.ok(
     routeText.indexOf('if (error)') < routeText.indexOf('return NextResponse.redirect(new URL(safeNext, resolvePublicOrigin(req)))'),
     'OAuth callback must only use next redirect after successful code exchange'
   );
   assert.ok(
-    routeText.indexOf('if (!code)') < routeText.indexOf('await supabase.auth.exchangeCodeForSession(code)'),
-    'OAuth callback must reject missing code before session exchange'
+    routeText.indexOf('await supabase.auth.exchangeCodeForSession(code)') < routeText.indexOf('await supabase.auth.verifyOtp({ token_hash: tokenHash, type })'),
+    'OAuth callback must prefer OAuth code exchange over email token-hash verification'
   );
   assert.ok(
     routeText.indexOf('redirectUrl.searchParams.set("error", AUTH_CALLBACK_ERROR)') <
@@ -1152,6 +1155,7 @@ function testOAuthCallbackErrorHandling() {
   );
   assert.doesNotMatch(routeText, /searchParams\.set\("message",\s*error\.message/);
   assert.doesNotMatch(routeText, /new URL\(safeNext,[\s\S]*if \(error\)/);
+  assert.doesNotMatch(routeText, /verifyOtp\(\{ token:/);
   assert.match(routeText, /process\.env\.FLOOM_ORIGIN/);
   assert.match(routeText, /x-forwarded-host/);
   assert.match(routeText, /x-forwarded-proto/);
