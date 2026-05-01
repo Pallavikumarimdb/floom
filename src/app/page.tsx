@@ -54,20 +54,7 @@ async function copyText(text: string) {
   document.body.removeChild(ta);
 }
 
-interface MvpHeroInstallProps {
-  /**
-   * R15 UI-6 (2026-04-28): hero trust signals. Total live apps + sum of
-   * runs_7d across visible apps. Both can be 0 on cold launch — when
-   * apps>0 we render "<N> apps live"; when runs_7d sum > 0 we append
-   * "<N> runs this week". Stars come from GitHubStarsBadge which fetches
-   * its own data. When all 3 stats are 0/missing, the strip hides
-   * entirely (no empty placeholder).
-   */
-  appsCount: number;
-  runs7dSum: number;
-}
-
-function MvpHeroInstall({ appsCount, runs7dSum }: MvpHeroInstallProps) {
+function MvpHeroInstall() {
   const [copied, setCopied] = useState(false);
 
   async function handleCopy() {
@@ -184,58 +171,15 @@ function MvpHeroInstall({ appsCount, runs7dSum }: MvpHeroInstallProps) {
           {copied ? '✓ Copied' : 'Copy'}
         </button>
       </div>
-      {/* R15 UI-6 (2026-04-28): hero trust-signals strip. */}
-      <HeroTrustSignals appsCount={appsCount} runs7dSum={runs7dSum} />
-    </div>
-  );
-}
-
-/**
- * Hero trust-signal strip. Reads apps + runs_7d totals from props.
- * GitHub-star count is intentionally NOT fetched: floom-minimal v0 has no
- * /api/gh-stars endpoint, and the hydration-safe alternative (useEffect
- * read of localStorage that some other unrelated page wrote) creates more
- * confusion than value.
- */
-function HeroTrustSignals({
-  appsCount,
-  runs7dSum,
-}: {
-  appsCount: number;
-  runs7dSum: number;
-}) {
-  const parts: string[] = [];
-  if (appsCount > 0) {
-    parts.push(`${appsCount} app${appsCount === 1 ? '' : 's'} live`);
-  }
-  if (runs7dSum > 0) {
-    parts.push(`${runs7dSum} run${runs7dSum === 1 ? '' : 's'} this week`);
-  }
-
-  if (parts.length === 0) return null;
-
-  return (
-    <div
-      data-testid="hero-trust-signals"
-      style={{
-        marginTop: 14,
-        fontSize: 12.5,
-        color: 'var(--muted)',
-        lineHeight: 1.5,
-      }}
-    >
-      {parts.join(' · ')}
+      {/* Trust strip removed — '1 app live' was hardcoded text (no GET
+          /api/apps list endpoint exists in v0). Stats that aren't real are
+          worse than no stats; bring this back when there's a real count. */}
     </div>
   );
 }
 
 export default function LandingV17PageMvp() {
   const { data: session, isAuthenticated } = useSession();
-  // floom-minimal v0: only demo-app exists. Showcase and directory grids
-  // were stripped in v8; trust-signal counts are static rather than
-  // fetched from a hub endpoint that doesn't exist on this codebase.
-  const totalAppsCount = 1;
-  const runs7dSum = 0;
 
   return (
     <div
@@ -363,11 +307,8 @@ export default function LandingV17PageMvp() {
               Localhost to live in 60 seconds.
             </p>
 
-            {/* CTA — MVP variant: inline MCP setup snippet. */}
-            <MvpHeroInstall
-              appsCount={totalAppsCount}
-              runs7dSum={runs7dSum}
-            />
+            {/* CTA — demo-first button + secondary install card. */}
+            <MvpHeroInstall />
             {/* WorksWithBelt moved to the eyebrow above H1 (Federico
                 2026-04-28). No longer rendered under the snippet — it
                 was a second hero element competing with H1+snippet. */}

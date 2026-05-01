@@ -41,6 +41,9 @@ const nextConfig: NextConfig = {
       { source: "/sign-up", destination: "/login?mode=signup", permanent: false },
       { source: "/signin", destination: "/login", permanent: false },
       { source: "/sign-in", destination: "/login", permanent: false },
+      // Common URL expectations that don't have dedicated pages in v0:
+      { source: "/pricing", destination: "/", permanent: false },
+      { source: "/apps", destination: "/", permanent: false },
     ];
   },
 };
