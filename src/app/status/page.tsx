@@ -3,6 +3,11 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { FloomFooter } from "@/components/FloomFooter";
 
 const SITE_URL = "https://floom.dev";
+const STATUS_API_ORIGIN =
+  cleanOrigin(process.env.FLOOM_ORIGIN) ??
+  cleanOrigin(process.env.NEXT_PUBLIC_FLOOM_ORIGIN) ??
+  cleanOrigin(process.env.NEXT_PUBLIC_APP_URL) ??
+  SITE_URL;
 
 export const metadata: Metadata = {
   title: "Status",
@@ -48,10 +53,20 @@ const SERVICE_LABEL: Record<string, string> = {
 
 async function fetchStatus(): Promise<StatusPayload | null> {
   try {
-    const base = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : SITE_URL;
-    const res = await fetch(`${base}/api/status`, { cache: "no-store" });
+    const res = await fetch(`${STATUS_API_ORIGIN}/api/status`, { cache: "no-store" });
     if (!res.ok && res.status !== 503) return null;
     return (await res.json()) as StatusPayload;
+  } catch {
+    return null;
+  }
+}
+
+function cleanOrigin(rawOrigin: string | undefined): string | null {
+  if (!rawOrigin) return null;
+  try {
+    const origin = new URL(rawOrigin);
+    if (!["https:", "http:"].includes(origin.protocol)) return null;
+    return origin.origin;
   } catch {
     return null;
   }

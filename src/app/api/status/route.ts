@@ -15,16 +15,29 @@ interface Check {
 }
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const FLOOM_ORIGIN =
+  cleanOrigin(process.env.FLOOM_ORIGIN) ??
+  cleanOrigin(process.env.NEXT_PUBLIC_FLOOM_ORIGIN) ??
+  cleanOrigin(process.env.NEXT_PUBLIC_APP_URL) ??
+  "https://floom.dev";
 
-async function probe(name: string, url: string, timeoutMs = 3000): Promise<Check> {
+interface ProbeOptions {
+  timeoutMs?: number;
+  headers?: HeadersInit;
+}
+
+async function probe(name: string, url: string, options: ProbeOptions = {}): Promise<Check> {
   const t0 = Date.now();
   try {
     const controller = new AbortController();
+    const timeoutMs = options.timeoutMs ?? 3000;
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     const res = await fetch(url, {
       method: "GET",
       signal: controller.signal,
       cache: "no-store",
+      headers: options.headers,
     });
     clearTimeout(timer);
     const latency = Date.now() - t0;
@@ -52,31 +65,46 @@ async function probe(name: string, url: string, timeoutMs = 3000): Promise<Check
   }
 }
 
+function cleanOrigin(rawOrigin: string | undefined): string | null {
+  if (!rawOrigin) return null;
+  try {
+    const origin = new URL(rawOrigin);
+    if (!["https:", "http:"].includes(origin.protocol)) return null;
+    return origin.origin;
+  } catch {
+    return null;
+  }
+}
+
 export async function GET() {
   const checks: Check[] = [];
 
-  // Supabase Auth health endpoint (returns 200 when reachable).
-  if (SUPABASE_URL) {
-    checks.push(await probe("supabase", `${SUPABASE_URL}/auth/v1/health`));
+  // Supabase Auth health requires the anon API key on hosted Supabase.
+  if (SUPABASE_URL && SUPABASE_ANON_KEY) {
+    checks.push(
+      await probe("supabase", `${SUPABASE_URL}/auth/v1/health`, {
+        headers: {
+          apikey: SUPABASE_ANON_KEY,
+          authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+        },
+      }),
+    );
   } else {
     checks.push({
       name: "supabase",
       status: "down",
       latency_ms: null,
-      detail: "NEXT_PUBLIC_SUPABASE_URL not configured",
+      detail: "Supabase URL or anon key not configured",
     });
   }
 
   // E2B sandbox public status page — they expose /api/status. Keep timeout
   // tight; if E2B is slow our run path is already slow.
-  checks.push(await probe("e2b", "https://e2b.dev/api/health", 2500));
+  checks.push(await probe("e2b", "https://e2b.dev/api/health", { timeoutMs: 2500 }));
 
-  // Self check — make sure our own MCP endpoint serves a tools/list at all.
-  // Uses an absolute URL so this works in serverless invocations.
-  // Skip in dev where we'd hit our own loopback awkwardly.
-  if (process.env.VERCEL_URL) {
-    checks.push(await probe("floom-mcp", `https://${process.env.VERCEL_URL}/mcp?probe=1`, 2000));
-  }
+  // Self check via the public origin. Vercel deployment URLs can require SSO,
+  // while the canonical origin is the user-facing surface we launch.
+  checks.push(await probe("floom-mcp", `${FLOOM_ORIGIN}/mcp`, { timeoutMs: 2000 }));
 
   const downCount = checks.filter((c) => c.status === "down").length;
   const degradedCount = checks.filter((c) => c.status === "degraded").length;
