@@ -1,5 +1,5 @@
 import { createHmac, randomBytes } from 'node:crypto';
-import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
@@ -19,6 +19,7 @@ const dependencySlug = `req-gate-${suffix}`;
 const secretSlug = `secret-gate-${suffix}`;
 const publicSecretSlug = `public-secret-gate-${suffix}`;
 const tempSecretName = 'FLOOM_TEMP_SECRET';
+const tempSecretValue = `temporary-live-gate-${randomBytes(12).toString('hex')}`;
 const results = [];
 const cleanupState = {
   slugs: [dependencySlug, secretSlug, publicSecretSlug],
@@ -75,7 +76,7 @@ async function main() {
 }
 
 async function publishDependencyAppViaCli() {
-  const appDir = makeTempFixture('python-requirements', dependencySlug);
+  const appDir = makeTempFixture('python-requirements', dependencySlug, { publicApp: true });
   const output = runCli('npx', ['tsx', 'cli/deploy.ts', appDir]);
   check(output.includes(`/p/${dependencySlug}`), 'CLI dependency publish did not return expected app URL');
   pass('cli_publish_dependency_app');
@@ -160,7 +161,7 @@ async function assertMetadataAndPageAccess() {
   await assertPageLoad(dependencySlug, {
     authToken: null,
     expectedStatus: 200,
-    expectedText: '__next',
+    expectedText: 'Requirements Formatter',
     label: 'public app page',
   });
 
@@ -179,13 +180,25 @@ async function assertMetadataAndPageAccess() {
   await assertPageLoad(secretSlug, {
     authToken: null,
     expectedStatus: 200,
-    expectedText: '__next',
+    expectedText: 'App not found',
     label: 'private anonymous app page shell',
   });
   pass('metadata_and_page_access');
 }
 
 async function assertSecretRouteAuthNegatives() {
+  const fixture = readFixture('python-secret');
+  await assertMcpError('publish_app', {
+    manifest: withSlug(fixture.manifest, `unauth-secret-${suffix}`),
+    source: fixture.source,
+    input_schema: fixture.inputSchema,
+    output_schema: fixture.outputSchema,
+  }, {
+    authToken: null,
+    expectedError: /Unauthorized/,
+    label: 'unauthenticated publish_app',
+  });
+
   await assertMcpError('get_app', { slug: secretSlug }, {
     authToken: null,
     expectedError: /App not found/,
@@ -247,7 +260,8 @@ async function setSecretValueViaCli() {
   assertNoSecret(data, 'set-secret CLI response');
   check(data.secret?.name === 'FLOOM_TEST_SECRET', 'set-secret CLI response missing metadata');
 
-  const tempData = runSecretsCliJson(['set', secretSlug, tempSecretName], 'temporary-live-gate-value');
+  const tempData = runSecretsCliJson(['set', secretSlug, tempSecretName], tempSecretValue);
+  assertNoSecret(tempData, 'set temp secret CLI response');
   check(tempData.secret?.name === tempSecretName, 'set temp secret CLI response missing metadata');
   pass('secret_set_metadata_only_cli');
 }
@@ -276,6 +290,18 @@ async function assertScopedAndNonOwnerAccessControls() {
   const readOnlyToken = await createScopedAgentToken(app.owner_id, ['read']);
   const otherUser = await createTemporaryUser();
   const otherToken = await createScopedAgentToken(otherUser.id, ['read', 'run', 'publish']);
+  const fixture = readFixture('python-secret');
+
+  await assertMcpError('publish_app', {
+    manifest: withSlug(fixture.manifest, `read-only-secret-${suffix}`),
+    source: fixture.source,
+    input_schema: fixture.inputSchema,
+    output_schema: fixture.outputSchema,
+  }, {
+    authToken: readOnlyToken.token,
+    expectedError: /publish scope/,
+    label: 'read-only publish_app',
+  });
 
   const readOnlyMetadata = await mcpTool('get_app', { slug: secretSlug }, readOnlyToken.token);
   check(readOnlyMetadata.slug === secretSlug, 'read-only MCP get_app returned unexpected slug');
@@ -449,7 +475,11 @@ async function assertPageLoad(slug, { authToken, expectedStatus, expectedText, l
   if (response.status !== expectedStatus) {
     throw new Error(`${label} returned ${response.status}: ${redactString(text.slice(0, 500))}`);
   }
-  check(text.includes(expectedText), `${label} did not contain expected page marker`);
+  check(text.includes('__next'), `${label} did not contain Next page shell`);
+
+  const hydratedText = dumpHydratedPageText(`${apiUrl}/p/${slug}`);
+  assertNoSecret(hydratedText, `${label} hydrated text`);
+  check(hydratedText.includes(expectedText), `${label} hydrated page did not contain expected text`);
 }
 
 function runCli(command, args, { input } = {}) {
@@ -476,12 +506,16 @@ function runSecretsCliJson(args, input) {
   return parseJson(output, `cli/secrets.ts ${args[0]} returned invalid JSON`);
 }
 
-function makeTempFixture(name, slug) {
+function makeTempFixture(name, slug, { publicApp = false } = {}) {
   const source = join('fixtures', name);
   const target = mkdtempSync(join(tmpdir(), `floom-${name}-`));
   cleanupState.tempDirs.push(target);
   cpSync(source, target, { recursive: true });
-  writeFileSync(join(target, 'floom.yaml'), withSlug(readFileSync(join(target, 'floom.yaml'), 'utf8'), slug));
+  let manifest = withSlug(readFileSync(join(target, 'floom.yaml'), 'utf8'), slug);
+  if (publicApp) {
+    manifest = manifest.replace(/^public: .+$/m, 'public: true');
+  }
+  writeFileSync(join(target, 'floom.yaml'), manifest);
   return target;
 }
 
@@ -639,6 +673,46 @@ async function cleanupStep(label, fn, failures) {
   }
 }
 
+function dumpHydratedPageText(url) {
+  const chrome = findChromeExecutable();
+  const profileDir = mkdtempSync(join(tmpdir(), 'floom-live-gate-chrome-'));
+  cleanupState.tempDirs.push(profileDir);
+  const output = execFileSync(chrome, [
+    '--headless',
+    '--disable-gpu',
+    '--no-sandbox',
+    `--user-data-dir=${profileDir}`,
+    '--virtual-time-budget=12000',
+    '--dump-dom',
+    url,
+  ], {
+    cwd: process.cwd(),
+    env: {
+      PATH: process.env.PATH || '',
+      HOME: process.env.HOME || '',
+      TMPDIR: process.env.TMPDIR || tmpdir(),
+    },
+    encoding: 'utf8',
+    stdio: 'pipe',
+  });
+  return output.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, ' ');
+}
+
+function findChromeExecutable() {
+  const candidates = [
+    process.env.FLOOM_CHROME_BIN,
+    '/usr/bin/google-chrome',
+    '/usr/bin/chromium',
+    '/usr/bin/chromium-browser',
+    '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+  ].filter(Boolean);
+  const found = candidates.find((candidate) => existsSync(candidate));
+  if (!found) {
+    throw new Error('Headless Chrome is required for hydrated app page verification; set FLOOM_CHROME_BIN');
+  }
+  return found;
+}
+
 function assertNoSecret(value, label) {
   const serialized = JSON.stringify(value);
   if (sensitiveValues().some((secret) => serialized.includes(secret))) {
@@ -673,7 +747,7 @@ function redactString(text) {
 }
 
 function sensitiveValues() {
-  return [secretValue, serviceRoleKey, agentTokenPepper, token].filter(Boolean);
+  return [secretValue, tempSecretValue, serviceRoleKey, agentTokenPepper, token].filter(Boolean);
 }
 
 function normalizeApiUrl(value) {
