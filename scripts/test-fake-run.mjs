@@ -761,7 +761,7 @@ function testOAuthCallbackErrorHandling() {
   assert.match(routeText, /const \{ error \} = await supabase\.auth\.exchangeCodeForSession\(code\)/);
   assert.match(routeText, /if \(error\)/);
   assert.ok(
-    routeText.indexOf('if (error)') < routeText.indexOf('return NextResponse.redirect(new URL(safeNext, req.url))'),
+    routeText.indexOf('if (error)') < routeText.indexOf('return NextResponse.redirect(new URL(safeNext, resolvePublicOrigin(req)))'),
     'OAuth callback must only use next redirect after successful code exchange'
   );
   assert.ok(
@@ -775,6 +775,8 @@ function testOAuthCallbackErrorHandling() {
   );
   assert.doesNotMatch(routeText, /searchParams\.set\("message",\s*error\.message/);
   assert.doesNotMatch(routeText, /new URL\(safeNext,[\s\S]*if \(error\)/);
+  assert.match(routeText, /x-forwarded-host/);
+  assert.match(routeText, /x-forwarded-proto/);
 }
 
 function testCliRejectsUnsupportedV0Shapes(manifestText, inputSchemaText, outputSchemaText) {

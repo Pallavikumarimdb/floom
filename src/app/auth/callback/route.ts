@@ -21,12 +21,23 @@ export async function GET(req: NextRequest) {
     return redirectToLoginWithAuthError(req);
   }
 
-  return NextResponse.redirect(new URL(safeNext, req.url));
+  return NextResponse.redirect(new URL(safeNext, resolvePublicOrigin(req)));
 }
 
 function redirectToLoginWithAuthError(req: NextRequest) {
-  const redirectUrl = new URL("/login", req.url);
+  const redirectUrl = new URL("/login", resolvePublicOrigin(req));
   redirectUrl.searchParams.set("error", AUTH_CALLBACK_ERROR);
   redirectUrl.searchParams.set("message", AUTH_CALLBACK_ERROR_MESSAGE);
   return NextResponse.redirect(redirectUrl);
+}
+
+function resolvePublicOrigin(req: NextRequest) {
+  const forwardedProto = req.headers.get("x-forwarded-proto")?.split(",")[0]?.trim();
+  const forwardedHost = req.headers.get("x-forwarded-host")?.split(",")[0]?.trim();
+
+  if (forwardedHost) {
+    return `${forwardedProto || "https"}://${forwardedHost}`;
+  }
+
+  return new URL(req.url).origin;
 }
