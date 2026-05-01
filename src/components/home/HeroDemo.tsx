@@ -196,11 +196,13 @@ function countLines(source: string, cap: number): number {
 // Hooks
 // -----------------------------------------------------------------------------
 function usePrefersReducedMotion(): boolean {
-  const [reduced, setReduced] = useState(false);
+  const [reduced, setReduced] = useState<boolean>(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return false;
+    return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  });
   useEffect(() => {
     if (typeof window === 'undefined' || !window.matchMedia) return;
     const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
-    setReduced(mq.matches);
     const onChange = (e: MediaQueryListEvent) => setReduced(e.matches);
     mq.addEventListener('change', onChange);
     return () => mq.removeEventListener('change', onChange);
@@ -222,11 +224,17 @@ function usePrefersReducedMotion(): boolean {
  * client effect flips to mobile after hydration.
  */
 function useIsMobile(breakpoint = 768): boolean {
-  const [isMobile, setIsMobile] = useState(false);
+  // SSR-safe: defaults to false so desktop layout renders on the server and
+  // matches the initial client render. The lazy initializer runs only in the
+  // browser, so it avoids a hydration mismatch while still reading the real
+  // value before the first paint.
+  const [isMobile, setIsMobile] = useState<boolean>(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return false;
+    return window.matchMedia(`(max-width: ${breakpoint - 1}px)`).matches;
+  });
   useEffect(() => {
     if (typeof window === 'undefined' || !window.matchMedia) return;
     const mq = window.matchMedia(`(max-width: ${breakpoint - 1}px)`);
-    setIsMobile(mq.matches);
     const onChange = (e: MediaQueryListEvent) => setIsMobile(e.matches);
     mq.addEventListener('change', onChange);
     return () => mq.removeEventListener('change', onChange);
@@ -247,6 +255,10 @@ function useTypewriter(
   reducedMotion: boolean,
 ): number {
   const [n, setN] = useState(reducedMotion ? text.length : 0);
+  // Animation driver: must synchronously reset state when reducedMotion or
+  // active changes so the interval/timer starts from the right position.
+  // There is no external system to subscribe to — setState here IS the output.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => {
     if (reducedMotion) {
       setN(text.length);
@@ -281,6 +293,10 @@ function useCountUp(
 ): number {
   const [value, setValue] = useState(reducedMotion ? target : 0);
   const rafRef = useRef<number | null>(null);
+  // Animation driver: must synchronously reset or skip to end when reducedMotion
+  // or trigger changes. setState in effect is intentional — this hook IS the
+  // animation state machine; there is no external system to subscribe to.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => {
     if (reducedMotion) {
       setValue(target);
@@ -328,7 +344,10 @@ function DesktopMorphDemo({ reducedMotion }: { reducedMotion: boolean }) {
   const [paused, setPaused] = useState(false);
   const timerRef = useRef<number | null>(null);
 
-  // Reset to Use if reduced motion gets enabled mid-cycle.
+  // Reset to the final demo state when reduced motion is enabled mid-cycle.
+  // This is an accessibility-driven state reset, not a data-fetch. The setState
+  // must fire synchronously so the transition to 'run' is immediate.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => {
     if (reducedMotion) {
       setState('run');
@@ -465,8 +484,8 @@ function MobileStackedDemo({ reducedMotion: _reducedMotion }: { reducedMotion: b
       <section style={MOBILE_CARD} aria-labelledby="hd-mob-deploy-title">
         <header style={MOBILE_CARD_HEADER}>
           <span style={MOBILE_STEP_NUM}>02</span>
-          <span style={MOBILE_STEP_LABEL} id="hd-mob-deploy-title">Beta publish</span>
-          <span style={MOBILE_STEP_HINT}>waitlist access</span>
+          <span style={MOBILE_STEP_LABEL} id="hd-mob-deploy-title">Publish</span>
+          <span style={MOBILE_STEP_HINT}>floom CLI</span>
         </header>
         <div style={MOBILE_DEPLOY_BODY}>
           <div style={MOBILE_DEPLOY_SLASH}>
@@ -615,7 +634,7 @@ function EditorSurface({ active, cycle, reducedMotion }: EditorProps) {
     <div style={surfaceStyle} aria-hidden={!active}>
       <div style={EDITOR_GRID} data-hd="editor-grid">
         <aside style={SIDEBAR_STYLE} aria-hidden="true" data-hd="sidebar">
-          <div style={SIDEBAR_SECTION}>ai-readiness-audit</div>
+          <div style={SIDEBAR_SECTION}>my-app</div>
           <div style={{ ...SIDEBAR_ITEM, ...SIDEBAR_ITEM_ACTIVE }}>handler.py</div>
           <div style={SIDEBAR_ITEM}>floom.yaml</div>
           <div style={SIDEBAR_ITEM}>README.md</div>
@@ -644,13 +663,13 @@ function EditorSurface({ active, cycle, reducedMotion }: EditorProps) {
           <div style={TERMINAL_PANE}>
             <div style={TERMINAL_LINE}>
               <span style={PROMPT_SIGN}>&gt;</span>
-              <span style={{ color: '#8b8680' }}>claude code &middot; ai-readiness-audit</span>
+              <span style={{ color: '#8b8680' }}>claude code &middot; demo-app</span>
             </div>
             {active && !reducedMotion && codeCap >= HANDLER_CODE.length && (
               <div style={{ ...TERMINAL_LINE, color: '#8b8680' }}>
                 <span style={PROMPT_SIGN}>&gt;</span>
                 <span>
-                  hosted publishing opens through waitlist access
+                  npx @floomhq/cli@latest publish ./my-app
                 </span>
               </div>
             )}
@@ -703,6 +722,10 @@ function DeploySurface({
   const [progress, setProgress] = useState(0);
   const [done, setDone] = useState(false);
 
+  // Animation driver: resets deploy animation state when active becomes false
+  // or jumps to end-state for reducedMotion. Both are synchronous resets —
+  // the deploy progress IS the state; there is no external system here.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => {
     if (!active) {
       setStepIndex(0);
@@ -885,7 +908,9 @@ function RunSurfaceDemo({
 
   // Choreography: enter Use -> 420ms wait -> press Run -> 200ms release ->
   // thinking dots -> 280ms tension -> reveal result -> count-up starts ->
-  // 800ms later tag fades in.
+  // 800ms later tag fades in. The synchronous resets when !active or
+  // reducedMotion are intentional animation state resets, not data fetches.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => {
     if (!active) {
       setPressed(false);

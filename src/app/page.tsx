@@ -282,118 +282,28 @@ interface Stripe {
   category?: string;
 }
 
-// Same showcase roster as CreatorHeroPage (P0 launch curation #253).
-// 2026-04-25 roster swap: bounded <5s demos replaced the heavy originals.
-const PREFERRED_SLUGS = ['competitor-lens', 'ai-readiness-audit', 'pitch-coach'] as const;
+// Curated showcase: only the demo-app exists in floom-minimal v0.
+const PREFERRED_SLUGS = ['demo-app'] as const;
 
-// Fallback descriptions rendered if /api/hub is slow or empty on cold
-// visits. Match the 2026-04-25 launch roster. Keep tight + benefit-led.
 const FALLBACK_STRIPES: Stripe[] = [
   {
-    slug: 'competitor-lens',
-    name: 'Competitor Lens',
-    description: 'Paste 2 URLs (yours + a competitor). Get a positioning, pricing, and angle diff in under 5 seconds.',
-    category: 'research',
-  },
-  {
-    slug: 'ai-readiness-audit',
-    name: 'AI Readiness Audit',
-    description: 'Paste one URL. Get a readiness score 0-10, three risks, three opportunities, and one concrete next step.',
-    category: 'research',
-  },
-  {
-    slug: 'pitch-coach',
+    slug: 'demo-app',
     name: 'Pitch Coach',
-    description: 'Paste a startup pitch. Get three direct critiques, three angle-specific rewrites, and a one-line TL;DR.',
+    description: 'Paste a startup pitch. Get a quick assessment of length and clarity.',
     category: 'writing',
   },
 ];
 
-function pickStripes(apps: HubApp[]): Stripe[] {
-  if (apps.length === 0) return FALLBACK_STRIPES;
-  const bySlug = new Map(apps.map((app) => [app.slug, app]));
-  const picked: Stripe[] = [];
-  for (const slug of PREFERRED_SLUGS) {
-    const hit = bySlug.get(slug);
-    if (hit) picked.push({ slug: hit.slug, name: hit.name, description: hit.description, category: hit.category ?? undefined });
-  }
-  if (picked.length === PREFERRED_SLUGS.length) return picked;
-  return picked.length >= 3 ? picked : FALLBACK_STRIPES;
-}
-
 export default function LandingV17PageMvp() {
-  const [, setStripes] = useState<Stripe[]>(FALLBACK_STRIPES);
-  // R8 #25 (2026-04-28): full HubApp[] for the AppGrid card variant.
-  // AppShowcaseCard didn't render the sample-output preview chip;
-  // AppGrid does (matches floom.dev's richer card style).
-  const [showcaseHubApps, setShowcaseHubApps] = useState<HubApp[]>([]);
-  // G9 (2026-04-28): inline directory grid on MVP landing. Next 6 apps
-  // after the 3 curated showcase slugs, plus a "Browse all <N> apps" CTA.
-  // Federico: "we should still, on the MVP Floom, have the app store
-  // visible, right?"
-  const [directoryApps, setDirectoryApps] = useState<Stripe[]>([]);
-  const [directoryHubApps, setDirectoryHubApps] = useState<HubApp[]>([]);
-  const [totalAppsCount, setTotalAppsCount] = useState<number>(0);
-  // R15 UI-6 (2026-04-28): sum of runs_7d across all visible apps.
-  // Renders into the hero trust-signals strip ("47 runs this week").
-  // Drops to 0 on cold launch — HeroTrustSignals hides the stat then.
-  const [runs7dSum, setRuns7dSum] = useState<number>(0);
-  // v26 §3 option C: logged-in-aware landing.
-  // When authenticated user hits "/", show a "Resume in {workspaceName} →" banner.
   const { data: session, isAuthenticated } = useSession();
-  // r39 (2026-04-29): "Run in your AI tool" CTA removed per Federico's comment —
-  // non-technical visitors don't understand it. Dominant CTA is now "Browse live
-  // apps" → /apps. The /install-in-claude route is still live for developer
-  // visitors who find it via docs or TopBar; it's just not promoted in the hero.
+  // floom-minimal v0: only demo-app exists. Showcase and directory grids
+  // were stripped in v8; trust-signal counts are static rather than
+  // fetched from a hub endpoint that doesn't exist on this codebase.
+  const totalAppsCount = 1;
+  const runs7dSum = 0;
 
   useEffect(() => {
     document.title = 'Ship AI apps fast · Floom';
-    // TODO(v5-port): api.getHub() replaced with fetch('/api/hub').
-    // floom-minimal's /api/hub returns apps from Supabase.
-    fetch('/api/hub', { headers: { Accept: 'application/json' } })
-      .then((r) => (r.ok ? r.json() : []))
-      .then((rawApps: unknown) => {
-        const apps = Array.isArray(rawApps) ? (rawApps as HubApp[]) : [];
-        const visible = publicHubApps(apps);
-        if (visible.length > 0) {
-          setStripes(pickStripes(visible));
-          setTotalAppsCount(visible.length);
-          // R15 UI-6: sum runs_7d across visible apps for hero trust strip.
-          // HubApp.runs_7d is optional; missing/undefined coerces to 0.
-          const totalRuns7d = visible.reduce(
-            (acc, app) => acc + (typeof app.runs_7d === 'number' ? app.runs_7d : 0),
-            0,
-          );
-          setRuns7dSum(totalRuns7d);
-          // R8 #25: keep full HubApp shape for AppGrid (sample-output
-          // preview chip needs thumbnail + manifest + sample data).
-          const curatedSlugs = new Set<string>(PREFERRED_SLUGS as readonly string[]);
-          const showcaseFull = visible.filter((a) => curatedSlugs.has(a.slug));
-          setShowcaseHubApps(
-            // Order to match PREFERRED_SLUGS so the editorial pick stays stable.
-            PREFERRED_SLUGS.map((slug) => showcaseFull.find((a) => a.slug === slug)).filter(
-              (a): a is HubApp => Boolean(a),
-            ),
-          );
-          // Pick the next 6 apps that aren't already in the curated showcase.
-          const rest = visible
-            .filter((app) => !curatedSlugs.has(app.slug))
-            .slice(0, 6)
-            .map((app) => ({
-              slug: app.slug,
-              name: app.name,
-              description: app.description,
-              category: app.category ?? undefined,
-            }));
-          setDirectoryApps(rest);
-          setDirectoryHubApps(
-            visible.filter((app) => !curatedSlugs.has(app.slug)).slice(0, 6),
-          );
-        }
-      })
-      .catch(() => {
-        // Keep static roster on failure.
-      });
   }, []);
 
   return (
@@ -508,17 +418,8 @@ export default function LandingV17PageMvp() {
               <span className="hero-accent-word" style={{ color: 'var(--accent)' }}>fast</span>.
             </h1>
 
-            {/* R38 (2026-04-29): quiet honest qualifier under the H1.
-                Surfaces "Localhost to live in 60 seconds" claim from
-                the LinkedIn/HN launch post, plus the waitlist context
-                so visitors landing via the post know what to expect.
-                Both variants (mvp + full) get this line. */}
-            {/* v8: dropped "Beta access via waitlist." — floom-minimal is a
-                real product, not a waitlist. Subhead is now a single calm
-                tagline; sign-up CTA already covered by the Sign up button
-                in the SiteHeader. */}
             <p
-              data-testid="hero-waitlist-qualifier"
+              data-testid="hero-qualifier"
               style={{
                 fontFamily: "'Inter', system-ui, sans-serif",
                 fontSize: 16,

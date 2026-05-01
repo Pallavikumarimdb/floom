@@ -1,9 +1,36 @@
 import type { Metadata } from "next";
 import "./globals.css";
 
+const SITE_NAME = "Floom";
+const SITE_TAGLINE = "Ship AI apps fast";
+const SITE_DESCRIPTION =
+  "Localhost to live in 60 seconds. Publish a Python function and get a hosted UI, REST endpoint, and MCP tool.";
+const SITE_URL = "https://floom-60sec.vercel.app";
+
 export const metadata: Metadata = {
-  title: "Floom — Function UI in 60 seconds",
-  description: "Generate a UI for Python function apps.",
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: `${SITE_NAME} — ${SITE_TAGLINE}`,
+    template: `%s · ${SITE_NAME}`,
+  },
+  description: SITE_DESCRIPTION,
+  applicationName: SITE_NAME,
+  authors: [{ name: "Floom" }],
+  openGraph: {
+    type: "website",
+    siteName: SITE_NAME,
+    title: `${SITE_NAME} — ${SITE_TAGLINE}`,
+    description: SITE_DESCRIPTION,
+    url: SITE_URL,
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: `${SITE_NAME} — ${SITE_TAGLINE}`,
+    description: SITE_DESCRIPTION,
+  },
+  icons: {
+    icon: "/favicon.ico",
+  },
 };
 
 export default function RootLayout({

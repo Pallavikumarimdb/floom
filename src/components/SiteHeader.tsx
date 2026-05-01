@@ -124,7 +124,11 @@ export function SiteHeader({ compact = false, onStudioMenuOpen }: Props = {}) {
     return () => document.removeEventListener('mousedown', onClick);
   }, []);
 
+  // Close the mobile menu on every route change. This is a layout side-effect
+  // (resetting UI state driven by the router) — not a data-fetch or external
+  // system sync, but it genuinely needs to run after the pathname flips.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMenuOpen(false);
   }, [pathname]);
 

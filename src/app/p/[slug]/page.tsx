@@ -142,6 +142,10 @@ export default function AppPermalinkPage() {
     void resolve();
   }, []);
 
+  // Fetches app metadata when slug is available. The synchronous setState
+  // in the !slug guard resets to a clean "not found" state before the async
+  // path runs — this is a deliberate early-exit reset, not a cascading render.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => {
     if (!slug) {
       setNotFound(true);
@@ -229,6 +233,9 @@ export default function AppPermalinkPage() {
   }, [slug]);
 
   // /p/:slug?run=<id> — fetch the run and hydrate RunSurface read-only.
+  // The synchronous reset in the guard branch clears stale run state when
+  // the URL no longer has a ?run= param — intentional early-exit reset.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => {
     if (!slug || !runIdFromUrl) {
       setInitialRun(null);
@@ -280,6 +287,10 @@ export default function AppPermalinkPage() {
     };
   }, [slug, runIdFromUrl, updateSearchParams]);
 
+  // /p/:slug?rerun=<id> — fetch the original run's inputs to pre-fill the form.
+  // The synchronous reset in the guard clears stale rerun state when the URL
+  // conditions are not met — intentional early-exit reset, not a cascading render.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => {
     if (!slug || !rerunIdFromUrl || runIdFromUrl) {
       setRerunInputs(null);
@@ -363,7 +374,9 @@ export default function AppPermalinkPage() {
       .replace(/^\s*(#+|[-*+]|\d+\.)\s+/gm, '')
       .replace(/\s+/g, ' ')
       .trim();
-  }, [app?.description, app?.slug]);
+  // Use `app` as the dep so the React Compiler can unambiguously track
+  // app.description and app.slug without optional-chaining mismatches.
+  }, [app]);
 
   const samplePrefillInputs = useMemo<Record<string, unknown> | null>(() => {
     if (!app) return null;
@@ -400,6 +413,10 @@ export default function AppPermalinkPage() {
     return first?.name ?? null;
   }, [app]);
 
+  // Fire confetti once when the user lands on a freshly-published app. The
+  // setState calls here are one-time celebratory UI triggers driven by a
+  // localStorage flag — not a data-fetch or cascading update loop.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => {
     if (!app?.slug) return;
     if (!consumeJustPublished(app.slug)) return;
@@ -1162,12 +1179,12 @@ export default function AppPermalinkPage() {
                 >
                   <img src="/floom-mark-glow.svg" alt="" aria-hidden="true" width={14} height={14} style={{ opacity: 0.55 }} />
                   Built with{' '}
-                  <a
+                  <Link
                     href="/"
                     style={{ color: 'var(--accent)', fontWeight: 600, textDecoration: 'none' }}
                   >
                     Floom
-                  </a>
+                  </Link>
                   {' '}— localhost to live in 60 seconds.
                 </div>
                 {celebrate && (
@@ -1487,7 +1504,7 @@ export default function AppPermalinkPage() {
                   }, null, 2)}
                 />
                 <a
-                  href={`${typeof window !== 'undefined' ? window.location.origin : ''}/api/hub/${app.slug}/openapi.json`}
+                  href={`${typeof window !== 'undefined' ? window.location.origin : ''}/api/apps/${app.slug}`}
                   target="_blank"
                   rel="noreferrer"
                   style={{ marginTop: 10, display: 'inline-block', fontSize: 12.5, color: 'var(--accent)', fontWeight: 600, textDecoration: 'none' }}
