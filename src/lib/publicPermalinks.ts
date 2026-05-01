@@ -11,7 +11,7 @@ export function classifyPermalinkLoadError(err: unknown): PermalinkLoadOutcome {
     if (status === 403 || status === 401) return 'private';
     if (status >= 500) return 'retryable';
   }
-  return 'not_found';
+  return 'retryable';
 }
 
 export function getPermalinkLoadErrorMessage(): string {

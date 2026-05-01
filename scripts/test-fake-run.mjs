@@ -36,6 +36,7 @@ import {
 } from '../src/lib/floom/schema.ts';
 import { resolveMcpForwardOrigin } from '../src/lib/mcp/origin.ts';
 import { callFloomTool, floomTools } from '../src/lib/mcp/tools.ts';
+import { classifyPermalinkLoadError } from '../src/lib/publicPermalinks.ts';
 
 const REQUESTS_HASHED = 'requests==2.32.3 --hash=sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 const OPENAI_HASHED = 'openai==1.14.0 --hash=sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
@@ -84,6 +85,10 @@ async function test() {
   );
   assert.equal(disabledTokenTool.isError, true);
   assert.match(parseToolResult(disabledTokenTool).error, /Unknown tool/);
+  assert.equal(classifyPermalinkLoadError({ status: 404 }), 'not_found');
+  assert.equal(classifyPermalinkLoadError({ status: 403 }), 'private');
+  assert.equal(classifyPermalinkLoadError({ status: 503 }), 'retryable');
+  assert.equal(classifyPermalinkLoadError(new TypeError('Failed to fetch')), 'retryable');
 
   if (isSafePythonEntrypoint('my-app.py')) {
     throw new Error('hyphenated Python entrypoint accepted');
