@@ -179,7 +179,8 @@ export const floomTools: McpToolDefinition[] = [
   },
   {
     name: "run_app",
-    description: "Run a Floom app with JSON inputs. Private apps require an Authorization bearer token.",
+    description:
+      "Run a Floom app with JSON inputs. Private apps require an Authorization bearer token. Returns an envelope: { execution_id, status, output, error }. The actual app result is at .output, NOT at the top level — agents must access result.output.<your_field>, not result.<your_field>.",
     inputSchema: {
       type: "object",
       properties: {
@@ -367,40 +368,63 @@ async function authStatus(context: McpToolContext): Promise<McpToolResult> {
 
 function getAppContract(): McpToolResult {
   return okResult({
-    version: "v0",
+    version: "v0.1",
+    runtime: {
+      language: "Python",
+      python_version: "3.11+ (e2b sandbox base image)",
+      stdlib: "available",
+      dependencies:
+        "declared in requirements.txt (exact pins, hash-locked recommended). Common libraries supported: google-genai, openai, requests, httpx, pypdf, pydantic, etc.",
+      secrets:
+        "declared by NAME in floom.yaml (e.g. `secrets: [GEMINI_API_KEY]`). Raw values are encrypted at rest in Supabase, decrypted at run time, and injected into the sandbox as environment variables. Never put raw values in floom.yaml.",
+    },
+    limits: {
+      max_request_bytes: 128 * 1024,
+      max_source_bytes: 64 * 1024,
+      max_schema_bytes: 32 * 1024,
+      max_input_bytes: 16 * 1024,
+      max_output_bytes: 64 * 1024,
+      public_run_rate_limit: "20 requests per 60-second rolling window per IP",
+      per_app_run_rate_limit: "100 requests per 60-second rolling window",
+      handler_timeout_seconds: 60,
+    },
     supported: [
-      "single-file Python",
-      "Python standard library only",
+      "single-file Python with optional requirements.txt for pinned dependencies",
       "one handler function that accepts a JSON object and returns a JSON object",
       "floom.yaml plus input.schema.json and output.schema.json",
       "public apps with public: true; private apps when public is omitted or false",
+      "secrets declared by name in floom.yaml; values stored encrypted, runtime-injected as env vars",
     ],
     unsupported: [
       {
-        case: "requirements.txt or pyproject.toml",
-        reason: "Dependency installation is post-v0. v0 runs one stdlib Python file without an install step.",
-      },
-      {
         case: "openapi.json, FastAPI, Flask, or HTTP servers",
-        reason: "HTTP app routing is post-v0. v0 exposes one JSON Schema form and one handler.",
+        reason: "HTTP app routing is post-v0.1. v0.1 exposes one JSON Schema form and one handler.",
       },
       {
         case: "package.json, TypeScript, or Node apps",
-        reason: "TypeScript/Node runtime parity is post-v0. v0 runtime is runtime: python.",
+        reason: "TypeScript/Node runtime parity is post-v0.1. v0.1 runtime is runtime: python.",
       },
       {
         case: "multiple Python files",
-        reason: "Multi-file bundles are post-v0. v0 packaging accepts one top-level Python entrypoint file.",
+        reason: "Multi-file bundles are post-v0.1. v0.1 packaging accepts one top-level Python entrypoint file.",
       },
       {
-        case: "manifest fields actions, dependencies, or secrets",
-        reason: "Multiple actions, dependency installs, and app secrets are post-v0 features.",
+        case: "manifest field: actions (multiple)",
+        reason: "Multi-action apps (one slug, multiple endpoints) are post-v0.1. v0.1 maps one action key per app.",
       },
       {
         case: "OpenBlog/OpenAPI apps",
-        reason: "OpenBlog has an HTTP/OpenAPI surface and dependency-style app shape. It belongs to the post-v0 HTTP app runner, not the 60-second v0 function path.",
+        reason: "OpenBlog has an HTTP/OpenAPI surface and dependency-style app shape. It belongs to the post-v0.1 HTTP app runner, not the 60-second function path.",
       },
     ],
+    response_envelope: {
+      run_app: {
+        shape:
+          "{ execution_id: string, status: 'success' | 'error', output: <matches output.schema.json>, error: string | null }",
+        note:
+          "The handler's return value is NESTED under the `output` field, not returned as the top level. Access it as result.output.<field>, NOT result.<field>.",
+      },
+    },
     files: {
       "floom.yaml": [
         "name: Hello Floom",
