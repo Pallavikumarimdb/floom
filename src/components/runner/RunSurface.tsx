@@ -533,6 +533,10 @@ function toCsv(output: unknown): string | null {
 }
 
 const inputStyle = {
+  // width: 100% + box-sizing: border-box stop the default textarea size
+  // (cols=20 ~= 200px) from blowing past the parent on narrow viewports.
+  width: '100%',
+  boxSizing: 'border-box' as const,
   padding: '9px 12px',
   border: '1px solid var(--line)',
   borderRadius: 8,

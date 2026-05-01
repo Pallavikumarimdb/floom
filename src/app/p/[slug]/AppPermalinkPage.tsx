@@ -1430,7 +1430,7 @@ export default function AppPermalinkPage() { // exported as default so the serve
                   lineHeight: 1.55,
                 }}
               >
-                Source not publicly linked. Check with the app creator.
+                The published source isn&rsquo;t linked to a public repo. The manifest below describes the contract this app exposes.
               </p>
             )}
             <div
@@ -1521,27 +1521,12 @@ export default function AppPermalinkPage() { // exported as default so the serve
               </div>
             </div>
 
-            {/* Self-host card (full width) */}
-            <div
-              data-testid="source-selfhost-card"
-              style={{
-                background: 'var(--card)',
-                border: '1px solid var(--line)',
-                borderRadius: 12,
-                padding: '18px 20px',
-              }}
-            >
-              <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10.5, color: 'var(--muted)', letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 600, marginBottom: 8 }}>
-                Self-host
-              </div>
-              <h3 style={{ fontSize: 14, fontWeight: 600, margin: '0 0 8px' }}>Run this app on your own infra.</h3>
-              <p style={{ fontSize: 13, color: 'var(--muted)', margin: '0 0 12px', lineHeight: 1.55 }}>
-                One Docker command. Bring your own API key. Yours forever.
-              </p>
-              <SourceSnippet
-                value={`docker run -e GEMINI_BYOK=$KEY -p 3000:3000 ghcr.io/floomhq/${app.slug}:latest`}
-              />
-            </div>
+            {/* Self-host card removed — there is no published
+                ghcr.io/floomhq/<slug>:latest image yet, and the v0 runtime
+                does not ship a per-app Docker artifact. Showing a fake
+                docker-run command is the same trust-killer pattern as the
+                stale 'Get 3 critiques + 3 rewrites' description was. Add
+                this card back when the BYOK self-host runtime ships. */}
           </section>
         )}
 
