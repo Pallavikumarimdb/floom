@@ -404,19 +404,55 @@ export function RunSurface({ app, initialRun, initialInputs, examplePrefillInput
             </pre>
           )}
           {state.kind === 'error' && (
-            <p
+            <div
               style={{
-                fontSize: 13,
-                color: '#b91c1c',
-                background: '#fef2f2',
-                border: '1px solid #fecaca',
                 borderRadius: 8,
+                border: '1px solid #fecaca',
+                background: '#fef2f2',
                 padding: 12,
-                margin: 0,
               }}
             >
-              {state.message}
-            </p>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, flexWrap: 'wrap' }}>
+                <p
+                  style={{
+                    fontSize: 13,
+                    color: '#b91c1c',
+                    margin: 0,
+                    flex: 1,
+                    minWidth: 0,
+                    lineHeight: 1.5,
+                  }}
+                >
+                  {state.message}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => void run()}
+                  style={{
+                    flexShrink: 0,
+                    fontSize: 12,
+                    fontWeight: 700,
+                    color: '#b91c1c',
+                    background: '#fff',
+                    border: '1px solid #fecaca',
+                    borderRadius: 6,
+                    padding: '4px 12px',
+                    cursor: 'pointer',
+                    fontFamily: 'inherit',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  Try again
+                </button>
+              </div>
+              <p style={{ fontSize: 11.5, color: '#9b1c1c', marginTop: 8, marginBottom: 0, opacity: 0.8 }}>
+                {/timeout|timed out|too long|slow/i.test(state.message)
+                  ? 'Sandbox can be slow on first run — give it a moment.'
+                  : /^(4\d\d|bad request|invalid|missing|required)/i.test(state.message) || state.message.includes('400')
+                  ? 'Check your inputs and try again.'
+                  : 'Floom is having a moment — try again or DM us in Discord.'}
+              </p>
+            </div>
           )}
         </div>
       </div>
