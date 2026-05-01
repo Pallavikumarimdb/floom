@@ -149,17 +149,12 @@ export default function AppPermalinkPage() {
     if (!slug) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setNotFound(true);
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setLoadFailure(null);
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setLoading(false);
       return;
     }
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setNotFound(false);
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoadFailure(null);
     // Data seam: getApp(slug) → fetch('/api/apps/' + slug)
     fetch(`/api/apps/${slug}`)
@@ -244,16 +239,12 @@ export default function AppPermalinkPage() {
     if (!slug || !runIdFromUrl) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setInitialRun(null);
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setInitialRunLoading(false);
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setRunNotFound(false);
       return;
     }
     let cancelled = false;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setInitialRunLoading(true);
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setRunNotFound(false);
     // Data seam: getRun(runIdFromUrl) → fetch('/api/runs/' + runIdFromUrl)
     fetch(`/api/runs/${runIdFromUrl}`)
@@ -303,12 +294,10 @@ export default function AppPermalinkPage() {
     if (!slug || !rerunIdFromUrl || runIdFromUrl) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setRerunInputs(null);
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setRerunLoading(false);
       return;
     }
     let cancelled = false;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setRerunLoading(true);
     // Data seam: getRun(rerunIdFromUrl) → fetch('/api/runs/' + rerunIdFromUrl)
     fetch(`/api/runs/${rerunIdFromUrl}`)
@@ -435,7 +424,6 @@ export default function AppPermalinkPage() {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setConfettiFire(true);
     }
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setCelebrate(true);
   }, [app?.slug]);
 

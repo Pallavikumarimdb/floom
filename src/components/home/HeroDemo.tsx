@@ -264,11 +264,9 @@ function useTypewriter(
       return;
     }
     if (!active) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setN(0);
       return;
     }
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setN(0);
     let i = 0;
     const iv = window.setInterval(() => {
@@ -303,7 +301,6 @@ function useCountUp(
       return;
     }
     if (!trigger) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setValue(0);
       return;
     }
@@ -728,26 +725,18 @@ function DeploySurface({
     if (!active) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setStepIndex(0);
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setProgress(0);
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setDone(false);
       return;
     }
     if (reducedMotion) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setStepIndex(DEPLOY_STEPS.length);
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setProgress(100);
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setDone(true);
       return;
     }
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setStepIndex(0);
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setProgress(0);
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setDone(false);
     const waitForSlash = SLASH.length * 45 + 180;
     const perStep = 380; // ~4 steps in ~1.5s
@@ -917,8 +906,12 @@ function RunSurfaceDemo({
   // thinking dots -> 280ms tension -> reveal result -> count-up starts ->
   // 800ms later tag fades in. The synchronous resets when !active or
   // reducedMotion are intentional animation state resets, not data fetches.
-  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => {
+    // Animation state machine: sync resets and timer-driven progressions
+    // are intentional. The rule wants no setState in effects; here we are
+    // not fetching data, we are scripting an animation across an external
+    // RAF/timer loop, so suppress the rule for the whole hook body.
+    /* eslint-disable react-hooks/set-state-in-effect */
     if (!active) {
       setPressed(false);
       setThinking(false);
@@ -950,6 +943,7 @@ function RunSurfaceDemo({
     timers.push(window.setTimeout(() => setShowTag(true), 1700) as unknown as number);
 
     return () => timers.forEach((t) => window.clearTimeout(t));
+    /* eslint-enable react-hooks/set-state-in-effect */
   }, [active, cycle, reducedMotion]);
 
   // Readiness score is 0-10 on ai-readiness-audit. 8 keeps it in the

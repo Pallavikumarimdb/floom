@@ -20,9 +20,6 @@ import { Code2, Rocket, Share2 } from 'lucide-react';
 
 import { SiteHeader } from '@/components/SiteHeader';
 import { FloomFooter } from '@/components/FloomFooter';
-import { AppStripe } from '@/components/public/AppStripe';
-import { AppGrid } from '@/components/public/AppGrid';
-import { ShowcaseCard, SHOWCASE_ENTRIES } from '@/components/public/AppShowcaseRow';
 import { FeedbackButton } from '@/components/FeedbackButton';
 
 import { WorksWithBelt } from '@/components/home/WorksWithBelt';
@@ -31,23 +28,6 @@ import { SectionEyebrow } from '@/components/home/SectionEyebrow';
 import { DiscordCta } from '@/components/home/DiscordCta';
 
 import { useSession } from '@/hooks/useSession';
-
-// TODO(v5-port): HubApp type from floom@main/lib/types.ts.
-// Stubbed with the fields LandingV17Page actually uses.
-interface HubApp {
-  slug: string;
-  name: string;
-  description: string;
-  category?: string;
-  runs_7d?: number;
-}
-
-// TODO(v5-port): publicHubApps from floom@main/lib/hub-filter.ts.
-// In floom@main this filters out unlisted/private apps.
-// In floom-minimal v0, treat all apps as public.
-function publicHubApps(apps: HubApp[]): HubApp[] {
-  return apps;
-}
 
 // MVP hero install — R7.6 (2026-04-28): hero composition cut to 4 elements
 // (eyebrow, H1, sub, npx command). Caption + MCP/CLI popover removed —
@@ -274,25 +254,6 @@ function HeroTrustSignals({
     </div>
   );
 }
-
-interface Stripe {
-  slug: string;
-  name: string;
-  description: string;
-  category?: string;
-}
-
-// Curated showcase: only the demo-app exists in floom-minimal v0.
-const PREFERRED_SLUGS = ['demo-app'] as const;
-
-const FALLBACK_STRIPES: Stripe[] = [
-  {
-    slug: 'demo-app',
-    name: 'Pitch Coach',
-    description: 'Paste a startup pitch. Get a quick assessment of length and clarity.',
-    category: 'writing',
-  },
-];
 
 export default function LandingV17PageMvp() {
   const { data: session, isAuthenticated } = useSession();
