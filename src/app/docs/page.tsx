@@ -28,19 +28,19 @@ output_schema: output.schema.json`;
 
 const launchCommand = `npx @floomhq/cli@latest setup
 mkdir my-floom-app && cd my-floom-app
-npx @floomhq/cli@latest init --name "Meeting Notes" --slug meeting-notes-demo --description "Extract action items from meeting notes." --type custom
+npx @floomhq/cli@latest init --name "Text Demo" --slug text-demo --description "Echo text and return a length." --type custom
 npx @floomhq/cli@latest deploy --dry-run
 npx @floomhq/cli@latest deploy
-npx @floomhq/cli@latest run meeting-notes-demo '{"transcript":"Action: Sarah sends launch notes by Friday"}' --json`;
+npx @floomhq/cli@latest run text-demo '{"text":"Hello from Floom"}' --json`;
 
-const apiExample = `curl -X POST https://floom.dev/api/apps/meeting-action-items/run \\
+const apiExample = `curl -X POST https://floom.dev/api/apps/text-demo/run \\
   -H 'Content-Type: application/json' \\
-  -d '{"inputs":{"transcript":"Action: Sarah sends launch notes by Friday"}}'`;
+  -d '{"inputs":{"text":"Hello from Floom"}}'`;
 
 const privateApiExample = `curl -X POST https://floom.dev/api/apps/YOUR_PRIVATE_SLUG/run \\
   -H 'Authorization: Bearer YOUR_FLOOM_AGENT_TOKEN' \\
   -H 'Content-Type: application/json' \\
-  -d '{"inputs":{"transcript":"Send this from n8n or any HTTP client"}}'`;
+  -d '{"inputs":{"text":"Send this from n8n or any HTTP client"}}'`;
 
 const mcpExample = `POST https://floom.dev/mcp
 tool: get_app_contract
@@ -54,7 +54,7 @@ arguments: { "key": "invoice_calculator" }
 
 POST https://floom.dev/mcp
 tool: run_app
-arguments: { "slug": "meeting-action-items", "inputs": { ... } }`;
+arguments: { "slug": "text-demo", "inputs": { "text": "Hello from Floom" } }`;
 
 const mcpJsonRpcExample = `curl -sS https://floom.dev/mcp \\
   -H 'Content-Type: application/json' \\
@@ -71,6 +71,11 @@ humanize==4.9.0 --hash=sha256:ce284a76d5b1377fd8836733b983bfb0b76f1aa1c090de2566
 # floom.yaml
 dependencies:
   python: ./requirements.txt`;
+
+const requirementsWorkflow = `printf 'humanize==4.9.0\\n' > requirements.in
+python -m pip install --upgrade pip pip-tools
+python -m piptools compile --generate-hashes --output-file requirements.txt requirements.in
+npx @floomhq/cli@latest deploy --dry-run`;
 
 function Section({
   title,
@@ -190,8 +195,9 @@ export default function DocsPage() {
             MCP clients can discover Floom at <code>/mcp</code>, call{" "}
             <code>get_app_contract</code> before generating files, fetch useful
             starters with <code>list_app_templates</code> and{" "}
-            <code>get_app_template</code>, and use <code>run_app</code> for the
-            same app execution path as the browser and API.
+            <code>get_app_template</code>, publish with{" "}
+            <code>publish_app</code>, and use <code>run_app</code> for the same
+            app execution path as the browser and API.
           </p>
           <CodeBlock>{mcpExample}</CodeBlock>
           <p>
@@ -205,6 +211,11 @@ export default function DocsPage() {
             <code>{`{ execution_id, status, output, error }`}</code>. Read{" "}
             <code>output</code> for the object that matches the app output
             schema.
+          </p>
+          <p className="text-sm text-neutral-500">
+            <code>validate_manifest</code> checks only the manifest and optional
+            JSON Schemas. <code>publish_app</code> performs the full publish
+            check with source, required schemas, and declared requirements.
           </p>
         </Section>
 
@@ -255,9 +266,20 @@ export default function DocsPage() {
             <li>Owner-scoped encrypted storage and E2B runtime injection.</li>
           </ul>
           <CodeBlock>{requirementsExample}</CodeBlock>
+          <p>
+            Generate hash-locked requirements from a small input file, then run
+            the deploy dry run before publishing:
+          </p>
+          <CodeBlock>{requirementsWorkflow}</CodeBlock>
           <CodeBlock>{`printf '%s' "$VALUE" | FLOOM_TOKEN=YOUR_FLOOM_AGENT_TOKEN FLOOM_API_URL=https://floom.dev npx @floomhq/cli@latest secrets set YOUR_PRIVATE_SLUG OPENAI_API_KEY --value-stdin
 FLOOM_TOKEN=YOUR_FLOOM_AGENT_TOKEN FLOOM_API_URL=https://floom.dev npx @floomhq/cli@latest secrets list YOUR_PRIVATE_SLUG
 FLOOM_TOKEN=YOUR_FLOOM_AGENT_TOKEN FLOOM_API_URL=https://floom.dev npx @floomhq/cli@latest secrets delete YOUR_PRIVATE_SLUG OPENAI_API_KEY`}</CodeBlock>
+          <p className="text-sm text-neutral-500">
+            MCP can publish and run secret-backed apps after the secret names are
+            declared in <code>floom.yaml</code>. Secret values are set through
+            the CLI or UI/API secrets flow until MCP secret management tools
+            exist.
+          </p>
           <p className="text-sm text-neutral-500">
             FastAPI/OpenAPI, arbitrary HTTP servers, TypeScript apps,
             background workers, and full repo hosting remain later milestones.

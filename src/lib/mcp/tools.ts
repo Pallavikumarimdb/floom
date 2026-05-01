@@ -104,7 +104,7 @@ export const floomTools: McpToolDefinition[] = [
   },
   {
     name: "validate_manifest",
-    description: "Validate a floom.yaml manifest and optional JSON schemas before publishing.",
+    description: "Validate only a floom.yaml manifest and optional JSON schemas. This does not inspect source, requirements text, secret values, or publish.",
     inputSchema: {
       type: "object",
       properties: {
@@ -127,7 +127,7 @@ export const floomTools: McpToolDefinition[] = [
   },
   {
     name: "publish_app",
-    description: "Publish a single-file Python Floom app through the existing app publish API. Requires Authorization: Bearer <agent-token>; call auth_status first when unsure.",
+    description: "Run the full publish check and publish a single-file Python Floom app through the existing app publish API. Requires Authorization: Bearer <agent-token>; call auth_status first when unsure.",
     inputSchema: {
       type: "object",
       properties: {
@@ -437,8 +437,8 @@ function getAppContract(): McpToolResult {
     ],
     files: {
       "floom.yaml": [
-        "name: Hello Floom",
-        "slug: hello-floom",
+        "name: Text Demo",
+        "slug: text-demo",
         "runtime: python",
         "entrypoint: app.py",
         "handler: run",
@@ -453,29 +453,33 @@ function getAppContract(): McpToolResult {
       ].join("\n"),
       "app.py": [
         "def run(inputs: dict) -> dict:",
-        "    name = str(inputs.get(\"name\", \"world\"))",
-        "    return {\"message\": f\"Hello, {name}!\"}",
+        "    text = str(inputs.get(\"text\", \"\"))",
+        "    return {\"result\": f\"Hello: {text}\", \"length\": len(text)}",
       ].join("\n"),
       "input.schema.json": {
         type: "object",
-        required: ["name"],
+        required: ["text"],
         additionalProperties: false,
         properties: {
-          name: {
+          text: {
             type: "string",
-            title: "Name",
-            default: "Federico",
+            title: "Text",
+            default: "Hello from Floom",
           },
         },
       },
       "output.schema.json": {
         type: "object",
-        required: ["message"],
+        required: ["result", "length"],
         additionalProperties: false,
         properties: {
-          message: {
+          result: {
             type: "string",
-            title: "Message",
+            title: "Result",
+          },
+          length: {
+            type: "integer",
+            title: "Length",
           },
         },
       },
@@ -528,20 +532,26 @@ function getAppContract(): McpToolResult {
       "humanize==4.9.0 --hash=sha256:ce284a76d5b1377fd8836733b983bfb0b76f1aa1c090de2566fcf008d7f6ab16",
       "Then declare dependencies.python: ./requirements.txt in floom.yaml.",
     ],
+    requirements_workflow: [
+      "printf 'humanize==4.9.0\\n' > requirements.in",
+      "python -m pip install --upgrade pip pip-tools",
+      "python -m piptools compile --generate-hashes --output-file requirements.txt requirements.in",
+      "npx @floomhq/cli@latest deploy --dry-run",
+    ],
     auth_and_access: {
       token_source: "Create agent tokens from https://floom.dev/tokens. MCP cannot mint or reveal raw tokens.",
       header: "Authorization: Bearer <agent-token>",
       public_apps: "public: true apps allow anonymous metadata and runs, including secret-backed runs, with per-caller and per-app rate limits.",
       private_apps: "public omitted or false apps require the owner session or owner agent token for get_app and run_app.",
-      secrets: "Declare secret names in floom.yaml; set values through CLI or REST. Runtime injects them as env vars, schema secret fields are redacted from output, and MCP never returns raw secret values.",
+      secrets: "MCP can publish and run apps that declare secret names in floom.yaml, but raw secret values are set through CLI, UI/API secrets flow, or REST until MCP secret tools exist. Runtime injects them as env vars, schema secret fields are redacted from output, and MCP never returns raw secret values.",
     },
     setup_commands: [
       "npx @floomhq/cli@latest setup",
       "mkdir my-floom-app && cd my-floom-app",
-      "npx @floomhq/cli@latest init --name \"Hello Floom\" --slug hello-floom-<unique-suffix> --description \"Return a JSON greeting.\" --type custom",
+      "npx @floomhq/cli@latest init --name \"Text Demo\" --slug text-demo-<unique-suffix> --description \"Echo text and return a length.\" --type custom",
       "npx @floomhq/cli@latest deploy --dry-run",
       "npx @floomhq/cli@latest deploy",
-      "npx @floomhq/cli@latest run hello-floom-<unique-suffix> '{\"name\":\"Federico\"}' --json",
+      "npx @floomhq/cli@latest run text-demo-<unique-suffix> '{\"text\":\"Hello from Floom\"}' --json",
     ],
     template_guidance:
       "Templates include fixed example slugs. Change the slug to a unique 3-64 character lowercase slug before publishing.",
@@ -555,7 +565,7 @@ function getAppContract(): McpToolResult {
     publish_tool: {
       name: "publish_app",
       requires_authorization: true,
-      note: "Use this tool from MCP clients when you already have floom.yaml, source, input_schema, output_schema, and optional requirements text in memory.",
+      note: "Use this full publish check from MCP clients when you already have floom.yaml, source, input_schema, output_schema, and optional requirements text in memory.",
     },
     run_tool: {
       name: "run_app",
@@ -1021,6 +1031,8 @@ function validateManifest(args: JsonObject): McpToolResult {
 
   return okResult({
     valid: true,
+    scope: "manifest_and_optional_json_schemas_only",
+    full_check: "Use publish_app to validate source, required schemas, declared requirements, auth, and the publish API path.",
     manifest: manifestResult.manifest,
     schemas: {
       input_schema: inputSchemaResult.provided ? "valid" : "not_provided",

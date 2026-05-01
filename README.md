@@ -99,6 +99,7 @@ npx @floomhq/cli@latest setup
 cd fixtures/python-simple
 npx @floomhq/cli@latest deploy --dry-run
 npx @floomhq/cli@latest deploy
+npx @floomhq/cli@latest run python-hello '{"text":"Hello from Floom"}' --json
 ```
 
 For local development, set `FLOOM_API_URL=http://localhost:3000` after `npm run dev`. For one-off scripts, set `FLOOM_TOKEN=YOUR_FLOOM_AGENT_TOKEN`.
@@ -144,6 +145,15 @@ Declare that file from `floom.yaml`:
 ```yaml
 dependencies:
   python: ./requirements.txt
+```
+
+Executable workflow for creating a hash-locked `requirements.txt`:
+
+```bash
+printf 'humanize==4.9.0\n' > requirements.in
+python -m pip install --upgrade pip pip-tools
+python -m piptools compile --generate-hashes --output-file requirements.txt requirements.in
+npx @floomhq/cli@latest deploy --dry-run
 ```
 
 ## Launch Claim Contract
@@ -216,9 +226,11 @@ Launch tools:
 
 MCP cannot create or return raw agent tokens. Create agent tokens from the signed-in `/tokens` page, where the raw token is shown once. The publish/run tools accept a Floom agent token when the token has the required scope.
 
-MCP does not return raw app secret values. App secret values are managed through the REST route or `npx @floomhq/cli@latest secrets`; list responses contain metadata only.
+MCP can publish and run apps that declare secret names in `floom.yaml`, including public secret-backed apps. Raw secret values are set through the CLI, UI/API secrets flow, or REST route until MCP secret tools exist. MCP does not return raw app secret values; list responses contain metadata only.
 
 `get_app_contract` returns the current v0.1 manifest, `app.py`, input/output schema examples, dependency/secret fields, and explicit unsupported cases. Agents use it before generating app files so they do not create FastAPI/OpenAPI, TypeScript, multi-file, server, or multi-action apps for this function runtime.
+
+`validate_manifest` is manifest/schema-only. It validates `floom.yaml` and optional JSON Schemas, but it does not inspect source, install requirements, check declared requirements content, or publish. `publish_app` is the full MCP publish check for manifest, source, required schemas, and declared hash-locked requirements.
 
 `list_app_templates` and `get_app_template` return useful copy-paste v0.1-safe app bundles. Current templates:
 

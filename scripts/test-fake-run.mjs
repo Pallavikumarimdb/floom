@@ -97,8 +97,10 @@ async function test() {
   );
   const appPageText = readFileSync('src/app/p/[slug]/page.tsx', 'utf8');
   assert.match(appPageText, /notFound\(\)/);
-  assert.match(appPageText, /isDefinitelyUnknownSlug/);
+  assert.match(appPageText, /isUnavailablePermalink/);
   assert.match(appPageText, /\.from\("apps"\)/);
+  assert.match(appPageText, /owner_id, public/);
+  assert.match(appPageText, /auth\.getUser\(\)/);
   assert.doesNotMatch(appPageText, /github\.com\/floomhq\/floom"/);
 
   if (isSafePythonEntrypoint('my-app.py')) {

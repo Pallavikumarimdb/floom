@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import AppPermalinkPage from "./AppPermalinkPage";
-import { demoApp, hasSupabaseConfig } from "@/lib/demo-app";
+import { demoApp, hasBrowserAuthConfig, hasSupabaseConfig } from "@/lib/demo-app";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient as createServerSupabaseClient } from "@/lib/supabase/server";
 
 const SITE_URL = "https://floom.dev";
 
@@ -60,14 +61,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function Page({ params }: Props) {
   const { slug } = await params;
-  if (await isDefinitelyUnknownSlug(slug)) {
+  if (await isUnavailablePermalink(slug)) {
     notFound();
   }
 
   return <AppPermalinkPage />;
 }
 
-async function isDefinitelyUnknownSlug(slug: string) {
+async function isUnavailablePermalink(slug: string) {
   if (!hasSupabaseConfig()) {
     return slug !== demoApp.slug;
   }
@@ -76,16 +77,31 @@ async function isDefinitelyUnknownSlug(slug: string) {
     const admin = createAdminClient();
     const { data, error } = await admin
       .from("apps")
-      .select("id")
+      .select("id, owner_id, public")
       .eq("slug", slug)
       .maybeSingle();
 
-    if (error) {
+    if (error || !data) {
+      return true;
+    }
+
+    if (data.public === true) {
       return false;
     }
 
-    return !data;
+    if (!hasBrowserAuthConfig()) {
+      return true;
+    }
+
+    const supabase = await createServerSupabaseClient();
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+
+    if (userError || !userData.user) {
+      return true;
+    }
+
+    return userData.user.id !== data.owner_id;
   } catch {
-    return false;
+    return true;
   }
 }

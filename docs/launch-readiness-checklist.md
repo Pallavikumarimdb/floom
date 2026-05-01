@@ -67,6 +67,7 @@ evidence store.
 | CLI deploy dry run | `deploy --dry-run` validates manifest/source/requirements/secrets without publishing | Needs current evidence |
 | CLI deploy | `deploy` publishes a new app from scratch and returns `https://floom.dev/p/:slug` | Needs current evidence |
 | CLI run | `run --json` executes the published app and returns non-trivial output | Needs current evidence |
+| CLI hash-locked requirements workflow | documented `requirements.in` -> `piptools compile --generate-hashes` -> `deploy --dry-run` workflow creates exact-pinned hashes and passes dry run | Needs current evidence |
 | CLI secrets | `secrets set/list/delete` works without echoing secret values | Needs current evidence |
 | CLI setup config | `npx @floomhq/cli@latest setup` writes config with `api_url=https://floom.dev`; `auth whoami` confirms the same origin | Needs current evidence |
 | Isolated HOME | CLI auth/deploy/run works in a fresh temporary HOME with no existing Floom config | Needs current evidence |
@@ -85,6 +86,8 @@ evidence store.
 | MCP publish | virgin agent publishes a new app from scratch with an agent token | Needs current evidence |
 | MCP run | virgin agent runs the app through MCP and sees correct output | Needs current evidence |
 | MCP setup clarity | MCP responses explain the exact local files required: `floom.yaml`, `app.py`, `input.schema.json`, `output.schema.json`, optional hash-locked `requirements.txt`, and secret names only | Needs current evidence |
+| MCP validation boundary | `validate_manifest` is documented and tested as manifest/schema-only; `publish_app` is documented and tested as the full source/schema/requirements publish check | Needs current evidence |
+| MCP secret-backed path | MCP can publish/run apps with declared secret names, while raw secret values are set through CLI/UI/API until MCP secret tools exist | Needs current evidence |
 | MCP no-overpromise | MCP guidance never suggests TypeScript, Java, FastAPI/OpenAPI, multi-file, unpinned deps, raw secret values, teams, or per-user ACLs as launch-supported | Needs current evidence |
 | MCP template matrix | every listed MCP template validates, publishes under a unique slug, and runs at least once | Needs current evidence |
 | MCP malformed input | malformed JSON-RPC, missing auth, invalid bearer, invalid schema, and unsupported manifest return clear safe errors | Needs current evidence |
