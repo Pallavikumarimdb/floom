@@ -239,6 +239,22 @@ export default function DocsPage() {
           </ul>
         </Section>
 
+        <Section title="What &ldquo;secure&rdquo; means in v0">
+          <p>
+            Each run executes in an isolated E2B sandbox. The site serves over
+            HTTPS with CSP, HSTS, X-Frame-Options, and Permissions-Policy
+            headers. Public app runs are rate-limited per IP. Agent tokens are
+            stored only as hashes; the raw token is shown once at creation.
+            Outputs marked secret in the schema are redacted in API and MCP
+            responses.
+          </p>
+          <p className="text-sm text-neutral-500">
+            v0.1 adds encrypted-at-rest secrets that the runtime injects into
+            the sandbox at execution time. Apps that need a secret today should
+            wait for v0.1 or use BYOK in inputs.
+          </p>
+        </Section>
+
         <Section title="Auth and email redirect">
           <p>
             Signup emails are sent by Supabase Auth. The confirmation link must

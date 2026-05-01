@@ -289,8 +289,10 @@ export default function LandingV17PageMvp() {
                 textWrap: 'balance' as unknown as 'balance',
               }}
             >
-              Ship AI apps{' '}
-              <span className="hero-accent-word" style={{ color: 'var(--accent)' }}>fast</span>.
+              Localhost to live and{' '}
+              <span className="hero-accent-word" style={{ color: 'var(--accent)' }}>secure</span>,
+              <br />
+              in 60 seconds.
             </h1>
 
             <p
@@ -304,7 +306,7 @@ export default function LandingV17PageMvp() {
                 margin: '-4px 0 20px',
               }}
             >
-              Localhost to live in 60 seconds.
+              Your AI just wrote some code. Floom puts it online — as a link, an API, and a tool any agent can call.
             </p>
 
             {/* CTA — demo-first button + secondary install card. */}

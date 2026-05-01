@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 const SITE_NAME = "Floom";
-const SITE_TAGLINE = "Ship AI apps fast";
+const SITE_TAGLINE = "Localhost to live and secure, in 60 seconds";
 const SITE_DESCRIPTION =
-  "Localhost to live in 60 seconds. Python functions become shareable browser apps backed by Supabase and E2B.";
+  "Your AI just wrote some code. Floom puts it online — as a link, an API, and a tool any agent can call.";
 const SITE_URL = "https://floom-60sec.vercel.app";
 
 export const metadata: Metadata = {
