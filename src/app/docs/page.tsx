@@ -53,6 +53,38 @@ POST https://floom-60sec.vercel.app/mcp
 tool: run_app
 arguments: { "slug": "meeting-action-items", "inputs": { ... } }`;
 
+const mcpInstallClaudeCode = `# Add Floom as an MCP server in Claude Code
+claude mcp add floom https://floom-60sec.vercel.app/mcp
+
+# Confirm it registered
+claude mcp list
+
+# Then ask Claude to list Floom tools:
+# > list tools from the floom MCP server`;
+
+const mcpInstallCursor = `// ~/.cursor/mcp.json
+{
+  "mcpServers": {
+    "floom": {
+      "url": "https://floom-60sec.vercel.app/mcp",
+      "transport": "http"
+    }
+  }
+}
+// Restart Cursor after saving. Tools appear under Model Context Protocol in settings.`;
+
+const mcpInstallCodex = `// ~/.codex/mcp.json
+{
+  "servers": {
+    "floom": {
+      "url": "https://floom-60sec.vercel.app/mcp",
+      "transport": "http"
+    }
+  }
+}
+// Codex picks up ~/.codex/mcp.json on startup.
+// Verify: codex mcp list`;
+
 function Section({
   title,
   children,
@@ -61,9 +93,9 @@ function Section({
   children: ReactNode;
 }) {
   return (
-    <section className="border-t border-[#ded8cc] py-8">
-      <h2 className="text-2xl font-black tracking-tight">{title}</h2>
-      <div className="mt-4 space-y-4 text-neutral-600">{children}</div>
+    <section className="border-t border-[var(--line)] py-8">
+      <h2 className="text-2xl font-black tracking-tight text-[var(--ink)]">{title}</h2>
+      <div className="mt-4 space-y-4 text-[var(--muted)]">{children}</div>
     </section>
   );
 }
@@ -75,7 +107,7 @@ function CodeBlock({ children }: { children: string }) {
   // off-screen. text-xs on mobile, sm on sm+ keeps it dense without
   // breaking layout at 375px.
   return (
-    <pre className="max-w-full overflow-x-auto whitespace-pre rounded-xl border border-[#ded8cc] bg-[#11110f] p-4 text-xs leading-6 text-[#f6f1e7] sm:text-sm sm:leading-7">
+    <pre className="max-w-full overflow-x-auto whitespace-pre rounded-xl border border-[var(--line)] bg-[var(--code)] p-4 text-xs leading-6 text-[var(--code-text)] sm:text-sm sm:leading-7">
       <code>{children}</code>
     </pre>
   );
@@ -83,17 +115,17 @@ function CodeBlock({ children }: { children: string }) {
 
 export default function DocsPage() {
   return (
-    <main className="min-h-screen overflow-x-hidden bg-[#faf9f5] text-[#11110f]">
+    <main className="min-h-screen overflow-x-hidden bg-[var(--bg)] text-[var(--ink)]">
       <SiteHeader />
 
       <article className="mx-auto max-w-4xl px-5 py-14">
-        <p className="mb-3 text-sm font-semibold text-emerald-700">
+        <p className="mb-3 text-sm font-semibold text-[var(--accent)]">
           Floom v0 docs
         </p>
-        <h1 className="text-4xl font-black tracking-tight sm:text-5xl">
+        <h1 className="text-4xl font-black tracking-tight text-[var(--ink)] sm:text-5xl">
           Local Python function to live app.
         </h1>
-        <p className="mt-4 max-w-2xl text-lg text-neutral-600">
+        <p className="mt-4 max-w-2xl text-lg text-[var(--muted)]">
           Floom v0 publishes a narrow app shape: one stdlib Python function,
           JSON Schema inputs, a browser page, API run, and MCP run.
         </p>
@@ -101,13 +133,13 @@ export default function DocsPage() {
         <div className="mt-8 flex flex-wrap gap-3">
           <Link
             href="/tokens"
-            className="rounded-md bg-black px-4 py-2 text-sm font-semibold text-white"
+            className="rounded-md bg-[var(--ink)] px-4 py-2 text-sm font-semibold text-white"
           >
             Create token
           </Link>
           <Link
             href="/p/meeting-action-items"
-            className="rounded-md border border-[#ded8cc] bg-white px-4 py-2 text-sm font-semibold text-neutral-800"
+            className="rounded-md border border-[var(--line)] bg-[var(--card)] px-4 py-2 text-sm font-semibold text-[var(--ink)]"
           >
             Run live demo
           </Link>
@@ -142,7 +174,7 @@ export default function DocsPage() {
             <li>Outputs: JSON object displayed in the app page.</li>
             <li>Dependencies: Python standard library only in v0.</li>
           </ul>
-          <p className="text-sm text-neutral-500">
+          <p className="text-sm text-[var(--muted)] opacity-80">
             TypeScript, FastAPI/OpenAPI, multiple Python files, custom packages,
             and secrets are outside the v0 contract.
           </p>
@@ -177,6 +209,58 @@ export default function DocsPage() {
           <CodeBlock>{mcpExample}</CodeBlock>
         </Section>
 
+        <Section title="Install Floom in your MCP client">
+          <p>
+            Floom speaks standard JSON-RPC 2.0 over HTTP POST. Any MCP client
+            that supports an HTTP transport can connect to{" "}
+            <code>https://floom-60sec.vercel.app/mcp</code>.
+          </p>
+
+          <div className="space-y-6">
+            {/* Claude Code */}
+            <div>
+              <h3 className="mb-2 text-base font-bold tracking-tight">Claude Code</h3>
+              <p className="mb-2 text-sm">
+                One command to register, then restart the session. Verified
+                end-to-end: <code>claude mcp add</code> registers the server,{" "}
+                <code>tools/list</code> returns all four Floom tools, and{" "}
+                <code>list_app_templates</code> returns a non-empty result.
+              </p>
+              <CodeBlock>{mcpInstallClaudeCode}</CodeBlock>
+            </div>
+
+            {/* Cursor */}
+            <div>
+              <h3 className="mb-2 text-base font-bold tracking-tight">Cursor</h3>
+              <p className="mb-2 text-sm">
+                Cursor reads MCP server config from <code>~/.cursor/mcp.json</code>{" "}
+                (or <code>.cursor/mcp.json</code> inside a workspace). Add the
+                snippet below and restart Cursor.
+              </p>
+              <CodeBlock>{mcpInstallCursor}</CodeBlock>
+            </div>
+
+            {/* Codex CLI */}
+            <div>
+              <h3 className="mb-2 text-base font-bold tracking-tight">Codex CLI</h3>
+              <p className="mb-2 text-sm">
+                Codex CLI loads MCP servers from{" "}
+                <code>~/.codex/mcp.json</code> on startup. Create or extend
+                that file with the snippet below.
+              </p>
+              <CodeBlock>{mcpInstallCodex}</CodeBlock>
+            </div>
+          </div>
+
+          <p className="text-sm text-[var(--muted)] opacity-80">
+            All three clients use the same JSON-RPC 2.0 wire format. The{" "}
+            <code>initialize</code> handshake returns{" "}
+            <code>protocolVersion: &quot;2024-11-05&quot;</code>. Tools are
+            listed via <code>tools/list</code> and called via{" "}
+            <code>tools/call</code>.
+          </p>
+        </Section>
+
         <Section title="MCP app templates">
           <p>
             Floom serves copy-paste v0-safe bundles for agents that need a fast,
@@ -200,7 +284,7 @@ export default function DocsPage() {
               extraction from pasted notes.
             </li>
           </ul>
-          <p className="text-sm text-neutral-500">
+          <p className="text-sm text-[var(--muted)] opacity-80">
             Every template uses one stdlib-only Python file and includes
             <code> floom.yaml</code>, <code>app.py</code>,{" "}
             <code>input.schema.json</code>, and{" "}
@@ -223,7 +307,7 @@ export default function DocsPage() {
             </li>
             <li>Secure secret storage and E2B runtime injection.</li>
           </ul>
-          <p className="text-sm text-neutral-500">
+          <p className="text-sm text-[var(--muted)] opacity-80">
             FastAPI/OpenAPI, arbitrary HTTP servers, TypeScript apps,
             background workers, and full repo hosting remain later milestones.
           </p>
@@ -248,7 +332,7 @@ export default function DocsPage() {
             Outputs marked secret in the schema are redacted in API and MCP
             responses.
           </p>
-          <p className="text-sm text-neutral-500">
+          <p className="text-sm text-[var(--muted)] opacity-80">
             v0.1 adds encrypted-at-rest secrets that the runtime injects into
             the sandbox at execution time. Apps that need a secret today should
             wait for v0.1 or use BYOK in inputs.
