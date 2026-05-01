@@ -22,10 +22,25 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       next: { revalidate: 300 },
     });
     if (res.ok) {
-      const data = (await res.json()) as { name?: string; description?: string };
+      const data = (await res.json()) as {
+        name?: string;
+        description?: string;
+        input_schema?: { properties?: Record<string, { description?: string }> };
+      };
       if (data.name) appName = data.name;
       if (data.description) {
         appDescription = data.description.replace(/\s+/g, " ").trim().slice(0, 220);
+      } else {
+        // Fallback: first input field's `description`. Until apps.description
+        // is a first-class column, the input-schema description is the only
+        // app-authored summary available — generic enough for meta + OG, and
+        // strictly better than the static "Run this Floom app..." stub.
+        const props = data.input_schema?.properties ?? {};
+        const firstField = Object.values(props)[0];
+        const candidate = firstField?.description?.trim();
+        if (candidate) {
+          appDescription = candidate.replace(/\s+/g, " ").slice(0, 220);
+        }
       }
     }
   } catch {

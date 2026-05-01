@@ -19,9 +19,20 @@ export default async function AppOpengraphImage({ params }: Props) {
       next: { revalidate: 300 },
     });
     if (res.ok) {
-      const data = (await res.json()) as { name?: string; description?: string };
+      const data = (await res.json()) as {
+        name?: string;
+        description?: string;
+        input_schema?: { properties?: Record<string, { description?: string }> };
+      };
       if (data.name) appName = data.name;
-      if (data.description) description = data.description.slice(0, 180);
+      if (data.description) {
+        description = data.description.slice(0, 180);
+      } else {
+        // Fallback: first input field's description. See note in page.tsx.
+        const firstField = Object.values(data.input_schema?.properties ?? {})[0];
+        const candidate = firstField?.description?.trim();
+        if (candidate) description = candidate.replace(/\s+/g, " ").slice(0, 180);
+      }
     }
   } catch {
     // Use slug fallback.
