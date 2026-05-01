@@ -182,7 +182,7 @@ Pass criteria:
 ```bash
 curl -sS -X POST "$FLOOM_API_URL/api/apps/<slug>/run" \
   -H 'content-type: application/json' \
-  --data '{"input":{}}'
+  --data '{"inputs":{}}'
 ```
 
 - Run the private app with and without authorization.

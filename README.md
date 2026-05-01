@@ -206,7 +206,7 @@ If `E2B_API_KEY` is not set, fake mode is available only outside production when
 - Marketplace
 - Billing
 - Teams/org switcher
-- PostHog/Sentry setup
+- Sentry setup
 - Custom renderers
 - File uploads
 - Cron
