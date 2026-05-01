@@ -255,19 +255,20 @@ function useTypewriter(
   reducedMotion: boolean,
 ): number {
   const [n, setN] = useState(reducedMotion ? text.length : 0);
-  // Animation driver: must synchronously reset state when reducedMotion or
-  // active changes so the interval/timer starts from the right position.
-  // There is no external system to subscribe to — setState here IS the output.
-  // eslint-disable-next-line react-hooks/set-state-in-effect
+  // Animation driver: synchronous setState resets are intentional here —
+  // this hook IS the animation state machine; there is no external system.
   useEffect(() => {
     if (reducedMotion) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setN(text.length);
       return;
     }
     if (!active) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setN(0);
       return;
     }
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setN(0);
     let i = 0;
     const iv = window.setInterval(() => {
@@ -293,16 +294,16 @@ function useCountUp(
 ): number {
   const [value, setValue] = useState(reducedMotion ? target : 0);
   const rafRef = useRef<number | null>(null);
-  // Animation driver: must synchronously reset or skip to end when reducedMotion
-  // or trigger changes. setState in effect is intentional — this hook IS the
-  // animation state machine; there is no external system to subscribe to.
-  // eslint-disable-next-line react-hooks/set-state-in-effect
+  // Animation driver: synchronous setState resets are intentional here —
+  // this hook IS the animation state machine; there is no external system.
   useEffect(() => {
     if (reducedMotion) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setValue(target);
       return;
     }
     if (!trigger) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setValue(0);
       return;
     }
@@ -345,11 +346,10 @@ function DesktopMorphDemo({ reducedMotion }: { reducedMotion: boolean }) {
   const timerRef = useRef<number | null>(null);
 
   // Reset to the final demo state when reduced motion is enabled mid-cycle.
-  // This is an accessibility-driven state reset, not a data-fetch. The setState
-  // must fire synchronously so the transition to 'run' is immediate.
-  // eslint-disable-next-line react-hooks/set-state-in-effect
+  // This is an accessibility-driven state reset, not a data-fetch.
   useEffect(() => {
     if (reducedMotion) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setState('run');
       if (timerRef.current) window.clearTimeout(timerRef.current);
     }
@@ -722,25 +722,32 @@ function DeploySurface({
   const [progress, setProgress] = useState(0);
   const [done, setDone] = useState(false);
 
-  // Animation driver: resets deploy animation state when active becomes false
-  // or jumps to end-state for reducedMotion. Both are synchronous resets —
-  // the deploy progress IS the state; there is no external system here.
-  // eslint-disable-next-line react-hooks/set-state-in-effect
+  // Animation driver: synchronous state resets are intentional — the deploy
+  // progress IS the state; there is no external system to subscribe to.
   useEffect(() => {
     if (!active) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setStepIndex(0);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setProgress(0);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setDone(false);
       return;
     }
     if (reducedMotion) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setStepIndex(DEPLOY_STEPS.length);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setProgress(100);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setDone(true);
       return;
     }
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setStepIndex(0);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setProgress(0);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setDone(false);
     const waitForSlash = SLASH.length * 45 + 180;
     const perStep = 380; // ~4 steps in ~1.5s
@@ -782,7 +789,7 @@ function DeploySurface({
         <div style={DEPLOY_LEFT}>
           <div style={DEPLOY_HEADER_ROW}>
             <span style={DEPLOY_HEADER_LABEL}>
-              {done ? 'PREVIEW READY' : 'BETA PUBLISH'}
+              {done ? 'PREVIEW READY' : 'PUBLISHING'}
             </span>
             <span style={DEPLOY_HEADER_PCT}>{progress}%</span>
           </div>
@@ -858,7 +865,7 @@ function DeploySurface({
             </span>
             <div style={DEPLOY_URL_TEXT_WRAP}>
               <div style={DEPLOY_URL_MAIN}>/p/demo-app</div>
-              <div style={DEPLOY_URL_META_CARD}>Beta publisher preview &middot; HTTPS &middot; edge</div>
+              <div style={DEPLOY_URL_META_CARD}>Live preview &middot; HTTPS &middot; edge</div>
             </div>
           </div>
         </div>

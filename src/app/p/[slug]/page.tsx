@@ -143,18 +143,23 @@ export default function AppPermalinkPage() {
   }, []);
 
   // Fetches app metadata when slug is available. The synchronous setState
-  // in the !slug guard resets to a clean "not found" state before the async
-  // path runs — this is a deliberate early-exit reset, not a cascading render.
-  // eslint-disable-next-line react-hooks/set-state-in-effect
+  // calls in the !slug guard are deliberate early-exit resets (not cascading
+  // renders) that clear stale state before the async fetch path runs.
   useEffect(() => {
     if (!slug) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setNotFound(true);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setLoadFailure(null);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setLoading(false);
       return;
     }
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setNotFound(false);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoadFailure(null);
     // Data seam: getApp(slug) → fetch('/api/apps/' + slug)
     fetch(`/api/apps/${slug}`)
@@ -235,16 +240,20 @@ export default function AppPermalinkPage() {
   // /p/:slug?run=<id> — fetch the run and hydrate RunSurface read-only.
   // The synchronous reset in the guard branch clears stale run state when
   // the URL no longer has a ?run= param — intentional early-exit reset.
-  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => {
     if (!slug || !runIdFromUrl) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setInitialRun(null);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setInitialRunLoading(false);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setRunNotFound(false);
       return;
     }
     let cancelled = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setInitialRunLoading(true);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setRunNotFound(false);
     // Data seam: getRun(runIdFromUrl) → fetch('/api/runs/' + runIdFromUrl)
     fetch(`/api/runs/${runIdFromUrl}`)
@@ -288,16 +297,18 @@ export default function AppPermalinkPage() {
   }, [slug, runIdFromUrl, updateSearchParams]);
 
   // /p/:slug?rerun=<id> — fetch the original run's inputs to pre-fill the form.
-  // The synchronous reset in the guard clears stale rerun state when the URL
-  // conditions are not met — intentional early-exit reset, not a cascading render.
-  // eslint-disable-next-line react-hooks/set-state-in-effect
+  // The synchronous resets in the guard clear stale state when URL conditions
+  // are not met — intentional early-exit resets, not cascading renders.
   useEffect(() => {
     if (!slug || !rerunIdFromUrl || runIdFromUrl) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setRerunInputs(null);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setRerunLoading(false);
       return;
     }
     let cancelled = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setRerunLoading(true);
     // Data seam: getRun(rerunIdFromUrl) → fetch('/api/runs/' + rerunIdFromUrl)
     fetch(`/api/runs/${rerunIdFromUrl}`)
@@ -416,14 +427,15 @@ export default function AppPermalinkPage() {
   // Fire confetti once when the user lands on a freshly-published app. The
   // setState calls here are one-time celebratory UI triggers driven by a
   // localStorage flag — not a data-fetch or cascading update loop.
-  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => {
     if (!app?.slug) return;
     if (!consumeJustPublished(app.slug)) return;
     if (!hasConfettiShown(app.slug)) {
       markConfettiShown(app.slug);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setConfettiFire(true);
     }
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setCelebrate(true);
   }, [app?.slug]);
 
@@ -1598,7 +1610,7 @@ const TABS: Array<{ id: 'run' | 'about' | 'install' | 'source' | 'runs'; label: 
   { id: 'about', label: 'About' },
   { id: 'install', label: 'Install' },
   { id: 'source', label: 'Source' },
-  { id: 'runs', label: 'Earlier runs' },
+  { id: 'runs', label: 'History' },
 ];
 
 function TabBar({

@@ -87,11 +87,11 @@ export function RunSurface({ app, initialRun, initialInputs, examplePrefillInput
   // initialRun arrives asynchronously from parent after hydration; the lazy
   // useState above handles the SSR case, but we must also sync when the prop
   // changes post-mount (e.g. ?run=<id> fetch resolves). This synchronous
-  // setState-in-effect is intentional: it has a guard condition and fires at
-  // most once per initialRun identity change.
-  // eslint-disable-next-line react-hooks/set-state-in-effect
+  // setState-in-effect is intentional: it fires at most once per initialRun
+  // identity change and there is no external subscription pattern to use here.
   useEffect(() => {
     if (initialRun?.output) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setState({ kind: 'ok', output: initialRun.output, ms: 0 });
     }
   }, [initialRun]);
