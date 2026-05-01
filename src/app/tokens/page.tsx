@@ -161,11 +161,11 @@ export default function TokensPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#faf9f5] text-[#11110f]">
+      <div style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--ink)' }}>
         <SiteHeader />
-        <section className="mx-auto max-w-4xl px-5 py-14">
-          <div className="flex items-center gap-3 text-neutral-500">
-            <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-neutral-300 border-t-emerald-600" />
+        <section style={{ maxWidth: 900, margin: '0 auto', padding: '56px 24px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: 'var(--muted)', fontSize: 14 }}>
+            <span style={{ display: 'inline-block', width: 16, height: 16, borderRadius: '50%', border: '2px solid var(--line)', borderTopColor: 'var(--accent)', animation: 'spin 0.7s linear infinite' }} />
             Loading tokens…
           </div>
         </section>
@@ -174,34 +174,41 @@ export default function TokensPage() {
     );
   }
 
+  const cardStyle = {
+    background: 'var(--card)',
+    border: '1px solid var(--line)',
+    borderRadius: 16,
+    padding: '24px',
+    boxShadow: 'var(--shadow-2)',
+  };
+
   return (
-    <div className="min-h-screen bg-[#faf9f5] text-[#11110f]">
+    <div style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--ink)' }}>
       <SiteHeader />
-      <section className="mx-auto max-w-5xl px-5 py-12">
+      <section style={{ maxWidth: 960, margin: '0 auto', padding: '40px 24px 80px' }}>
         {/* Header row */}
-        <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
+        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, marginBottom: 8 }}>
           <div>
-            <p className="mb-3 text-sm font-semibold text-emerald-700">
+            <p style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--accent)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 10, fontFamily: "'JetBrains Mono', ui-monospace, monospace" }}>
               Builder token
             </p>
-            <h1 className="text-4xl font-black tracking-tight">
+            <h1 style={{ fontSize: 30, fontWeight: 800, letterSpacing: '-0.025em', margin: 0, color: 'var(--ink)' }}>
               Publish apps from your agent
             </h1>
-            <p className="mt-3 max-w-2xl text-neutral-600">
-              Create a Floom agent token, then use it with the CLI to publish a
-              local Python function as a live app page.
+            <p style={{ fontSize: 14, color: 'var(--muted)', marginTop: 8, lineHeight: 1.6 }}>
+              Create a Floom agent token, then use it with the CLI to publish a local Python function as a live app page.
             </p>
             {email && (
-              <p className="mt-2 text-sm text-neutral-500">
+              <p style={{ marginTop: 6, fontSize: 12.5, color: 'var(--muted)' }}>
                 Signed in as{" "}
-                <span className="font-medium text-neutral-700">{email}</span>
+                <span style={{ fontWeight: 600, color: 'var(--ink)' }}>{email}</span>
               </p>
             )}
           </div>
           <button
             type="button"
             onClick={signOut}
-            className="shrink-0 rounded-lg border border-[#ded8cc] bg-white px-4 py-2 text-sm font-semibold text-neutral-700 transition-colors hover:bg-[#f3f0ea]"
+            className="btn-outline sm"
           >
             Sign out
           </button>
@@ -211,263 +218,289 @@ export default function TokensPage() {
         {error && (
           <div
             role="alert"
-            className="mt-6 flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3"
+            style={{
+              marginTop: 20,
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: 10,
+              borderRadius: 8,
+              border: '1px solid var(--danger-border)',
+              background: 'var(--danger-soft)',
+              padding: '10px 14px',
+            }}
           >
-            <svg
-              className="mt-0.5 h-4 w-4 shrink-0 text-red-600"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-              aria-hidden="true"
-            >
+            <svg width={14} height={14} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true" style={{ flexShrink: 0, color: 'var(--danger)', marginTop: 2 }}>
               <circle cx="12" cy="12" r="10" />
               <line x1="12" y1="8" x2="12" y2="12" />
               <line x1="12" y1="16" x2="12.01" y2="16" />
             </svg>
-            <p className="text-sm font-medium text-red-700">{error}</p>
+            <p style={{ fontSize: 13, fontWeight: 500, color: 'var(--danger)', margin: 0 }}>{error}</p>
           </div>
         )}
 
-        {/* Create + publish command */}
-        <div className="mt-8 grid gap-6 lg:grid-cols-[1fr_1.1fr]">
-          {/* Create form */}
-          <div className="rounded-2xl border border-[#ded8cc] bg-white p-6 shadow-xl shadow-neutral-200/50">
-            <h2 className="text-xl font-black">Create token</h2>
-            <p className="mt-2 text-sm text-neutral-600">
-              The raw token is shown once. Store it in your local secret manager.
-            </p>
-            <label
-              className="mt-5 block text-sm font-bold"
-              htmlFor="token-name"
-            >
-              Token name
-            </label>
-            <input
-              id="token-name"
-              ref={nameInputRef}
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              className="mt-2 w-full rounded-lg border border-[#cfc7b8] bg-[#fffdf8] px-4 py-3 outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/10"
-              placeholder="e.g. Launch token"
-            />
-            <button
-              type="button"
-              disabled={working}
-              onClick={createToken}
-              className="mt-5 rounded-lg bg-emerald-700 px-5 py-3 font-semibold text-white transition-colors hover:bg-emerald-800 disabled:opacity-50"
-            >
-              {working ? "Working…" : "Create agent token"}
-            </button>
-
-            {/* Raw token — shown exactly once, clearly distinct */}
-            {newToken && (
-              <div
-                role="status"
-                className="mt-6 rounded-xl border-2 border-emerald-400 bg-emerald-50 p-4"
+        {/* When no tokens: create form is the hero, publish command below */}
+        {tokens.length === 0 ? (
+          <>
+            <div style={{ marginTop: 36, maxWidth: 460, ...cardStyle }}>
+              <h2 style={{ fontSize: 20, fontWeight: 700, margin: '0 0 6px', letterSpacing: '-0.015em' }}>Create your first token</h2>
+              <p style={{ fontSize: 13, color: 'var(--muted)', margin: '0 0 20px', lineHeight: 1.55 }}>
+                The raw token is shown once. Store it in your local secret manager.
+              </p>
+              <label
+                style={{ display: 'block', fontSize: 12.5, fontWeight: 600, color: 'var(--muted)', marginBottom: 6 }}
+                htmlFor="token-name"
               >
-                <div className="flex items-center gap-2">
-                  <svg
-                    className="h-4 w-4 text-emerald-700"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={2}
-                    aria-hidden="true"
-                  >
-                    <path d="M12 2a5 5 0 0 1 5 5c0 2.4-1.7 4.4-4 4.9V13h2v2h-2v2h-2v-2H9v-2h2v-1.1A5 5 0 0 1 7 7a5 5 0 0 1 5-5z" />
-                  </svg>
-                  <p className="text-sm font-bold text-emerald-900">
+                Token name
+              </label>
+              <input
+                id="token-name"
+                ref={nameInputRef}
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                className="input-field"
+                placeholder="e.g. Launch token"
+                style={{ width: '100%', boxSizing: 'border-box', marginBottom: 16 }}
+              />
+              <button
+                type="button"
+                disabled={working}
+                onClick={createToken}
+                className="btn-primary"
+                style={{ opacity: working ? 0.6 : 1 }}
+              >
+                {working ? "Working…" : "Create agent token"}
+              </button>
+
+              {newToken && (
+                <div
+                  role="status"
+                  style={{
+                    marginTop: 20,
+                    borderRadius: 10,
+                    border: '2px solid var(--accent-border)',
+                    background: 'var(--accent-soft)',
+                    padding: 16,
+                  }}
+                >
+                  <p style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--accent)', margin: '0 0 10px' }}>
                     Copy this token now — it will not be shown again
                   </p>
+                  <pre style={{ maxHeight: 120, overflow: 'auto', borderRadius: 8, border: '1px solid var(--accent-border)', background: 'var(--card)', padding: '10px 12px', fontSize: 11.5, margin: '0 0 10px', fontFamily: "'JetBrains Mono', monospace", color: 'var(--ink)', wordBreak: 'break-all', whiteSpace: 'pre-wrap' }}>
+                    {newToken}
+                  </pre>
+                  <button
+                    type="button"
+                    onClick={() => copy(newToken, "token")}
+                    className="btn-primary sm"
+                  >
+                    {copied === "token" ? "✓ Copied" : "Copy token"}
+                  </button>
                 </div>
-                <pre className="mt-3 max-h-32 overflow-auto rounded-lg border border-emerald-200 bg-white p-3 text-xs text-emerald-950">
-                  {newToken}
+              )}
+            </div>
+
+            <div style={{ marginTop: 24, maxWidth: 640, ...cardStyle }}>
+              <h2 style={{ fontSize: 15, fontWeight: 700, margin: '0 0 6px', letterSpacing: '-0.01em' }}>Publish command</h2>
+              <p style={{ fontSize: 12.5, color: 'var(--muted)', margin: '0 0 14px', lineHeight: 1.55 }}>
+                Replace <code style={{ fontFamily: "'JetBrains Mono', monospace", background: 'var(--studio)', padding: '1px 5px', borderRadius: 4, fontSize: 11.5 }}>YOUR_FLOOM_AGENT_TOKEN</code> with the token you just copied.
+              </p>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, background: 'var(--terminal-bg)', borderRadius: 8, padding: '12px 14px' }}>
+                <pre style={{ flex: 1, fontFamily: "'JetBrains Mono', monospace", fontSize: 11.5, color: 'var(--terminal-ink)', margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-all', lineHeight: 1.7 }}>
+                  {publishCommand}
                 </pre>
                 <button
                   type="button"
-                  onClick={() => copy(newToken, "token")}
-                  className="mt-3 rounded-md bg-emerald-700 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-800"
+                  onClick={() => copy(publishCommand, "command")}
+                  style={{ flexShrink: 0, fontSize: 11, fontWeight: 600, color: copied === 'command' ? '#fff' : 'var(--code-accent)', background: 'transparent', border: `1px solid ${copied === 'command' ? 'var(--code-accent)' : 'rgba(110,231,183,0.3)'}`, borderRadius: 5, padding: '4px 10px', cursor: 'pointer', fontFamily: 'inherit', transition: 'background 0.1s', whiteSpace: 'nowrap' }}
                 >
-                  {copied === "token" ? "Copied!" : "Copy token"}
+                  {copied === "command" ? "✓ Copied" : "Copy"}
                 </button>
               </div>
-            )}
-          </div>
-
-          {/* Publish command */}
-          <div className="rounded-2xl border border-[#ded8cc] bg-white p-6 shadow-xl shadow-neutral-200/50">
-            <h2 className="text-xl font-black">Publish command</h2>
-            <p className="mt-2 text-sm text-neutral-600">
-              From this repo, replace{" "}
-              <code className="rounded bg-neutral-100 px-1 py-0.5 font-mono text-xs">
-                YOUR_FLOOM_AGENT_TOKEN
-              </code>{" "}
-              with the token you just copied.
-            </p>
-            <pre className="mt-4 overflow-auto rounded-lg bg-[#11110f] p-4 text-xs leading-6 text-white">
-              {publishCommand}
-            </pre>
-            <button
-              type="button"
-              onClick={() => copy(publishCommand, "command")}
-              className="mt-4 rounded-md border border-[#ded8cc] bg-white px-4 py-2 text-sm font-semibold text-neutral-700 transition-colors hover:bg-[#f3f0ea]"
-            >
-              {copied === "command" ? "Copied!" : "Copy command"}
-            </button>
-            <p className="mt-5 text-sm text-neutral-600">
-              Successful publish returns a{" "}
-              <code className="rounded bg-neutral-100 px-1 py-0.5 font-mono text-xs">
-                /p/:slug
-              </code>{" "}
-              URL. Open that page and run the app in the browser.
-            </p>
-          </div>
-        </div>
-
-        {/* Token table */}
-        <div className="mt-8 rounded-2xl border border-[#ded8cc] bg-white p-6">
-          <h2 className="text-xl font-black">Existing tokens</h2>
-          {tokens.length === 0 ? (
-            <div className="mt-6 rounded-xl border border-dashed border-[#ded8cc] bg-[#fffdf8] px-6 py-10 text-center">
-              <svg
-                className="mx-auto h-8 w-8 text-emerald-700"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={1.6}
-                aria-hidden="true"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M15 7a3 3 0 1 0-6 0v3H7a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2h-2V7zm-4 7v3"
-                />
-              </svg>
-              <p className="mt-3 text-base font-bold text-neutral-800">
-                No tokens yet
-              </p>
-              <p className="mx-auto mt-1 max-w-sm text-sm text-neutral-500">
-                You need an agent token to publish apps from the CLI. Mint one
-                in 10 seconds.
-              </p>
-              <button
-                type="button"
-                onClick={focusCreateForm}
-                className="mt-5 inline-flex items-center gap-2 rounded-lg bg-emerald-700 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-800"
-              >
-                Create your first token
-                <span aria-hidden="true">→</span>
-              </button>
             </div>
-          ) : (
-            <div className="mt-4 overflow-x-auto">
-              <table className="w-full min-w-[720px] text-left text-sm">
-                <thead className="text-xs uppercase tracking-widest text-neutral-500">
-                  <tr>
-                    <th className="border-b border-[#ded8cc] py-3 pr-4">
-                      Name
-                    </th>
-                    <th className="border-b border-[#ded8cc] py-3 pr-4">
-                      Prefix
-                    </th>
-                    <th className="border-b border-[#ded8cc] py-3 pr-4">
-                      Scopes
-                    </th>
-                    <th className="border-b border-[#ded8cc] py-3 pr-4">
-                      Status
-                    </th>
-                    <th className="border-b border-[#ded8cc] py-3 pr-4">
-                      Created
-                    </th>
-                    <th className="border-b border-[#ded8cc] py-3 pr-4">
-                      Last used
-                    </th>
-                    <th className="border-b border-[#ded8cc] py-3 pr-4">
-                      Expires
-                    </th>
-                    <th className="border-b border-[#ded8cc] py-3" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {tokens.map((token) => (
-                    <tr key={token.id} className="group">
-                      <td className="border-b border-[#eee8dc] py-3 pr-4 font-semibold">
-                        {token.name}
-                      </td>
-                      <td className="border-b border-[#eee8dc] py-3 pr-4 font-mono text-xs text-neutral-500">
-                        {token.token_prefix}…
-                      </td>
-                      <td className="border-b border-[#eee8dc] py-3 pr-4 text-neutral-600">
-                        {token.scopes.join(", ")}
-                      </td>
-                      <td className="border-b border-[#eee8dc] py-3 pr-4">
-                        {token.revoked_at ? (
-                          <span className="rounded-full bg-red-50 px-2.5 py-0.5 text-xs font-semibold text-red-700">
-                            Revoked
-                          </span>
-                        ) : (
-                          <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">
-                            Active
-                          </span>
-                        )}
-                      </td>
-                      <td className="border-b border-[#eee8dc] py-3 pr-4 text-neutral-500">
-                        {relative(token.created_at)}
-                      </td>
-                      <td className="border-b border-[#eee8dc] py-3 pr-4 text-neutral-500">
-                        {relative(token.last_used_at)}
-                      </td>
-                      <td className="border-b border-[#eee8dc] py-3 pr-4 text-neutral-500">
-                        {token.expires_at
-                          ? new Date(token.expires_at).toLocaleDateString()
-                          : "Never"}
-                      </td>
-                      <td className="border-b border-[#eee8dc] py-3 text-right">
-                        {!token.revoked_at && (
-                          confirmRevoke === token.id ? (
-                            <span className="inline-flex items-center gap-2">
+          </>
+        ) : (
+          /* When tokens exist: table leads, create form demoted */
+          <>
+            {/* Token table */}
+            <div style={{ marginTop: 32, ...cardStyle }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
+                <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0, letterSpacing: '-0.015em' }}>Agent tokens</h2>
+                <button
+                  type="button"
+                  onClick={focusCreateForm}
+                  className="btn-primary sm"
+                >
+                  + New token
+                </button>
+              </div>
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', minWidth: 640, borderCollapse: 'collapse', fontSize: 13, textAlign: 'left' }}>
+                  <thead>
+                    <tr>
+                      {['Name', 'Prefix', 'Scopes', 'Status', 'Created', 'Last used', 'Expires', ''].map((h) => (
+                        <th key={h} style={{ borderBottom: '1px solid var(--line)', padding: '6px 12px 10px 0', fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.07em', whiteSpace: 'nowrap' }}>
+                          {h}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {tokens.map((token) => (
+                      <tr key={token.id}>
+                        <td style={{ borderBottom: '1px solid var(--line)', padding: '10px 12px 10px 0', fontWeight: 600, color: 'var(--ink)' }}>
+                          {token.name}
+                        </td>
+                        <td style={{ borderBottom: '1px solid var(--line)', padding: '10px 12px 10px 0', fontFamily: "'JetBrains Mono', monospace", fontSize: 11.5, color: 'var(--muted)' }}>
+                          {token.token_prefix}…
+                        </td>
+                        <td style={{ borderBottom: '1px solid var(--line)', padding: '10px 12px 10px 0', color: 'var(--muted)' }}>
+                          {token.scopes.join(", ")}
+                        </td>
+                        <td style={{ borderBottom: '1px solid var(--line)', padding: '10px 12px 10px 0' }}>
+                          {token.revoked_at ? (
+                            <span style={{ borderRadius: 999, background: 'var(--danger-soft)', border: '1px solid var(--danger-border)', padding: '2px 8px', fontSize: 11, fontWeight: 600, color: 'var(--danger)' }}>
+                              Revoked
+                            </span>
+                          ) : (
+                            <span style={{ borderRadius: 999, background: 'var(--accent-soft)', border: '1px solid var(--accent-border)', padding: '2px 8px', fontSize: 11, fontWeight: 600, color: 'var(--accent)' }}>
+                              Active
+                            </span>
+                          )}
+                        </td>
+                        <td style={{ borderBottom: '1px solid var(--line)', padding: '10px 12px 10px 0', color: 'var(--muted)', whiteSpace: 'nowrap' }}>
+                          {relative(token.created_at)}
+                        </td>
+                        <td style={{ borderBottom: '1px solid var(--line)', padding: '10px 12px 10px 0', color: 'var(--muted)', whiteSpace: 'nowrap' }}>
+                          {relative(token.last_used_at)}
+                        </td>
+                        <td style={{ borderBottom: '1px solid var(--line)', padding: '10px 12px 10px 0', color: 'var(--muted)', whiteSpace: 'nowrap' }}>
+                          {token.expires_at ? new Date(token.expires_at).toLocaleDateString() : "Never"}
+                        </td>
+                        <td style={{ borderBottom: '1px solid var(--line)', padding: '10px 0 10px 0', textAlign: 'right' }}>
+                          {!token.revoked_at && (
+                            confirmRevoke === token.id ? (
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                                <button
+                                  type="button"
+                                  disabled={working}
+                                  onClick={() => revokeToken(token.id)}
+                                  style={{ background: 'var(--danger)', color: '#fff', border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 11.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', opacity: working ? 0.6 : 1 }}
+                                >
+                                  Confirm
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setConfirmRevoke(null)}
+                                  style={{ background: 'var(--card)', color: 'var(--ink)', border: '1px solid var(--line)', borderRadius: 6, padding: '4px 10px', fontSize: 11.5, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}
+                                >
+                                  Cancel
+                                </button>
+                              </span>
+                            ) : (
                               <button
                                 type="button"
                                 disabled={working}
-                                onClick={() => revokeToken(token.id)}
-                                className="rounded-md bg-red-600 px-3 py-1.5 text-xs font-bold text-white disabled:opacity-50"
+                                onClick={() => setConfirmRevoke(token.id)}
+                                style={{ background: 'var(--danger-soft)', color: 'var(--danger)', border: '1px solid var(--danger-border)', borderRadius: 6, padding: '4px 10px', fontSize: 11.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', opacity: working ? 0.6 : 1 }}
                               >
-                                Confirm
+                                Revoke
                               </button>
-                              <button
-                                type="button"
-                                onClick={() => setConfirmRevoke(null)}
-                                className="rounded-md border border-[#ded8cc] bg-white px-3 py-1.5 text-xs font-semibold text-neutral-600"
-                              >
-                                Cancel
-                              </button>
-                            </span>
-                          ) : (
-                            <button
-                              type="button"
-                              disabled={working}
-                              onClick={() => setConfirmRevoke(token.id)}
-                              className="rounded-md border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-bold text-red-700 disabled:opacity-50"
-                            >
-                              Revoke
-                            </button>
-                          )
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                            )
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          )}
-        </div>
 
-        <p className="mt-8 text-sm text-neutral-500">
+            {/* Demoted create form */}
+            <div style={{ marginTop: 24, display: 'grid', gap: 20, gridTemplateColumns: 'minmax(0,1fr) minmax(0,1.1fr)' }}>
+              <div style={cardStyle}>
+                <h2 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 6px', letterSpacing: '-0.01em' }}>Create token</h2>
+                <p style={{ fontSize: 12.5, color: 'var(--muted)', margin: '0 0 16px', lineHeight: 1.55 }}>
+                  The raw token is shown once. Store it in your local secret manager.
+                </p>
+                <label
+                  style={{ display: 'block', fontSize: 12.5, fontWeight: 600, color: 'var(--muted)', marginBottom: 6 }}
+                  htmlFor="token-name"
+                >
+                  Token name
+                </label>
+                <input
+                  id="token-name"
+                  ref={nameInputRef}
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
+                  className="input-field"
+                  placeholder="e.g. Launch token"
+                  style={{ width: '100%', boxSizing: 'border-box', marginBottom: 14 }}
+                />
+                <button
+                  type="button"
+                  disabled={working}
+                  onClick={createToken}
+                  className="btn-primary sm"
+                  style={{ opacity: working ? 0.6 : 1 }}
+                >
+                  {working ? "Working…" : "Create agent token"}
+                </button>
+                {newToken && (
+                  <div
+                    role="status"
+                    style={{
+                      marginTop: 16,
+                      borderRadius: 10,
+                      border: '2px solid var(--accent-border)',
+                      background: 'var(--accent-soft)',
+                      padding: 14,
+                    }}
+                  >
+                    <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--accent)', margin: '0 0 8px' }}>
+                      Copy now — not shown again
+                    </p>
+                    <pre style={{ maxHeight: 80, overflow: 'auto', borderRadius: 6, border: '1px solid var(--accent-border)', background: 'var(--card)', padding: '8px 10px', fontSize: 11, margin: '0 0 8px', fontFamily: "'JetBrains Mono', monospace", color: 'var(--ink)', wordBreak: 'break-all', whiteSpace: 'pre-wrap' }}>
+                      {newToken}
+                    </pre>
+                    <button
+                      type="button"
+                      onClick={() => copy(newToken, "token")}
+                      className="btn-primary sm"
+                    >
+                      {copied === "token" ? "✓ Copied" : "Copy token"}
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              <div style={cardStyle}>
+                <h2 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 6px', letterSpacing: '-0.01em' }}>Publish command</h2>
+                <p style={{ fontSize: 12.5, color: 'var(--muted)', margin: '0 0 12px', lineHeight: 1.55 }}>
+                  Replace <code style={{ fontFamily: "'JetBrains Mono', monospace", background: 'var(--studio)', padding: '1px 5px', borderRadius: 4, fontSize: 11 }}>YOUR_FLOOM_AGENT_TOKEN</code> with the token.
+                </p>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, background: 'var(--terminal-bg)', borderRadius: 8, padding: '10px 12px' }}>
+                  <pre style={{ flex: 1, fontFamily: "'JetBrains Mono', monospace", fontSize: 10.5, color: 'var(--terminal-ink)', margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-all', lineHeight: 1.7 }}>
+                    {publishCommand}
+                  </pre>
+                  <button
+                    type="button"
+                    onClick={() => copy(publishCommand, "command")}
+                    style={{ flexShrink: 0, fontSize: 11, fontWeight: 600, color: copied === 'command' ? '#fff' : 'var(--code-accent)', background: 'transparent', border: `1px solid ${copied === 'command' ? 'var(--code-accent)' : 'rgba(110,231,183,0.3)'}`, borderRadius: 5, padding: '4px 10px', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}
+                  >
+                    {copied === "command" ? "✓ Copied" : "Copy"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+
+        <p style={{ marginTop: 32, fontSize: 12.5, color: 'var(--muted)' }}>
           Production URL:{" "}
           <a
             href={PRODUCTION_FLOOM_URL}
-            className="font-medium text-neutral-700 underline"
+            style={{ fontWeight: 600, color: 'var(--muted)', textDecoration: 'underline', textUnderlineOffset: 2 }}
             target="_blank"
             rel="noreferrer"
           >

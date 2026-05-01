@@ -169,6 +169,7 @@ export function RunSurface({ app, initialRun, initialInputs, examplePrefillInput
       }}
     >
       <div
+        className="run-surface-grid"
         style={{
           display: 'grid',
           gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)',
@@ -177,19 +178,61 @@ export function RunSurface({ app, initialRun, initialInputs, examplePrefillInput
       >
         {/* Inputs */}
         <div style={{ padding: 24, borderRight: '1px solid var(--line)' }}>
+          {/* v11: lighter Inputs header */}
           <div
             style={{
-              fontFamily: "'JetBrains Mono', ui-monospace, monospace",
-              fontSize: 10.5,
-              fontWeight: 700,
-              letterSpacing: '0.12em',
-              textTransform: 'uppercase',
-              color: 'var(--muted)',
-              marginBottom: 12,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 7,
+              marginBottom: 14,
             }}
           >
-            Inputs · {fields.length} field{fields.length === 1 ? '' : 's'}
+            <span style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--muted)', letterSpacing: '0.01em' }}>
+              Inputs
+            </span>
+            <span style={{
+              fontSize: 11,
+              fontWeight: 500,
+              color: 'var(--muted)',
+              opacity: 0.65,
+              background: 'var(--bg)',
+              border: '1px solid var(--line)',
+              borderRadius: 20,
+              padding: '1px 7px',
+            }}>
+              {fields.length}
+            </span>
           </div>
+          {/* v11: example prefill hint chip — appears above first field when idle+empty */}
+          {showExampleHint && examplePrefillInputs && (
+            <button
+              type="button"
+              onClick={applyExample}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                marginBottom: 12,
+                padding: '6px 12px',
+                background: 'rgba(4,120,87,0.06)',
+                border: '1px dashed rgba(4,120,87,0.3)',
+                borderRadius: 8,
+                fontSize: 12,
+                fontWeight: 600,
+                color: 'var(--accent)',
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+                width: '100%',
+                textAlign: 'left',
+              }}
+            >
+              <span aria-hidden="true" style={{ fontSize: 13, opacity: 0.7 }}>⚡</span>
+              Try with example
+              <span style={{ opacity: 0.6, fontWeight: 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                {' '}— {String(Object.values(examplePrefillInputs)[0] ?? '').slice(0, 40)}{String(Object.values(examplePrefillInputs)[0] ?? '').length > 40 ? '…' : ''}
+              </span>
+            </button>
+          )}
           {fields.length === 0 ? (
             <div style={{ fontSize: 13, color: 'var(--muted)' }}>
               This app takes no inputs.
@@ -288,32 +331,12 @@ export function RunSurface({ app, initialRun, initialInputs, examplePrefillInput
             >
               Reset
             </button>
-            {showExampleHint && (
-              <button
-                type="button"
-                onClick={applyExample}
-                style={{
-                  marginLeft: 'auto',
-                  padding: '6px 0',
-                  background: 'transparent',
-                  color: 'var(--accent)',
-                  border: 'none',
-                  fontSize: 12.5,
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  fontFamily: 'inherit',
-                  textDecoration: 'underline',
-                  textUnderlineOffset: 3,
-                }}
-              >
-                Try with example →
-              </button>
-            )}
+            {/* v11: "Try with example" is now a chip ABOVE the first field — removed here */}
           </div>
         </div>
 
         {/* Output */}
-        <div style={{ padding: 24, background: 'var(--bg)' }}>
+        <div className="run-surface-output" style={{ padding: 24, background: 'var(--bg)' }}>
           <div
             style={{
               display: 'flex',
@@ -323,16 +346,8 @@ export function RunSurface({ app, initialRun, initialInputs, examplePrefillInput
               gap: 12,
             }}
           >
-            <span
-              style={{
-                fontFamily: "'JetBrains Mono', ui-monospace, monospace",
-                fontSize: 10.5,
-                fontWeight: 700,
-                letterSpacing: '0.12em',
-                textTransform: 'uppercase',
-                color: 'var(--muted)',
-              }}
-            >
+            {/* v11: lighter Output label — matches Inputs */}
+            <span style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--muted)', letterSpacing: '0.01em' }}>
               Output
             </span>
             {state.kind === 'ok' && (
@@ -520,6 +535,7 @@ const inputStyle = {
   color: 'var(--ink)',
   outline: 'none',
   fontFamily: 'inherit',
+  transition: 'border-color 0.15s, box-shadow 0.15s',
 } as const;
 
 interface PastRunsDisclosureProps {

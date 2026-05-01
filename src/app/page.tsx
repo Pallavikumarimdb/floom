@@ -100,31 +100,40 @@ function MvpHeroInstall({ appsCount, runs7dSum }: MvpHeroInstallProps) {
   // first viewport.
 
   return (
-    <div style={{ maxWidth: 540, margin: '20px auto 0', textAlign: 'left' }}>
-      {/* v8 (2026-05-01): collapsed dense hero per Federico's feedback.
-          Removed: "PASTE IN YOUR TERMINAL — OR ANY AI AGENT" label
-          (redundant with the $ prefix), outcome line "→ Mints your agent
-          token..." (visual noise). Result: 7 stacked elements → 4. */}
-      <div style={{ position: 'relative' }}>
+    <div style={{ maxWidth: 560, margin: '28px auto 0', textAlign: 'left' }}>
+      {/* v11: Elevated install card with better hierarchy and Copy CTA */}
+      <div
+        className="hero-install-card"
+        style={{
+          background: 'var(--card)',
+          border: '1.5px solid var(--line)',
+          borderRadius: 12,
+          padding: '10px 10px 10px 20px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 12,
+          boxShadow: '0 1px 3px rgba(22,21,18,.04), 0 4px 20px rgba(22,21,18,.06)',
+        }}
+      >
         <pre
           data-testid="hero-npx-command"
           style={{
             fontFamily: "'JetBrains Mono', ui-monospace, monospace",
-            fontSize: 14,
-            background: 'var(--studio, #f5f4f0)',
+            fontSize: 13.5,
             color: 'var(--ink)',
-            border: '1px solid var(--line)',
-            borderRadius: 10,
-            padding: '14px 90px 14px 18px',
             overflowX: 'auto',
             whiteSpace: 'pre',
             lineHeight: 1.5,
             margin: 0,
-            display: 'flex',
-            alignItems: 'center',
+            background: 'transparent',
+            border: 'none',
+            padding: 0,
+            flex: 1,
+            minWidth: 0,
           }}
         >
-          <span style={{ color: 'var(--muted)', userSelect: 'none', marginRight: 10 }}>$</span>
+          <span style={{ color: 'var(--muted)', userSelect: 'none', marginRight: 8 }}>$</span>
           {NPX_SETUP_COMMAND}
         </pre>
         <button
@@ -132,63 +141,58 @@ function MvpHeroInstall({ appsCount, runs7dSum }: MvpHeroInstallProps) {
           data-testid="hero-npx-copy-btn"
           onClick={() => void handleCopy()}
           style={{
-            position: 'absolute',
-            top: '50%',
-            transform: 'translateY(-50%)',
-            right: 10,
-            fontSize: 12,
+            flexShrink: 0,
+            fontSize: 13,
             fontWeight: 600,
             color: copied ? '#fff' : 'var(--accent)',
-            background: copied ? 'var(--accent)' : 'var(--card)',
-            border: `1px solid ${copied ? 'var(--accent)' : 'rgba(4,120,87,0.35)'}`,
-            borderRadius: 6,
-            padding: '6px 14px',
+            background: copied ? 'var(--accent)' : 'transparent',
+            border: `1.5px solid ${copied ? 'var(--accent)' : 'var(--accent)'}`,
+            borderRadius: 8,
+            padding: '8px 18px',
             cursor: 'pointer',
             fontFamily: 'inherit',
-            letterSpacing: '0.03em',
+            letterSpacing: '0.01em',
+            transition: 'background 0.15s, color 0.15s',
           }}
           aria-label={copied ? 'Copied' : 'Copy command'}
         >
-          {copied ? 'Copied' : 'Copy'}
+          {copied ? '✓ Copied' : 'Copy'}
         </button>
       </div>
-      {/* R10 (2026-04-28): complementary "Try a live app" CTA. Gemini
-          baseline scored landing 6/10 partly because the only first-
-          step action was "copy this command and paste in your terminal".
-          Adding a 1-click path to a live app gives non-CLI visitors a
-          way to feel the product without installing anything. */}
+      {/* v11: "Try a live app" promoted to secondary button beside install */}
       <div
         style={{
-          marginTop: 12,
+          marginTop: 14,
           display: 'flex',
           alignItems: 'center',
-          gap: 8,
-          fontSize: 13,
-          color: 'var(--muted)',
+          justifyContent: 'center',
+          gap: 10,
         }}
       >
-        <span>or</span>
         <Link
           href="/p/demo-app"
           data-testid="hero-try-live-app"
           style={{
-            color: 'var(--accent)',
-            fontWeight: 600,
-            textDecoration: 'none',
             display: 'inline-flex',
             alignItems: 'center',
-            gap: 4,
+            gap: 6,
+            padding: '9px 20px',
+            border: '1px solid var(--line)',
+            borderRadius: 8,
+            fontSize: 13.5,
+            fontWeight: 600,
+            color: 'var(--ink)',
+            background: 'var(--card)',
+            textDecoration: 'none',
+            boxShadow: '0 1px 2px rgba(22,21,18,.03)',
+            transition: 'border-color 0.15s, box-shadow 0.15s',
           }}
         >
-          try a live app in your browser
-          <span aria-hidden="true">→</span>
+          Try a live app
+          <span aria-hidden="true" style={{ opacity: 0.6 }}>→</span>
         </Link>
       </div>
-      {/* R15 UI-6 (2026-04-28): hero trust-signals strip. Real numbers
-          sourced from /api/hub (apps count + runs_7d sum) and
-          GitHubStarsBadge's /api/gh-stars cache. Renders as one quiet
-          gray line below the npx + "try live app" CTAs. Each stat hides
-          when it's zero/missing so a cold launch never shows "0 runs". */}
+      {/* R15 UI-6 (2026-04-28): hero trust-signals strip. */}
       <HeroTrustSignals appsCount={appsCount} runs7dSum={runs7dSum} />
     </div>
   );
@@ -485,7 +489,8 @@ export default function LandingV17PageMvp() {
             </div>
 
             {/* H1 — locked copy. Wireframe ships 64px desktop, balance wrap.
-                F10 (2026-04-28): "fast" coloured with brand green for emphasis. */}
+                F10 (2026-04-28): "fast" coloured with brand green for emphasis.
+                v11: hero-accent-word class adds underline-draw animation. */}
             <h1
               className="hero-headline"
               style={{
@@ -499,7 +504,8 @@ export default function LandingV17PageMvp() {
                 textWrap: 'balance' as unknown as 'balance',
               }}
             >
-              Ship AI apps <span style={{ color: 'var(--accent)' }}>fast</span>.
+              Ship AI apps{' '}
+              <span className="hero-accent-word" style={{ color: 'var(--accent)' }}>fast</span>.
             </h1>
 
             {/* R38 (2026-04-29): quiet honest qualifier under the H1.
@@ -653,12 +659,19 @@ export default function LandingV17PageMvp() {
                 <p style={{ fontSize: 15, color: 'var(--muted)', lineHeight: 1.6, margin: 0 }}>
                   {s.body}
                 </p>
+                {/* v11: action line is the visual anchor — accent colour + stronger weight */}
                 <div
                   style={{
                     marginTop: 14,
                     fontFamily: "'JetBrains Mono', ui-monospace, monospace",
-                    fontSize: 11.5,
-                    color: 'var(--muted)',
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: 'var(--accent)',
+                    background: 'rgba(4,120,87,0.06)',
+                    border: '1px solid rgba(4,120,87,0.15)',
+                    borderRadius: 6,
+                    padding: '5px 10px',
+                    display: 'inline-block',
                   }}
                 >
                   {s.mono}

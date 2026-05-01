@@ -11,7 +11,7 @@
 //   - All heavy components → stubs with // TODO(v5-port): comments
 // See docs/v5-port-stubs.md for full stub list.
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { SiteHeader } from '@/components/SiteHeader';
@@ -1014,68 +1014,19 @@ export default function AppPermalinkPage() {
             </div>
           </section>
 
-          {/* Tab bar (#626, 2026-04-24): underlined tabs directly below hero */}
-          <div
-            role="tablist"
-            aria-label="App content"
-            data-testid="permalink-tabs"
-            style={{
-              display: 'flex',
-              alignItems: 'stretch',
-              flexWrap: 'wrap',
-              gap: 0,
-              padding: '0',
-              borderBottom: '1px solid var(--line)',
-              background: 'transparent',
+          {/* Tab bar v11: sliding underline animation */}
+          <TabBar
+            activeTab={activeTab}
+            setActiveTab={(tab) => {
+              setActiveTab(tab);
+              updateSearchParams((prev) => {
+                const next = new URLSearchParams(prev);
+                if (tab === 'run') next.delete('tab');
+                else next.set('tab', tab);
+                return next;
+              });
             }}
-          >
-            {([
-              { id: 'run' as PTab, label: 'Run' },
-              { id: 'about' as PTab, label: 'About' },
-              { id: 'install' as PTab, label: 'Install' },
-              { id: 'source' as PTab, label: 'Source' },
-              { id: 'runs' as PTab, label: 'Earlier runs' },
-            ]).map((t) => {
-              const isOn = activeTab === t.id;
-              return (
-                <button
-                  key={t.id}
-                  type="button"
-                  role="tab"
-                  aria-selected={isOn}
-                  data-testid={`permalink-tab-${t.id}`}
-                  data-state={isOn ? 'active' : 'inactive'}
-                  onClick={() => {
-                    setActiveTab(t.id);
-                    updateSearchParams((prev) => {
-                      const next = new URLSearchParams(prev);
-                      if (t.id === 'run') next.delete('tab');
-                      else next.set('tab', t.id);
-                      return next;
-                    });
-                  }}
-                  style={{
-                    padding: '12px 16px',
-                    fontSize: 13,
-                    fontWeight: isOn ? 600 : 500,
-                    border: 'none',
-                    background: 'transparent',
-                    color: isOn ? 'var(--ink)' : 'var(--muted)',
-                    borderBottom: isOn
-                      ? '2px solid var(--accent)'
-                      : '2px solid transparent',
-                    marginBottom: -1,
-                    cursor: 'pointer',
-                    fontFamily: 'inherit',
-                    whiteSpace: 'nowrap',
-                    transition: 'color .12s, border-color .12s',
-                  }}
-                >
-                  {t.label}
-                </button>
-              );
-            })}
-          </div>
+          />
 
           {/* Frame body: swappable by ?tab= */}
           <div
@@ -1165,26 +1116,22 @@ export default function AppPermalinkPage() {
                   onResult={handleRunResult}
                   onShare={openShareModal}
                 />
-                {/* R7.8 / R16: privacy note */}
+                {/* v11: privacy note — tighter, info-icon style */}
                 <div
                   data-testid="ap-privacy-note"
                   style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: 8,
-                    marginTop: 20,
-                    padding: '10px 14px',
-                    border: '1px solid var(--line)',
-                    borderRadius: 10,
-                    background: 'var(--bg)',
-                    fontSize: 13,
-                    color: 'var(--ink)',
-                    lineHeight: 1.55,
+                    gap: 6,
+                    marginTop: 16,
+                    fontSize: 12,
+                    color: 'var(--muted)',
+                    lineHeight: 1.5,
                   }}
                 >
                   <svg
-                    width="14"
-                    height="14"
+                    width="13"
+                    height="13"
                     viewBox="0 0 24 24"
                     fill="none"
                     stroke="currentColor"
@@ -1192,13 +1139,36 @@ export default function AppPermalinkPage() {
                     strokeLinecap="round"
                     strokeLinejoin="round"
                     aria-hidden="true"
-                    style={{ flexShrink: 0, color: 'var(--accent)' }}
+                    style={{ flexShrink: 0, opacity: 0.5 }}
                   >
                     <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
                   </svg>
                   <span>
-                    Your inputs are sent to {app.manifest?.name ?? app.name} to produce a result. Floom doesn&apos;t sell or share run data.
+                    Inputs are sent to {app.manifest?.name ?? app.name}{' '}to produce a result. Floom doesn&apos;t sell or share run data.
                   </span>
+                </div>
+                {/* v11: Built with Floom credit */}
+                <div
+                  style={{
+                    marginTop: 24,
+                    paddingTop: 20,
+                    borderTop: '1px solid var(--line)',
+                    fontSize: 12,
+                    color: 'var(--muted)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                  }}
+                >
+                  <img src="/floom-mark-glow.svg" alt="" aria-hidden="true" width={14} height={14} style={{ opacity: 0.55 }} />
+                  Built with{' '}
+                  <a
+                    href="/"
+                    style={{ color: 'var(--accent)', fontWeight: 600, textDecoration: 'none' }}
+                  >
+                    Floom
+                  </a>
+                  {' '}— localhost to live in 60 seconds.
                 </div>
                 {celebrate && (
                   <CelebrationCard
@@ -1600,6 +1570,109 @@ export default function AppPermalinkPage() {
         />
       )}
 
+    </div>
+  );
+}
+
+/* ----------------- TabBar with sliding underline ----------------- */
+
+const TABS: Array<{ id: 'run' | 'about' | 'install' | 'source' | 'runs'; label: string }> = [
+  { id: 'run', label: 'Run' },
+  { id: 'about', label: 'About' },
+  { id: 'install', label: 'Install' },
+  { id: 'source', label: 'Source' },
+  { id: 'runs', label: 'Earlier runs' },
+];
+
+function TabBar({
+  activeTab,
+  setActiveTab,
+}: {
+  activeTab: 'run' | 'about' | 'install' | 'source' | 'runs';
+  setActiveTab: (t: 'run' | 'about' | 'install' | 'source' | 'runs') => void;
+}) {
+  const tabRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
+  const [indicator, setIndicator] = useState<{ left: number; width: number } | null>(null);
+
+  useEffect(() => {
+    const el = tabRefs.current.get(activeTab);
+    if (el) {
+      const { offsetLeft, offsetWidth } = el;
+      setIndicator({ left: offsetLeft, width: offsetWidth });
+    }
+  }, [activeTab]);
+
+  const tabBtnStyle = (isOn: boolean): CSSProperties => ({
+    padding: '11px 16px',
+    fontSize: 13.5,
+    fontWeight: isOn ? 600 : 500,
+    border: 'none',
+    background: 'transparent',
+    color: isOn ? 'var(--ink)' : 'var(--muted)',
+    marginBottom: 0,
+    cursor: 'pointer',
+    fontFamily: 'inherit',
+    whiteSpace: 'nowrap',
+    transition: 'color .14s',
+    letterSpacing: isOn ? '-0.01em' : undefined,
+  });
+
+  return (
+    <div
+      role="tablist"
+      aria-label="App content"
+      data-testid="permalink-tabs"
+      className="permalink-tab-bar"
+      style={{
+        display: 'flex',
+        alignItems: 'stretch',
+        flexWrap: 'nowrap',
+        overflowX: 'auto',
+        gap: 0,
+        padding: 0,
+        borderBottom: '1px solid var(--line)',
+        background: 'transparent',
+        position: 'relative',
+      }}
+    >
+      {TABS.map((t) => {
+        const isOn = activeTab === t.id;
+        return (
+          <button
+            key={t.id}
+            ref={(el) => {
+              if (el) tabRefs.current.set(t.id, el);
+              else tabRefs.current.delete(t.id);
+            }}
+            type="button"
+            role="tab"
+            aria-selected={isOn}
+            data-testid={`permalink-tab-${t.id}`}
+            data-state={isOn ? 'active' : 'inactive'}
+            onClick={() => setActiveTab(t.id)}
+            style={tabBtnStyle(isOn)}
+          >
+            {t.label}
+          </button>
+        );
+      })}
+      {/* Sliding underline indicator */}
+      {indicator && (
+        <div
+          className="permalink-tab-underline"
+          style={{
+            position: 'absolute',
+            bottom: -1,
+            left: indicator.left,
+            width: indicator.width,
+            height: 2,
+            background: 'var(--accent)',
+            borderRadius: '1px 1px 0 0',
+            transition: 'left 0.18s cubic-bezier(0.22, 1, 0.36, 1), width 0.18s cubic-bezier(0.22, 1, 0.36, 1)',
+            pointerEvents: 'none',
+          }}
+        />
+      )}
     </div>
   );
 }
