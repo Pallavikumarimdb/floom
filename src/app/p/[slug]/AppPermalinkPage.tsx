@@ -1191,29 +1191,9 @@ export default function AppPermalinkPage() { // exported as default so the serve
                     Inputs are sent to {app.manifest?.name ?? app.name}{' '}to produce a result. Floom doesn&apos;t sell or share run data.
                   </span>
                 </div>
-                {/* v11: Built with Floom credit */}
-                <div
-                  style={{
-                    marginTop: 24,
-                    paddingTop: 20,
-                    borderTop: '1px solid var(--line)',
-                    fontSize: 12,
-                    color: 'var(--muted)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 6,
-                  }}
-                >
-                  <img src="/floom-mark-glow.svg" alt="" aria-hidden="true" width={14} height={14} style={{ opacity: 0.55 }} />
-                  Built with{' '}
-                  <Link
-                    href="/"
-                    style={{ color: 'var(--accent)', fontWeight: 600, textDecoration: 'none' }}
-                  >
-                    Floom
-                  </Link>
-                  {' '}— localhost to live in 60 seconds.
-                </div>
+                {/* "Built with Floom" credit row removed — already in the
+                    site footer right below; doubling the brand on every app
+                    page is noise, not signal. */}
                 {celebrate && (
                   <CelebrationCard
                     slug={app.slug}
@@ -1620,12 +1600,13 @@ export default function AppPermalinkPage() { // exported as default so the serve
 
 /* ----------------- TabBar with sliding underline ----------------- */
 
+// History tab hidden until run-history is wired (today it renders a 'coming
+// in v0.1' stub which is just noise). 4 tabs read cleaner on mobile too.
 const TABS: Array<{ id: 'run' | 'about' | 'install' | 'source' | 'runs'; label: string }> = [
   { id: 'run', label: 'Run' },
   { id: 'about', label: 'About' },
   { id: 'install', label: 'Install' },
   { id: 'source', label: 'Source' },
-  { id: 'runs', label: 'History' },
 ];
 
 function TabBar({
