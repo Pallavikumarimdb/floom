@@ -50,18 +50,34 @@ For launch readiness, v0.1 must support:
 
 ## Open Launch Blockers
 
-1. Apply and verify Supabase `app_secrets` migration.
-2. Deploy v0.1 integration branch.
-3. Verify Google signup/signin to `/tokens` on `https://floom.dev`.
-4. Fix token page API failure if still present after v0.1 deploy.
-5. Test token create/copy/list/revoke.
-6. Test CLI setup with generated token.
-7. Test app publish with `requirements.txt`.
-8. Test encrypted secret set/list/delete and run.
-9. Test browser/API/MCP run for v0.1 apps.
-10. Run virgin-agent QA for full signup/token/publish/run flow.
-11. Run independent code-cleanliness/security agents.
-12. Decide merge order for PR #11 UI polish after v0.1 flow is green.
+1. Google signup/signin and token creation still need one fresh browser QA pass after the v0.1 deploy.
+2. Token revoke and revoked-token rejection still need one fresh browser QA pass after the v0.1 deploy.
+3. Virgin-agent QA for full signup/token/publish/run is in progress.
+4. Independent code-cleanliness/security audit is in progress.
+5. PR #11 UI polish must be updated after v0.1 lands on `main`; it currently conflicts with the v0.1 branch.
+6. Supabase SMTP remains open for public self-serve signup volume beyond the default provider limits.
+
+## Verified On Production
+
+- `https://floom.dev` serves the Vercel deployment through AX41 nginx.
+- `https://floom.dev/mcp` returns the Floom MCP descriptor.
+- `meeting-action-items` exists as the canonical public demo app.
+- Live v0.1 gate passed on `https://floom.dev`:
+  - CLI publish of a dependency app.
+  - MCP publish of a dependency app.
+  - REST and MCP run of dependency app.
+  - Public secret-backed app rejection.
+  - MCP publish of private secret app.
+  - Private metadata/page access controls.
+  - Missing-secret failure before run.
+  - Encrypted secret set/list/delete through CLI.
+  - Scoped-token and non-owner negative checks.
+  - REST and MCP run of private secret app with redacted output.
+  - Supabase evidence check proving secrets are not persisted in execution output.
+- Published `@floomhq/cli@latest` is `0.2.16`.
+- Published npm CLI passed isolated `auth login`, `deploy --dry-run`, `deploy`, `run --json`, and REST run against `https://floom.dev`.
+
+Use `node scripts/run-live-v01-gate.mjs` from the repo root to rerun the live gate with redacted output. It expects `/tmp/floom-v01-prod-refresh.env` and `/tmp/floom-v01-agent-token` unless overridden by `FLOOM_VERCEL_ENV_FILE` and `FLOOM_TOKEN_FILE`.
 
 ## User-Reported Blocking List
 
