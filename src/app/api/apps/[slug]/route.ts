@@ -3,6 +3,16 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { callerHasScope, resolveAuthCaller } from "@/lib/supabase/auth";
 import { demoApp, hasSupabaseConfig } from "@/lib/demo-app";
 
+type AppVersionBundle = {
+  bundle_path: string | null;
+};
+
+type DeletableApp = {
+  id: string;
+  owner_id: string;
+  app_versions?: AppVersionBundle[];
+};
+
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ slug: string }> }
@@ -52,4 +62,79 @@ export async function GET(
     input_schema: latestVersion?.input_schema ?? {},
     output_schema: latestVersion?.output_schema ?? {},
   });
+}
+
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ slug: string }> }
+) {
+  const { slug } = await params;
+
+  if (!hasSupabaseConfig()) {
+    return NextResponse.json(
+      { error: "Supabase is not configured. Set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY." },
+      { status: 503 }
+    );
+  }
+
+  const admin = createAdminClient();
+  const caller = await resolveAuthCaller(req, admin);
+  if (!caller) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  if (!callerHasScope(caller, "publish")) {
+    return NextResponse.json({ error: "Missing publish scope" }, { status: 403 });
+  }
+
+  const { data: app, error } = await admin
+    .from("apps")
+    .select("id, owner_id, app_versions(bundle_path)")
+    .eq("slug", slug)
+    .maybeSingle();
+
+  if (error) {
+    return NextResponse.json({ error: "Failed to load app" }, { status: 500 });
+  }
+
+  if (!app || (app as DeletableApp).owner_id !== caller.userId) {
+    return NextResponse.json({ error: "App not found" }, { status: 404 });
+  }
+
+  const deletableApp = app as DeletableApp;
+  const bundlePaths = Array.from(
+    new Set(
+      (deletableApp.app_versions ?? [])
+        .map((version) => version.bundle_path)
+        .filter((path): path is string => Boolean(path))
+    )
+  );
+
+  if (bundlePaths.length > 0) {
+    const { error: storageError } = await admin
+      .storage
+      .from("app-bundles")
+      .remove(bundlePaths);
+
+    if (storageError) {
+      return NextResponse.json({ error: "Failed to delete app bundles" }, { status: 500 });
+    }
+  }
+
+  const { data: deletedRows, error: deleteError } = await admin
+    .from("apps")
+    .delete()
+    .eq("id", deletableApp.id)
+    .eq("owner_id", caller.userId)
+    .select("id");
+
+  if (deleteError) {
+    return NextResponse.json({ error: "Failed to delete app" }, { status: 500 });
+  }
+
+  if (!deletedRows || deletedRows.length !== 1) {
+    return NextResponse.json({ error: "App not found" }, { status: 404 });
+  }
+
+  return NextResponse.json({ deleted: true, slug });
 }

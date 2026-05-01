@@ -203,6 +203,7 @@ async function test() {
   testSecretRedaction();
   await testV01DependencyAndSecretMetadata();
   testPublicRunRateLimitHardening();
+  testAppDeleteRoute();
   testOAuthCallbackErrorHandling();
   await testSandboxDependenciesAndSecrets();
   await testSandboxErrorContainment();
@@ -1145,6 +1146,28 @@ function testPublicRunRateLimitHardening() {
   const tokenLibText = readFileSync('src/lib/supabase/agent-tokens.ts', 'utf8');
   assert.match(tokenLibText, /scopes: string\[\] = \["read", "run", "publish"\]/);
   assert.doesNotMatch(tokenLibText, /"revoke"\]/);
+}
+
+function testAppDeleteRoute() {
+  const routeText = readFileSync('src/app/api/apps/[slug]/route.ts', 'utf8');
+
+  assert.match(routeText, /export async function DELETE/);
+  assert.match(routeText, /resolveAuthCaller\(req, admin\)/);
+  assert.match(routeText, /callerHasScope\(caller, "publish"\)/);
+  assert.match(routeText, /Missing publish scope/);
+  assert.match(routeText, /\.select\("id, owner_id, app_versions\(bundle_path\)"\)/);
+  assert.match(routeText, /owner_id !== caller\.userId/);
+  assert.match(routeText, /App not found/);
+  assert.match(routeText, /storage\s*\.\s*from\("app-bundles"\)\s*\.\s*remove\(bundlePaths\)/s);
+  assert.match(routeText, /\.from\("apps"\)\s*\.\s*delete\(\)/s);
+  assert.match(routeText, /\.eq\("owner_id", caller\.userId\)/);
+  assert.match(routeText, /data: deletedRows/);
+  assert.match(routeText, /deletedRows\.length !== 1/);
+  assert.ok(
+    routeText.indexOf('.remove(bundlePaths)') < routeText.indexOf('.from("apps")\n    .delete()'),
+    'bundle cleanup must happen before deleting the app row'
+  );
+  assert.match(routeText, /return NextResponse\.json\(\{ deleted: true, slug \}\)/);
 }
 
 function testOAuthCallbackErrorHandling() {
