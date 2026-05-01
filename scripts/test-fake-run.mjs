@@ -766,6 +766,8 @@ function testSecretRedaction() {
   assert.match(routeText, /Object\.values\(runtimeSecrets\.envs\)/);
   assert.match(routeText, /public apps may run anonymously even with runtime secrets/);
   assert.equal(routeText.includes('Secret-backed apps require owner authentication'), false);
+  const publishRouteText = readFileSync('src/app/api/apps/route.ts', 'utf8');
+  assert.doesNotMatch(publishRouteText, /Secret-backed apps must be private/);
   assert.match(routeText, /input: redactedInputs/);
   assert.ok(
     routeText.indexOf('redactSecretInput') < routeText.indexOf('.from("executions")'),

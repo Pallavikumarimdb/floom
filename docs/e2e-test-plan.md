@@ -149,7 +149,7 @@ Verify:
 - secret values never appear in API, MCP, execution rows, logs, screenshots, app versions, or storage bundles,
 - secret metadata list shows names/timestamps only,
 - missing required secret fails before user code runs,
-- public secret-backed app publish is rejected,
+- public secret-backed app publishes, runs anonymously, and still never exposes raw secret values,
 - E2B output proves dependency import or secret environment access,
 - dependency install runs before secret injection.
 

@@ -82,12 +82,6 @@ export async function POST(req: NextRequest) {
   }
 
   const ownerId = caller.userId;
-  if (manifest.public && (manifest.secrets?.length ?? 0) > 0) {
-    return NextResponse.json(
-      { error: "Secret-backed apps must be private in v0.1" },
-      { status: 400 }
-    );
-  }
 
   // Fetch existing app so owners can publish updates to their slug.
   const { data: existing } = await admin

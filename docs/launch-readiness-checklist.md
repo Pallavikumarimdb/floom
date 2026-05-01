@@ -101,8 +101,8 @@ evidence store.
 | Secret redaction | secret-like output fields are redacted | Needs current evidence |
 | Network isolation | dependency install sandbox runs separately from the secret-backed execution sandbox; public-secret apps now rely on runtime isolation plus rate limits, not no-egress execution | Pre-merge evidence exists; needs current evidence |
 | Missing secret failure | missing required secret fails before user code runs | Needs current evidence |
-| Public secret app rejection | secret-backed apps cannot be public | Needs current evidence |
-| YAML contract matrix | documented valid manifests publish; documented invalid fields (`runtime`, `actions`, inline schemas, multi-file entrypoints, public secrets) fail with clear copy | Needs current evidence |
+| Public secret app run | secret-backed public apps publish, run anonymously, and never expose raw secret values | Needs current evidence |
+| YAML contract matrix | documented valid manifests publish; documented invalid fields (`runtime`, `actions`, inline schemas, multi-file entrypoints) fail with clear copy | Needs current evidence |
 | Dependency failure matrix | missing requirements file, unpinned requirement, wrong hash, install timeout, import failure, and oversized requirements fail safely | Needs current evidence |
 | Secret database evidence | production DB stores encrypted ciphertext only; plaintext test secret is absent from `app_secrets`, `app_versions`, `executions`, logs, and screenshots | Needs current evidence |
 | Secret RLS evidence | owner can manage secret metadata; non-owner and anon cannot read or mutate secret records | Needs current evidence |
