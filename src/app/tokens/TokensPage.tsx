@@ -236,7 +236,70 @@ export default function TokensPage() {
         {/* When no tokens: create form is the hero, publish command below */}
         {tokens.length === 0 ? (
           <>
-            <div style={{ marginTop: 36, maxWidth: 460, ...cardStyle }}>
+            {/* First-time hint: only shown before any token exists AND before newToken is revealed */}
+            {!newToken && (
+              <div
+                style={{
+                  marginTop: 32,
+                  padding: '20px 24px',
+                  background: 'var(--accent-soft)',
+                  border: '1px solid var(--accent-border)',
+                  borderRadius: 14,
+                  maxWidth: 620,
+                }}
+              >
+                <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--accent)', letterSpacing: '0.07em', textTransform: 'uppercase', margin: '0 0 14px', fontFamily: "'JetBrains Mono', ui-monospace, monospace" }}>
+                  Your first 60 seconds
+                </p>
+                <div
+                  style={{
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    gap: 10,
+                  }}
+                >
+                  {[
+                    { n: 1, text: 'Mint a token below.' },
+                    { n: 2, text: <>Run <code style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, background: 'rgba(0,0,0,0.06)', padding: '1px 5px', borderRadius: 4 }}>npx @floomhq/cli setup</code> and paste it.</> },
+                    { n: 3, text: 'Drop a Python file in. Floom does the rest.' },
+                  ].map(({ n, text }) => (
+                    <div
+                      key={n}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'flex-start',
+                        gap: 10,
+                        flex: '1 1 180px',
+                        minWidth: 160,
+                      }}
+                    >
+                      <span
+                        style={{
+                          flexShrink: 0,
+                          width: 22,
+                          height: 22,
+                          borderRadius: '50%',
+                          background: 'var(--accent)',
+                          color: '#fff',
+                          fontSize: 11,
+                          fontWeight: 800,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontFamily: "'JetBrains Mono', monospace",
+                          marginTop: 1,
+                        }}
+                      >
+                        {n}
+                      </span>
+                      <span style={{ fontSize: 13, color: 'var(--ink)', lineHeight: 1.5 }}>{text}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div style={{ marginTop: 24, maxWidth: 460, ...cardStyle }}>
               <h2 style={{ fontSize: 20, fontWeight: 700, margin: '0 0 6px', letterSpacing: '-0.015em' }}>Create your first token</h2>
               <p style={{ fontSize: 13, color: 'var(--muted)', margin: '0 0 20px', lineHeight: 1.55 }}>
                 The raw token is shown once. Store it in your local secret manager.
