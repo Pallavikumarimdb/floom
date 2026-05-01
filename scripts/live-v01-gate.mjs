@@ -217,7 +217,7 @@ async function assertSecretRouteAuthNegatives() {
     inputs: { message: 'anonymous mcp secret run' },
   }, {
     authToken: null,
-    expectedError: /Forbidden/,
+    expectedError: /App not found/,
     label: 'unauthenticated private run_app',
   });
   await assertMcpError('get_app', { slug: secretSlug }, {
@@ -338,7 +338,7 @@ async function assertScopedAndNonOwnerAccessControls() {
     inputs: { message: 'non-owner mcp secret run' },
   }, {
     authToken: otherToken.token,
-    expectedError: /Forbidden/,
+    expectedError: /App not found/,
     label: 'non-owner private run_app',
   });
 

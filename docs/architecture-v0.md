@@ -28,7 +28,7 @@ flowchart TD
   REST["REST caller"] --> Run
   MCP -->|run_app| Run
 
-  Run --> Access["auth + public/private RLS + rate limit"]
+  Run --> Access["API auth + public/private visibility + rate limit"]
   Access --> Bundles
   Access --> Secrets
   Run --> E2B["E2B sandbox"]
@@ -82,20 +82,20 @@ v0.1 rejects:
 
 `FLOOM_SECRET_ENCRYPTION_KEY` is a server-only base64-encoded 32-byte key. App owners manage values via `GET/PUT/DELETE /api/apps/:slug/secrets` or `npx @floomhq/cli@latest secrets`. List responses contain only `name`, `created_at`, and `updated_at` metadata. Values decrypt server-side at run time and are injected as E2B environment variables — never round-tripped to the client.
 
-## v0.1 Launch Blockers
+## v0.1 Launch Verification
 
-Public self-serve sign-up is gated on fresh provider-email verification:
+Public self-serve sign-up has current production evidence:
 
 - The app-side redirect is fixed for `https://floom.dev/auth/callback?next=/tokens`.
-- Supabase Auth provider settings and SMTP/rate-limit behavior still need a fresh real-email pass before public self-serve launch.
-- Google OAuth must be verified through the full production callback, not only provider handoff.
+- A fresh disposable-inbox signup on 2026-05-01 received mail from `noreply@auth.floom.dev`, confirmed without exposing the URL, and landed on `https://floom.dev/tokens`.
+- Google OAuth still remains in the launch checklist for repeated browser regression coverage.
 
 Verified working:
 
 - Agent token creation in authenticated browser sessions.
 - CLI publish with `FLOOM_TOKEN`.
 - Public app metadata and run.
-- Private anonymous metadata/run blocked at API and RLS layers.
+- Private anonymous metadata/run blocked through API non-disclosure and owner-only RLS.
 - Private owner token metadata/run.
 - Browser, REST, and MCP run surfaces.
 - E2B-backed execution with `requirements.txt` install.

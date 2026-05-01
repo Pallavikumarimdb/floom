@@ -100,7 +100,7 @@ export async function POST(
   const isPublic = app.public;
 
   if (!isOwner && !isPublic) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    return NextResponse.json({ error: "App not found" }, { status: 404 });
   }
 
   // v0.1 design call: public apps may run anonymously even with runtime secrets; secrets are injected as env vars, secret-marked output fields are redacted, and per-caller public rate limits still apply.

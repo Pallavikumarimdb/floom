@@ -100,7 +100,7 @@ FLOOM_API_URL="https://floom.dev" npx @floomhq/cli@latest deploy
    - Create or copy a minimal app with `public: false` or no `public` field.
    - Publish with the same token.
    - Confirm anonymous `GET /api/apps/:slug` returns 404.
-   - Confirm anonymous `POST /api/apps/:slug/run` returns 403.
+   - Confirm anonymous `POST /api/apps/:slug/run` returns 404.
    - Confirm owner token `GET /api/apps/:slug` returns 200.
    - Confirm owner token `POST /api/apps/:slug/run` returns `status: "success"`.
 
