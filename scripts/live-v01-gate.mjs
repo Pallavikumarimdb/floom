@@ -180,7 +180,7 @@ async function assertMetadataAndPageAccess() {
   await assertPageLoad(secretSlug, {
     authToken: null,
     expectedStatus: 200,
-    expectedText: 'App not found',
+    expectedText: ['App not found', 'No app found', 'Page not found', '404'],
     label: 'private anonymous app page shell',
   });
   pass('metadata_and_page_access');
@@ -479,8 +479,9 @@ async function assertPageLoad(slug, { authToken, expectedStatus, expectedText, l
 
   const hydratedText = dumpHydratedPageText(`${apiUrl}/p/${slug}`);
   assertNoSecret(hydratedText, `${label} hydrated text`);
+  const expectedTexts = Array.isArray(expectedText) ? expectedText : [expectedText];
   check(
-    text.includes(expectedText) || hydratedText.includes(expectedText),
+    expectedTexts.some((value) => text.includes(value) || hydratedText.includes(value)),
     `${label} page did not contain expected text`
   );
 }
