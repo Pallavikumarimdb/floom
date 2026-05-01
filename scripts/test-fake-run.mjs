@@ -142,6 +142,7 @@ async function test() {
 
   testSecretRedaction();
   testPublicRunRateLimitHardening();
+  testOAuthCallbackErrorHandling();
   await testSandboxErrorContainment();
 
   const authStatus = await callFloomTool('auth_status', {}, { baseUrl: 'http://localhost:3000' });
@@ -740,6 +741,32 @@ function testPublicRunRateLimitHardening() {
   const tokenLibText = readFileSync('src/lib/supabase/agent-tokens.ts', 'utf8');
   assert.match(tokenLibText, /scopes: string\[\] = \["read", "run", "publish"\]/);
   assert.doesNotMatch(tokenLibText, /"revoke"\]/);
+}
+
+function testOAuthCallbackErrorHandling() {
+  const routeText = readFileSync('src/app/auth/callback/route.ts', 'utf8');
+
+  assert.match(routeText, /AUTH_CALLBACK_ERROR = "oauth_callback"/);
+  assert.match(routeText, /AUTH_CALLBACK_ERROR_MESSAGE = "Authentication failed\. Please try again\."/);
+  assert.match(routeText, /if \(!code\)/);
+  assert.match(routeText, /redirectToLoginWithAuthError\(req\)/);
+  assert.match(routeText, /const \{ error \} = await supabase\.auth\.exchangeCodeForSession\(code\)/);
+  assert.match(routeText, /if \(error\)/);
+  assert.ok(
+    routeText.indexOf('if (error)') < routeText.indexOf('return NextResponse.redirect(new URL(safeNext, req.url))'),
+    'OAuth callback must only use next redirect after successful code exchange'
+  );
+  assert.ok(
+    routeText.indexOf('if (!code)') < routeText.indexOf('await supabase.auth.exchangeCodeForSession(code)'),
+    'OAuth callback must reject missing code before session exchange'
+  );
+  assert.ok(
+    routeText.indexOf('redirectUrl.searchParams.set("error", AUTH_CALLBACK_ERROR)') <
+      routeText.indexOf('redirectUrl.searchParams.set("message", AUTH_CALLBACK_ERROR_MESSAGE)'),
+    'OAuth callback failure redirect must include sanitized error and message query params'
+  );
+  assert.doesNotMatch(routeText, /searchParams\.set\("message",\s*error\.message/);
+  assert.doesNotMatch(routeText, /new URL\(safeNext,[\s\S]*if \(error\)/);
 }
 
 function testCliRejectsUnsupportedV0Shapes(manifestText, inputSchemaText, outputSchemaText) {
