@@ -364,14 +364,14 @@ function LoginContent() {
         </button>
 
         <p style={{ marginTop: 24, fontSize: 13, color: 'var(--muted)', textAlign: 'center' }}>
-          Already have a token?{" "}
+          Have an agent token already? Use it with the CLI, or{" "}
           <Link
             href="/p/meeting-action-items"
             style={{ fontWeight: 600, color: 'var(--accent)', textDecoration: 'none' }}
           >
-            Try the live app
-          </Link>{" "}
-          or publish with the CLI.
+            try the live demo
+          </Link>
+          .
         </p>
       </main>
       <FloomFooter />
