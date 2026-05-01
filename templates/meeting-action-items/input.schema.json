@@ -1,15 +1,17 @@
 {
-  "$schema": "https://json-schema.org/draft-07/schema#",
   "type": "object",
-  "title": "Meeting notes",
+  "required": ["transcript"],
   "properties": {
-    "notes": {
+    "transcript": {
       "type": "string",
       "title": "Meeting notes",
-      "description": "Paste raw meeting notes, transcript, or chat log. We'll pull out who owes what.",
-      "minLength": 20,
-      "maxLength": 8000
+      "default": "Action: Sarah sends launch notes by Friday\nMike owns beta checklist tomorrow\nPriya will run demo QA before launch"
+    },
+    "default_owner": {
+      "type": "string",
+      "title": "Default owner",
+      "default": ""
     }
   },
-  "required": ["notes"]
+  "additionalProperties": false
 }

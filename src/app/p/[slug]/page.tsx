@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import AppPermalinkPage from "./AppPermalinkPage";
 
-const SITE_URL = "https://floom-60sec.vercel.app";
+const SITE_URL = "https://floom.dev";
 
 interface Props {
   params: Promise<{ slug: string }>;

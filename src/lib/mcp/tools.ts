@@ -1,12 +1,18 @@
 import yaml from "js-yaml";
 import type { NextRequest } from "next/server";
 import { hasSupabaseConfig } from "@/lib/demo-app";
-import { MAX_SCHEMA_BYTES, MAX_SOURCE_BYTES } from "@/lib/floom/limits";
+import {
+  MAX_INPUT_BYTES,
+  MAX_REQUEST_BYTES,
+  MAX_SCHEMA_BYTES,
+  MAX_SOURCE_BYTES,
+} from "@/lib/floom/limits";
 import {
   parseManifest,
   validatePythonSourceForManifest,
   type FloomManifest,
 } from "@/lib/floom/manifest";
+import { validatePythonRequirementsText } from "@/lib/floom/requirements";
 import { validateJsonSchemaValue } from "@/lib/floom/schema";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { resolveAuthCaller } from "@/lib/supabase/auth";
@@ -46,6 +52,9 @@ type FloomToolName =
   | "run_app";
 
 const SLUG_RE = /^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$/;
+const MAX_MCP_FILE_COUNT = 100;
+const MAX_MCP_FILE_PATH_BYTES = 256;
+const MAX_MCP_FILE_BYTES = 64 * 1024;
 
 export const floomTools: McpToolDefinition[] = [
   {
@@ -59,7 +68,7 @@ export const floomTools: McpToolDefinition[] = [
   },
   {
     name: "get_app_contract",
-    description: "Return the exact Floom v0 app contract, copy-paste starter files, and explicit post-v0 unsupported cases.",
+    description: "Return the exact Floom v0.1 app contract, copy-paste starter files, and explicit post-v0.1 unsupported cases.",
     inputSchema: {
       type: "object",
       properties: {},
@@ -68,7 +77,7 @@ export const floomTools: McpToolDefinition[] = [
   },
   {
     name: "list_app_templates",
-    description: "List useful Floom v0-safe starter app templates that agents can copy before publishing.",
+    description: "List useful Floom v0.1-safe starter app templates that agents can copy before publishing.",
     inputSchema: {
       type: "object",
       properties: {},
@@ -77,7 +86,7 @@ export const floomTools: McpToolDefinition[] = [
   },
   {
     name: "get_app_template",
-    description: "Return one copy-paste Floom v0-safe app template bundle.",
+    description: "Return one copy-paste Floom v0.1-safe app template bundle.",
     inputSchema: {
       type: "object",
       properties: {
@@ -135,6 +144,10 @@ export const floomTools: McpToolDefinition[] = [
           oneOf: [{ type: "string" }, { type: "object", additionalProperties: true }],
           description: "Output JSON Schema as JSON text or an object.",
         },
+        requirements: {
+          type: "string",
+          description: "requirements.txt content, required only when floom.yaml declares dependencies.python.",
+        },
       },
       required: ["manifest", "source", "input_schema", "output_schema"],
       additionalProperties: false,
@@ -179,8 +192,7 @@ export const floomTools: McpToolDefinition[] = [
   },
   {
     name: "run_app",
-    description:
-      "Run a Floom app with JSON inputs. Private apps require an Authorization bearer token. Returns an envelope: { execution_id, status, output, error }. The actual app result is at .output, NOT at the top level — agents must access result.output.<your_field>, not result.<your_field>.",
+    description: "Run a Floom app with JSON inputs. Private apps require an Authorization bearer token.",
     inputSchema: {
       type: "object",
       properties: {
@@ -224,6 +236,11 @@ async function callFloomToolUnchecked(
   const args = asObject(argumentsValue);
   if (!args) {
     return errorResult("Tool arguments must be an object");
+  }
+
+  const argumentSize = jsonByteLength(args);
+  if (argumentSize === null || argumentSize > MAX_REQUEST_BYTES) {
+    return errorResult("Tool arguments are too large");
   }
 
   if (name === "get_app") {
@@ -305,13 +322,23 @@ async function runApp(args: JsonObject, context: McpToolContext): Promise<McpToo
     return errorResult("inputs must be an object");
   }
 
+  const inputSize = jsonByteLength(inputs);
+  if (inputSize === null || inputSize > MAX_INPUT_BYTES) {
+    return errorResult("inputs are too large");
+  }
+
+  const body = JSON.stringify({ inputs });
+  if (Buffer.byteLength(body, "utf8") > MAX_REQUEST_BYTES) {
+    return errorResult("run_app request body is too large");
+  }
+
   return proxyJson(`${context.baseUrl}/api/apps/${encodeURIComponent(slug)}/run`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       ...forwardedHeaders(context),
     },
-    body: JSON.stringify({ inputs }),
+    body,
   });
 }
 
@@ -369,33 +396,19 @@ async function authStatus(context: McpToolContext): Promise<McpToolResult> {
 function getAppContract(): McpToolResult {
   return okResult({
     version: "v0.1",
-    runtime: {
-      language: "Python",
-      python_version: "3.11+ (e2b sandbox base image)",
-      stdlib: "available",
-      dependencies:
-        "declared in requirements.txt (exact pins, hash-locked recommended). Common libraries supported: google-genai, openai, requests, httpx, pypdf, pydantic, etc.",
-      secrets:
-        "declared by NAME in floom.yaml (e.g. `secrets: [GEMINI_API_KEY]`). Raw values are encrypted at rest in Supabase, decrypted at run time, and injected into the sandbox as environment variables. Never put raw values in floom.yaml.",
-    },
-    limits: {
-      max_request_bytes: 128 * 1024,
-      max_source_bytes: 64 * 1024,
-      max_schema_bytes: 32 * 1024,
-      max_input_bytes: 16 * 1024,
-      max_output_bytes: 64 * 1024,
-      public_run_rate_limit: "20 requests per 60-second rolling window per IP",
-      per_app_run_rate_limit: "100 requests per 60-second rolling window",
-      handler_timeout_seconds: 60,
-    },
     supported: [
-      "single-file Python with optional requirements.txt for pinned dependencies",
+      "single-file Python",
+      "Python standard library, plus exact-pinned hash-locked requirements.txt when declared",
       "one handler function that accepts a JSON object and returns a JSON object",
       "floom.yaml plus input.schema.json and output.schema.json",
+      "manifest-declared secret names with owner-managed encrypted secret values",
       "public apps with public: true; private apps when public is omitted or false",
-      "secrets declared by name in floom.yaml; values stored encrypted, runtime-injected as env vars",
     ],
     unsupported: [
+      {
+        case: "undeclared requirements.txt, pyproject.toml, or unhashed package specs",
+        reason: "v0.1 supports exact-pinned requirements.txt packages with sha256 hashes only when floom.yaml declares dependencies.python.",
+      },
       {
         case: "openapi.json, FastAPI, Flask, or HTTP servers",
         reason: "HTTP app routing is post-v0.1. v0.1 exposes one JSON Schema form and one handler.",
@@ -409,22 +422,14 @@ function getAppContract(): McpToolResult {
         reason: "Multi-file bundles are post-v0.1. v0.1 packaging accepts one top-level Python entrypoint file.",
       },
       {
-        case: "manifest field: actions (multiple)",
-        reason: "Multi-action apps (one slug, multiple endpoints) are post-v0.1. v0.1 maps one action key per app.",
+        case: "manifest field actions",
+        reason: "Multiple actions are post-v0. v0.1 still exposes one handler.",
       },
       {
         case: "OpenBlog/OpenAPI apps",
         reason: "OpenBlog has an HTTP/OpenAPI surface and dependency-style app shape. It belongs to the post-v0.1 HTTP app runner, not the 60-second function path.",
       },
     ],
-    response_envelope: {
-      run_app: {
-        shape:
-          "{ execution_id: string, status: 'success' | 'error', output: <matches output.schema.json>, error: string | null }",
-        note:
-          "The handler's return value is NESTED under the `output` field, not returned as the top level. Access it as result.output.<field>, NOT result.<field>.",
-      },
-    },
     files: {
       "floom.yaml": [
         "name: Hello Floom",
@@ -435,6 +440,11 @@ function getAppContract(): McpToolResult {
         "public: true",
         "input_schema: ./input.schema.json",
         "output_schema: ./output.schema.json",
+        "# Optional v0.1:",
+        "# dependencies:",
+        "#   python: ./requirements.txt",
+        "# secrets:",
+        "#   - OPENAI_API_KEY",
       ].join("\n"),
       "app.py": [
         "def run(inputs: dict) -> dict:",
@@ -465,13 +475,35 @@ function getAppContract(): McpToolResult {
         },
       },
     },
+    accepted_manifest_keys: [
+      "name",
+      "slug",
+      "runtime",
+      "entrypoint",
+      "handler",
+      "public",
+      "input_schema",
+      "output_schema",
+      "dependencies",
+      "secrets",
+    ],
+    setup_commands: [
+      "npx @floomhq/cli@latest setup",
+      "mkdir my-floom-app && cd my-floom-app",
+      "npx @floomhq/cli@latest init --name \"Hello Floom\" --slug hello-floom-<unique-suffix> --description \"Return a JSON greeting.\" --type custom",
+      "npx @floomhq/cli@latest deploy --dry-run",
+      "npx @floomhq/cli@latest deploy",
+      "npx @floomhq/cli@latest run hello-floom-<unique-suffix> '{\"name\":\"Federico\"}' --json",
+    ],
+    template_guidance:
+      "Templates include fixed example slugs. Change the slug to a unique 3-64 character lowercase slug before publishing.",
     templates_tool: {
       list: "list_app_templates",
       get: "get_app_template",
       available_keys: Object.keys(APP_TEMPLATES),
     },
     publish_command:
-      "FLOOM_TOKEN=<agent-token> FLOOM_API_URL=https://floom-60sec.vercel.app npx tsx cli/deploy.ts <app-dir>",
+      "FLOOM_TOKEN=<agent-token> FLOOM_API_URL=https://floom.dev npx @floomhq/cli@latest deploy",
   });
 }
 
@@ -886,417 +918,6 @@ const APP_TEMPLATES: Record<string, AppTemplate> = {
       default_owner: "",
     },
   },
-  slugify: {
-    key: "slugify",
-    name: "Slugify",
-    description: "Convert a title to a URL-safe slug. Lowercase, hyphens, ASCII-folded, optional max length.",
-    useful_for: "Generating clean URL paths, file names, identifier keys.",
-    files: {
-      "floom.yaml": [
-        "name: Slugify",
-        "slug: slugify",
-        "runtime: python",
-        "entrypoint: app.py",
-        "handler: run",
-        "public: true",
-        "input_schema: ./input.schema.json",
-        "output_schema: ./output.schema.json",
-      ].join("\n"),
-      "app.py": [
-        "import re",
-        "import unicodedata",
-        "",
-        "",
-        "def run(inputs: dict) -> dict:",
-        "    title = str(inputs.get('title') or '').strip()",
-        "    if not title:",
-        "        return {'slug': '', 'length': 0, 'was_truncated': False}",
-        "    max_length = int(inputs.get('max_length') or 80)",
-        "    if max_length < 1:",
-        "        max_length = 80",
-        "    # NFKD-normalize and drop non-ASCII",
-        "    normalized = unicodedata.normalize('NFKD', title)",
-        "    ascii_text = normalized.encode('ascii', 'ignore').decode('ascii')",
-        "    # Lowercase",
-        "    slug = ascii_text.lower()",
-        "    # Replace non-alphanumeric characters with hyphens",
-        "    slug = re.sub(r'[^a-z0-9]+', '-', slug)",
-        "    # Strip leading/trailing hyphens",
-        "    slug = slug.strip('-')",
-        "    # Collapse multiple hyphens",
-        "    slug = re.sub(r'-{2,}', '-', slug)",
-        "    was_truncated = False",
-        "    if len(slug) > max_length:",
-        "        slug = slug[:max_length].rstrip('-')",
-        "        was_truncated = True",
-        "    return {'slug': slug, 'length': len(slug), 'was_truncated': was_truncated}",
-      ].join("\n"),
-      "input.schema.json": {
-        $schema: "http://json-schema.org/draft-07/schema#",
-        type: "object",
-        required: ["title"],
-        additionalProperties: false,
-        properties: {
-          title: {
-            type: "string",
-            title: "Title",
-            description: "Text to convert to a slug.",
-            minLength: 1,
-            maxLength: 500,
-            default: "How to ship in 60 seconds! (an opinionated guide)",
-          },
-          max_length: {
-            type: "integer",
-            title: "Max length",
-            description: "Maximum number of characters in the output slug.",
-            minimum: 1,
-            default: 80,
-          },
-        },
-      },
-      "output.schema.json": {
-        $schema: "http://json-schema.org/draft-07/schema#",
-        type: "object",
-        required: ["slug", "length", "was_truncated"],
-        additionalProperties: false,
-        properties: {
-          slug: { type: "string", title: "Slug", description: "The URL-safe slug." },
-          length: { type: "integer", title: "Length", description: "Character count of the slug." },
-          was_truncated: { type: "boolean", title: "Was truncated", description: "True if the slug was cut to max_length." },
-        },
-      },
-    },
-    example_inputs: {
-      title: "How to ship in 60 seconds! (an opinionated guide)",
-      max_length: 80,
-    },
-  },
-  password_strength: {
-    key: "password_strength",
-    name: "Password Strength",
-    description: "Score a password 0–4 (weak → strong) and list specific reasons.",
-    useful_for: "Inline password feedback during signup, password-policy checking.",
-    files: {
-      "floom.yaml": [
-        "name: Password Strength",
-        "slug: password-strength",
-        "runtime: python",
-        "entrypoint: app.py",
-        "handler: run",
-        "public: true",
-        "input_schema: ./input.schema.json",
-        "output_schema: ./output.schema.json",
-      ].join("\n"),
-      "app.py": [
-        "import re",
-        "",
-        "",
-        "COMMON_SUBSTRINGS = ['password', '123456', '1234', 'qwerty', 'letmein', 'abc123', 'iloveyou', 'admin', 'welcome']",
-        "",
-        "",
-        "def run(inputs: dict) -> dict:",
-        "    password = str(inputs.get('password') or '')",
-        "    if not password:",
-        "        return {'score': 0, 'label': 'Very Weak', 'reasons': [], 'suggestions': ['Enter a password.']}",
-        "    reasons = []",
-        "    suggestions = []",
-        "    score = 0",
-        "    # Length checks",
-        "    if len(password) >= 16:",
-        "        score += 1",
-        "        reasons.append('Long (16+ characters)')",
-        "    elif len(password) >= 12:",
-        "        score += 1",
-        "        reasons.append('Good length (12+ characters)')",
-        "        suggestions.append('Use 16+ characters for maximum length score.')",
-        "    elif len(password) >= 8:",
-        "        suggestions.append('Use 12+ characters for a better score.')",
-        "    else:",
-        "        suggestions.append('Use at least 8 characters.')",
-        "    # Character class diversity",
-        "    has_lower = bool(re.search(r'[a-z]', password))",
-        "    has_upper = bool(re.search(r'[A-Z]', password))",
-        "    has_digit = bool(re.search(r'[0-9]', password))",
-        "    has_symbol = bool(re.search(r'[^a-zA-Z0-9]', password))",
-        "    char_classes = sum([has_lower, has_upper, has_digit, has_symbol])",
-        "    if char_classes >= 3:",
-        "        score += 1",
-        "        reasons.append(f'Uses {char_classes} character classes (lower, upper, digit, symbol)')",
-        "    else:",
-        "        if not has_upper:",
-        "            suggestions.append('Add uppercase letters.')",
-        "        if not has_digit:",
-        "            suggestions.append('Add numbers.')",
-        "        if not has_symbol:",
-        "            suggestions.append('Add symbols (e.g. !, @, #).')",
-        "    # Penalize common substrings",
-        "    lower_pw = password.lower()",
-        "    common_found = [s for s in COMMON_SUBSTRINGS if s in lower_pw]",
-        "    if common_found:",
-        "        suggestions.append(f'Avoid common patterns: {\", \".join(common_found)}.')",
-        "    else:",
-        "        score += 1",
-        "        reasons.append('No common patterns detected')",
-        "    # Reward length-only bonus for very long passwords",
-        "    if len(password) >= 20:",
-        "        score = min(4, score + 1)",
-        "        reasons.append('Very long (20+ characters)')",
-        "    score = min(4, score)",
-        "    labels = ['Very Weak', 'Weak', 'Fair', 'Strong', 'Very Strong']",
-        "    return {'score': score, 'label': labels[score], 'reasons': reasons, 'suggestions': suggestions}",
-      ].join("\n"),
-      "input.schema.json": {
-        $schema: "http://json-schema.org/draft-07/schema#",
-        type: "object",
-        required: ["password"],
-        additionalProperties: false,
-        properties: {
-          password: {
-            type: "string",
-            title: "Password",
-            description: "The password to evaluate.",
-            minLength: 1,
-            maxLength: 256,
-            default: "correcthorsebatterystaple",
-          },
-        },
-      },
-      "output.schema.json": {
-        $schema: "http://json-schema.org/draft-07/schema#",
-        type: "object",
-        required: ["score", "label", "reasons", "suggestions"],
-        additionalProperties: false,
-        properties: {
-          score: { type: "integer", title: "Score", description: "0 (very weak) to 4 (very strong).", minimum: 0, maximum: 4 },
-          label: { type: "string", title: "Label", description: "Human-readable strength label." },
-          reasons: {
-            type: "array",
-            title: "Reasons",
-            description: "What the password does well.",
-            items: { type: "string" },
-          },
-          suggestions: {
-            type: "array",
-            title: "Suggestions",
-            description: "How to make the password stronger.",
-            items: { type: "string" },
-          },
-        },
-      },
-    },
-    example_inputs: {
-      password: "correcthorsebatterystaple",
-    },
-  },
-  regex_test: {
-    key: "regex_test",
-    name: "Regex Tester",
-    description: "Test a Python regex pattern against multiple samples. Returns which matched, which didn't, and any captured groups.",
-    useful_for: "Validating regexes during development, batch-testing patterns against fixtures.",
-    files: {
-      "floom.yaml": [
-        "name: Regex Tester",
-        "slug: regex-tester",
-        "runtime: python",
-        "entrypoint: app.py",
-        "handler: run",
-        "public: true",
-        "input_schema: ./input.schema.json",
-        "output_schema: ./output.schema.json",
-      ].join("\n"),
-      "app.py": [
-        "import re",
-        "",
-        "",
-        "def run(inputs: dict) -> dict:",
-        "    pattern = str(inputs.get('pattern') or '')",
-        "    samples = inputs.get('samples') or []",
-        "    if not pattern:",
-        "        return {'results': [], 'match_count': 0, 'error': 'pattern is required'}",
-        "    if not isinstance(samples, list):",
-        "        return {'results': [], 'match_count': 0, 'error': 'samples must be an array'}",
-        "    try:",
-        "        compiled = re.compile(pattern)",
-        "    except re.error as exc:",
-        "        return {'results': [], 'match_count': 0, 'error': str(exc)}",
-        "    results = []",
-        "    match_count = 0",
-        "    for sample in samples[:50]:",
-        "        sample_str = str(sample)",
-        "        m = compiled.search(sample_str)",
-        "        if m:",
-        "            match_count += 1",
-        "            results.append({",
-        "                'sample': sample_str,",
-        "                'matched': True,",
-        "                'groups': list(m.groups()),",
-        "                'span': list(m.span()),",
-        "            })",
-        "        else:",
-        "            results.append({",
-        "                'sample': sample_str,",
-        "                'matched': False,",
-        "                'groups': [],",
-        "                'span': None,",
-        "            })",
-        "    return {'results': results, 'match_count': match_count, 'error': None}",
-      ].join("\n"),
-      "input.schema.json": {
-        $schema: "http://json-schema.org/draft-07/schema#",
-        type: "object",
-        required: ["pattern", "samples"],
-        additionalProperties: false,
-        properties: {
-          pattern: {
-            type: "string",
-            title: "Pattern",
-            description: "Python regex pattern to test.",
-            minLength: 1,
-            maxLength: 500,
-            default: "\\b[a-z0-9._%+\\-]+@[a-z0-9.\\-]+\\.[a-z]{2,}\\b",
-          },
-          samples: {
-            type: "array",
-            title: "Samples",
-            description: "Strings to test the pattern against.",
-            minItems: 1,
-            maxItems: 50,
-            items: { type: "string", maxLength: 500 },
-            default: ["sarah@floom.dev", "no email here", "marcus+test@example.com please reply"],
-          },
-        },
-      },
-      "output.schema.json": {
-        $schema: "http://json-schema.org/draft-07/schema#",
-        type: "object",
-        required: ["results", "match_count", "error"],
-        additionalProperties: false,
-        properties: {
-          results: {
-            type: "array",
-            title: "Results",
-            items: {
-              type: "object",
-              required: ["sample", "matched", "groups", "span"],
-              additionalProperties: false,
-              properties: {
-                sample: { type: "string" },
-                matched: { type: "boolean" },
-                groups: { type: "array", items: { type: "string" } },
-                span: {
-                  oneOf: [
-                    { type: "array", items: { type: "integer" }, minItems: 2, maxItems: 2 },
-                    { type: "null" },
-                  ],
-                  description: "Start and end offsets of the match, or null.",
-                },
-              },
-            },
-          },
-          match_count: { type: "integer", title: "Match count" },
-          error: { type: ["string", "null"], title: "Error", description: "Regex compile error if pattern is invalid, otherwise null." },
-        },
-      },
-    },
-    example_inputs: {
-      pattern: "\\b[a-z0-9._%+\\-]+@[a-z0-9.\\-]+\\.[a-z]{2,}\\b",
-      samples: ["sarah@floom.dev", "no email here", "marcus+test@example.com please reply"],
-    },
-  },
-  markdown_to_text: {
-    key: "markdown_to_text",
-    name: "Markdown → Text",
-    description: "Strip markdown formatting and return clean plain text. Handles headings, links, code blocks, emphasis, lists.",
-    useful_for: "Extracting prose from README/docs for LLM context, summary input cleaning, plaintext export.",
-    files: {
-      "floom.yaml": [
-        "name: Markdown to Text",
-        "slug: markdown-to-text",
-        "runtime: python",
-        "entrypoint: app.py",
-        "handler: run",
-        "public: true",
-        "input_schema: ./input.schema.json",
-        "output_schema: ./output.schema.json",
-      ].join("\n"),
-      "app.py": [
-        "import re",
-        "",
-        "",
-        "def run(inputs: dict) -> dict:",
-        "    markdown = str(inputs.get('markdown') or '')",
-        "    if not markdown:",
-        "        return {'text': '', 'char_count': 0, 'link_count': 0, 'heading_count': 0}",
-        "    # Count links and headings before stripping",
-        "    link_count = len(re.findall(r'\\[([^\\]]+)\\]\\([^)]+\\)', markdown))",
-        "    heading_count = len(re.findall(r'^#{1,6} ', markdown, re.MULTILINE))",
-        "    text = markdown",
-        "    # Remove fenced code blocks (``` ... ```)",
-        "    text = re.sub(r'```[\\s\\S]*?```', '', text)",
-        "    # Remove inline code (preserve content, drop backticks)",
-        "    text = re.sub(r'`([^`]+)`', r'\\1', text)",
-        "    # Remove HTML tags",
-        "    text = re.sub(r'<[^>]+>', '', text)",
-        "    # Images: replace with alt text",
-        "    text = re.sub(r'!\\[([^\\]]*)\\]\\([^)]*\\)', r'\\1', text)",
-        "    # Links: replace with link text",
-        "    text = re.sub(r'\\[([^\\]]+)\\]\\([^)]+\\)', r'\\1', text)",
-        "    # Headings: remove # prefix",
-        "    text = re.sub(r'^#{1,6} +', '', text, flags=re.MULTILINE)",
-        "    # Bold and italic",
-        "    text = re.sub(r'\\*\\*\\*([^*]+)\\*\\*\\*', r'\\1', text)",
-        "    text = re.sub(r'\\*\\*([^*]+)\\*\\*', r'\\1', text)",
-        "    text = re.sub(r'\\*([^*]+)\\*', r'\\1', text)",
-        "    text = re.sub(r'___([^_]+)___', r'\\1', text)",
-        "    text = re.sub(r'__([^_]+)__', r'\\1', text)",
-        "    text = re.sub(r'_([^_]+)_', r'\\1', text)",
-        "    # Blockquotes",
-        "    text = re.sub(r'^> ?', '', text, flags=re.MULTILINE)",
-        "    # Unordered list bullets",
-        "    text = re.sub(r'^[\\-\\*] +', '', text, flags=re.MULTILINE)",
-        "    # Ordered list numbers",
-        "    text = re.sub(r'^\\d+\\.\\s+', '', text, flags=re.MULTILINE)",
-        "    # Horizontal rules",
-        "    text = re.sub(r'^---+$', '', text, flags=re.MULTILINE)",
-        "    text = re.sub(r'^\\*\\*\\*+$', '', text, flags=re.MULTILINE)",
-        "    # Collapse multiple blank lines",
-        "    text = re.sub(r'\\n{3,}', '\\n\\n', text)",
-        "    text = text.strip()",
-        "    return {'text': text, 'char_count': len(text), 'link_count': link_count, 'heading_count': heading_count}",
-      ].join("\n"),
-      "input.schema.json": {
-        $schema: "http://json-schema.org/draft-07/schema#",
-        type: "object",
-        required: ["markdown"],
-        additionalProperties: false,
-        properties: {
-          markdown: {
-            type: "string",
-            title: "Markdown",
-            description: "Markdown-formatted text to convert to plain text.",
-            minLength: 1,
-            maxLength: 50000,
-            default: "# Hello\n\nThis is **important**. See [the docs](https://floom.dev) and `floom publish`.\n\n```python\nprint('hi')\n```",
-          },
-        },
-      },
-      "output.schema.json": {
-        $schema: "http://json-schema.org/draft-07/schema#",
-        type: "object",
-        required: ["text", "char_count", "link_count", "heading_count"],
-        additionalProperties: false,
-        properties: {
-          text: { type: "string", title: "Plain text", description: "The stripped plain text." },
-          char_count: { type: "integer", title: "Char count", description: "Character count of the output text." },
-          link_count: { type: "integer", title: "Link count", description: "Number of markdown links found in the input." },
-          heading_count: { type: "integer", title: "Heading count", description: "Number of markdown headings found in the input." },
-        },
-      },
-    },
-    example_inputs: {
-      markdown: "# Hello\n\nThis is **important**. See [the docs](https://floom.dev) and `floom publish`.\n\n```python\nprint('hi')\n```",
-    },
-  },
 };
 
 function listAppTemplates(): McpToolResult {
@@ -1385,11 +1006,31 @@ async function publishApp(args: JsonObject, context: McpToolContext): Promise<Mc
     return errorResult(outputSchemaResult.error);
   }
 
+  const requirements = args.requirements;
+  if (manifestResult.manifest.dependencies?.python) {
+    if (typeof requirements !== "string") {
+      return errorResult("requirements must be provided when dependencies.python is declared");
+    }
+
+    try {
+      validatePythonRequirementsText(requirements);
+    } catch (requirementsError) {
+      return errorResult(
+        requirementsError instanceof Error ? requirementsError.message : "Invalid requirements.txt"
+      );
+    }
+  } else if (requirements !== undefined) {
+    return errorResult("requirements requires dependencies.python in floom.yaml");
+  }
+
   const form = new FormData();
   form.append("manifest", textBlob(manifestToYaml(manifestResult.manifest), "application/x-yaml"), "floom.yaml");
   form.append("bundle", textBlob(source, "text/x-python"), manifestResult.manifest.entrypoint);
   form.append("input_schema", textBlob(JSON.stringify(inputSchemaResult.schema), "application/json"), "input.schema.json");
   form.append("output_schema", textBlob(JSON.stringify(outputSchemaResult.schema), "application/json"), "output.schema.json");
+  if (typeof requirements === "string") {
+    form.append("requirements", textBlob(validatePythonRequirementsText(requirements), "text/plain"), "requirements.txt");
+  }
 
   return proxyJson(`${context.baseUrl}/api/apps`, {
     method: "POST",
@@ -1399,10 +1040,11 @@ async function publishApp(args: JsonObject, context: McpToolContext): Promise<Mc
 }
 
 function findCandidateApps(args: JsonObject): McpToolResult {
-  const files = asStringMap(args.files);
-  if (!files) {
-    return errorResult("files must be an object mapping paths to text contents");
+  const filesResult = parseFileMap(args.files);
+  if (!filesResult.ok) {
+    return errorResult(filesResult.error);
   }
+  const files = filesResult.files;
 
   const maxResults =
     typeof args.max_results === "number" &&
@@ -1440,8 +1082,25 @@ function findCandidateApps(args: JsonObject): McpToolResult {
           errors.push(`Missing entrypoint: ${entrypointPath}`);
         }
 
-        for (const unsupportedPath of unsupportedV0Files(appDir, files)) {
+        for (const unsupportedPath of unsupportedV0Files(appDir, files, manifest)) {
           errors.push(unsupportedFileReason(unsupportedPath));
+        }
+
+        if (manifest.dependencies?.python) {
+          const requirementsPath = joinPath(appDir, manifest.dependencies.python);
+          if (!(requirementsPath in files)) {
+            errors.push(`Missing requirements.txt: ${requirementsPath}`);
+          } else {
+            try {
+              validatePythonRequirementsText(files[requirementsPath]);
+            } catch (requirementsError) {
+              errors.push(
+                requirementsError instanceof Error
+                  ? requirementsError.message
+                  : "Invalid requirements.txt"
+              );
+            }
+          }
         }
 
         const pythonFiles = pythonFilesInAppDir(appDir, files);
@@ -1481,22 +1140,43 @@ function findCandidateApps(args: JsonObject): McpToolResult {
   });
 }
 
-function unsupportedV0Files(appDir: string, files: Record<string, string>) {
-  return ["requirements.txt", "pyproject.toml", "package.json", "openapi.json"]
+function unsupportedV0Files(appDir: string, files: Record<string, string>, manifest?: FloomManifest) {
+  const unsupported = ["pyproject.toml", "package.json", "openapi.json"];
+  if (!manifest?.dependencies?.python) {
+    unsupported.push("requirements.txt");
+  }
+
+  return unsupported
     .map((fileName) => joinPath(appDir, fileName))
     .filter((filePath) => filePath in files);
 }
 
 function unsupportedManifestFields(manifest: JsonObject) {
   const reasons: string[] = [];
-  if (manifest.actions !== undefined) {
-    reasons.push("floom.yaml field actions is not supported in v0; multiple actions are post-v0.");
+  const unsupportedFields = [
+    "actions",
+    "description",
+    "type",
+    "visibility",
+    "category",
+    "manifest_version",
+    "python_dependencies",
+    "secrets_needed",
+    "openapi_spec_url",
+  ];
+  for (const field of unsupportedFields) {
+    if (manifest[field] !== undefined) {
+      reasons.push(`floom.yaml field ${field} is not supported in v0.1.`);
+    }
   }
-  if (manifest.dependencies !== undefined) {
-    reasons.push("floom.yaml field dependencies is not supported in v0; dependency installation is post-v0.");
+  if (manifest.input_schema !== undefined && typeof manifest.input_schema !== "string") {
+    reasons.push("floom.yaml field input_schema must be a file path string in v0.1.");
   }
-  if (manifest.secrets !== undefined) {
-    reasons.push("floom.yaml field secrets is not supported in v0; app secret injection is post-v0.");
+  if (manifest.output_schema !== undefined && typeof manifest.output_schema !== "string") {
+    reasons.push("floom.yaml field output_schema must be a file path string in v0.1.");
+  }
+  if (manifest.public !== undefined && typeof manifest.public !== "boolean") {
+    reasons.push("floom.yaml field public must be true or false in v0.1.");
   }
   return reasons;
 }
@@ -1504,18 +1184,18 @@ function unsupportedManifestFields(manifest: JsonObject) {
 function unsupportedFileReason(filePath: string) {
   const fileName = basename(filePath);
   if (fileName === "requirements.txt") {
-    return `${filePath} is not supported in v0; Python dependencies require the post-v0 dependency installer.`;
+    return `${filePath} requires floom.yaml dependencies.python: ./requirements.txt.`;
   }
   if (fileName === "pyproject.toml") {
-    return `${filePath} is not supported in v0; Python packaging/dependencies require the post-v0 dependency installer.`;
+    return `${filePath} is not supported in v0.1; use requirements.txt with dependencies.python.`;
   }
   if (fileName === "package.json") {
-    return `${filePath} is not supported in v0; TypeScript/Node apps require the post-v0 TypeScript runner.`;
+    return `${filePath} is not supported in v0.1; TypeScript/Node apps require the post-v0.1 TypeScript runner.`;
   }
   if (fileName === "openapi.json") {
-    return `${filePath} is not supported in v0; OpenAPI/HTTP apps require the post-v0 HTTP app runner.`;
+    return `${filePath} is not supported in v0.1; OpenAPI/HTTP apps require the post-v0.1 HTTP app runner.`;
   }
-  return `${filePath} is not supported in v0.`;
+  return `${filePath} is not supported in v0.1.`;
 }
 
 function pythonFilesInAppDir(appDir: string, files: Record<string, string>) {
@@ -1539,7 +1219,7 @@ function unsupportedRepositoryCandidates(files: Record<string, string>) {
   }
 
   if (fileNames.has("requirements.txt") || fileNames.has("pyproject.toml")) {
-    candidates.push(unsupportedCandidate("Python dependencies require the post-v0 dependency installer"));
+    candidates.push(unsupportedCandidate("Python dependencies require a floom.yaml manifest with dependencies.python: ./requirements.txt"));
   }
 
   if (fileNames.has("package.json")) {
@@ -1607,6 +1287,14 @@ function parseManifestArgument(
   manifestValue: unknown
 ): { ok: true; manifest: FloomManifest } | { ok: false; error: string } {
   try {
+    const manifestSize =
+      typeof manifestValue === "string"
+        ? Buffer.byteLength(manifestValue, "utf8")
+        : jsonByteLength(manifestValue);
+    if (manifestSize === null || manifestSize > MAX_SCHEMA_BYTES) {
+      return { ok: false, error: "manifest is too large" };
+    }
+
     const value =
       typeof manifestValue === "string" ? yaml.load(manifestValue) : manifestValue;
     return { ok: true, manifest: parseManifest(value) };
@@ -1664,6 +1352,8 @@ function manifestToYaml(manifest: FloomManifest) {
     public: manifest.public ?? false,
     ...(manifest.input_schema ? { input_schema: manifest.input_schema } : {}),
     ...(manifest.output_schema ? { output_schema: manifest.output_schema } : {}),
+    ...(manifest.dependencies ? { dependencies: manifest.dependencies } : {}),
+    ...(manifest.secrets ? { secrets: manifest.secrets } : {}),
   });
 }
 
@@ -1671,18 +1361,50 @@ function textBlob(text: string, type: string) {
   return new Blob([text], { type });
 }
 
-function asStringMap(value: unknown): Record<string, string> | null {
+function parseFileMap(
+  value: unknown
+): { ok: true; files: Record<string, string> } | { ok: false; error: string } {
   const object = asObject(value);
   if (!object) {
-    return null;
+    return { ok: false, error: "files must be an object mapping paths to text contents" };
   }
 
   const entries = Object.entries(object);
-  if (!entries.every(([, fileText]) => typeof fileText === "string")) {
-    return null;
+  if (entries.length > MAX_MCP_FILE_COUNT) {
+    return { ok: false, error: `files supports at most ${MAX_MCP_FILE_COUNT} entries` };
   }
 
-  return object as Record<string, string>;
+  let totalBytes = 0;
+  const files: Record<string, string> = {};
+
+  for (const [filePath, fileText] of entries) {
+    if (typeof fileText !== "string") {
+      return { ok: false, error: "files must map paths to text contents" };
+    }
+
+    const normalizedPath = normalizePath(filePath);
+    if (!isSafeRepositoryPath(normalizedPath)) {
+      return { ok: false, error: `Invalid file path: ${filePath}` };
+    }
+
+    if (Buffer.byteLength(normalizedPath, "utf8") > MAX_MCP_FILE_PATH_BYTES) {
+      return { ok: false, error: `File path is too long: ${filePath}` };
+    }
+
+    const fileBytes = Buffer.byteLength(fileText, "utf8");
+    if (fileBytes > MAX_MCP_FILE_BYTES) {
+      return { ok: false, error: `File is too large: ${normalizedPath}` };
+    }
+
+    totalBytes += Buffer.byteLength(normalizedPath, "utf8") + fileBytes;
+    if (totalBytes > MAX_REQUEST_BYTES) {
+      return { ok: false, error: "files map is too large" };
+    }
+
+    files[normalizedPath] = fileText;
+  }
+
+  return { ok: true, files };
 }
 
 function validateCandidateSchema(
@@ -1726,6 +1448,27 @@ function joinPath(dir: string, filePath: string) {
 
 function normalizePath(filePath: string) {
   return filePath.replace(/\\/g, "/").replace(/^\.\//, "");
+}
+
+function isSafeRepositoryPath(filePath: string) {
+  if (
+    filePath === "" ||
+    filePath.startsWith("/") ||
+    filePath.includes("\0") ||
+    filePath.split("/").some((part) => part === "" || part === "." || part === "..")
+  ) {
+    return false;
+  }
+
+  return true;
+}
+
+function jsonByteLength(value: unknown) {
+  try {
+    return Buffer.byteLength(JSON.stringify(value), "utf8");
+  } catch {
+    return null;
+  }
 }
 
 function okResult(data: unknown): McpToolResult {

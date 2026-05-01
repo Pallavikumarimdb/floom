@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { SiteHeader } from "@/components/SiteHeader";
 
-const SITE_URL = "https://floom-60sec.vercel.app";
+const SITE_URL = "https://floom.dev";
 
 export const metadata: Metadata = {
   title: "Legal & privacy",
@@ -100,7 +100,7 @@ export default function LegalPage() {
           <p>
             Floom does not use third-party analytics, advertising, or tracking
             cookies. The only cookies we set are Supabase Auth session cookies
-            (issued after sign-in, scoped to floom-60sec.vercel.app) and a
+            (issued after sign-in, scoped to floom.dev) and a
             small CSRF cookie used by the auth callback. No banner is shown
             because no consent is required for strictly necessary auth
             cookies.

@@ -42,6 +42,7 @@ import {
   samplePrefill,
 } from '@/lib/onboarding';
 import { getLaunchDemoExampleTextInputs } from '@/lib/app-examples';
+import { createClient } from '@/lib/supabase/client';
 
 // Map of known app slugs to GitHub repo URLs.
 const GITHUB_REPOS: Record<string, string> = {
@@ -154,9 +155,19 @@ export default function AppPermalinkPage() { // exported as default so the serve
     setLoading(true);
     setNotFound(false);
     setLoadFailure(null);
-    // Data seam: getApp(slug) → fetch('/api/apps/' + slug)
-    fetch(`/api/apps/${slug}`)
-      .then(async (res) => {
+    const loadApp = async () => {
+      const headers: Record<string, string> = {};
+      try {
+        const { data } = await createClient().auth.getSession();
+        if (data.session?.access_token) {
+          headers.Authorization = `Bearer ${data.session.access_token}`;
+        }
+      } catch {
+        // Public app metadata still loads without a browser session.
+      }
+
+      // Data seam: getApp(slug) → fetch('/api/apps/' + slug)
+      const res = await fetch(`/api/apps/${slug}`, { headers });
         if (!res.ok) {
           const err = new ApiError('App not found', res.status);
           const outcome = classifyPermalinkLoadError(err);
@@ -165,11 +176,16 @@ export default function AppPermalinkPage() { // exported as default so the serve
           setLoading(false);
           return;
         }
-        const a = await res.json() as AppDetail & {
+      return await res.json() as AppDetail & {
           handler?: string;
           input_schema?: unknown;
           output_schema?: unknown;
         };
+    };
+
+    loadApp()
+      .then(async (a) => {
+        if (!a) return;
         // Synthesize manifest from the floom-minimal API shape:
         // /api/apps/[slug] returns { id, slug, name, runtime, entrypoint,
         // handler, input_schema, output_schema, public }. The v5-ported
@@ -1393,7 +1409,7 @@ export default function AppPermalinkPage() { // exported as default so the serve
               testId="connector-claude"
               title="Claude Code"
               desc={`Add ${app.name} as an MCP server in Claude Code. Then call its tools via natural language.`}
-              snippetValue={`claude mcp add floom https://floom-60sec.vercel.app/mcp`}
+              snippetValue="claude mcp add floom https://floom.dev/mcp"
               copyLabel="Copy command"
             />
             <InstallCard

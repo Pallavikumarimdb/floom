@@ -61,19 +61,19 @@ export const SHOWCASE_ENTRIES: ShowcaseEntry[] = [
     tags: ['research', 'positioning'],
   },
   {
-    slug: 'pitch-coach',
-    name: 'Pitch Coach',
+    slug: 'meeting-action-items',
+    name: 'Meeting Action Items',
     description:
-      'Roast and rewrite a startup pitch in your voice. Top 3 critiques, 3 punchier rewrites.',
-    category: 'Writing',
-    bannerTitle: 'pitch-coach',
+      'Pull owned tasks out of meeting notes and return clean JSON for follow-up.',
+    category: 'Operations',
+    bannerTitle: 'meeting-action-items',
     bannerLines: [
-      { text: 'harsh truth' },
-      { text: '3 critiques', accent: true },
-      { text: '3 rewrites', dim: true },
+      { text: 'transcript pasted' },
+      { text: '3 owners found', accent: true },
+      { text: 'Friday · tomorrow · launch', dim: true },
     ],
-    installVia: 'via Floom or ChatGPT',
-    tags: ['writing', 'pitch'],
+    installVia: 'via Floom or Claude',
+    tags: ['operations', 'meetings'],
   },
 ];
 

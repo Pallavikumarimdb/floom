@@ -1,27 +1,25 @@
 {
-  "$schema": "https://json-schema.org/draft-07/schema#",
   "type": "object",
-  "title": "Action items",
+  "required": ["count", "items"],
   "properties": {
-    "actions": {
+    "count": {
+      "type": "integer",
+      "title": "Action item count"
+    },
+    "items": {
       "type": "array",
-      "description": "List of action items extracted from the meeting notes.",
+      "title": "Action items",
       "items": {
         "type": "object",
-        "properties": {
-          "task": { "type": "string", "description": "What needs to be done." },
-          "owner": { "type": "string", "description": "Who is responsible. Empty string if not stated." },
-          "due": { "type": "string", "description": "Due date or timeframe in plain English (e.g. 'Friday', 'next sprint', 'EOQ'). Empty if not stated." }
-        },
         "required": ["task", "owner", "due"],
+        "properties": {
+          "task": { "type": "string" },
+          "owner": { "type": "string" },
+          "due": { "type": "string" }
+        },
         "additionalProperties": false
       }
-    },
-    "summary": {
-      "type": "string",
-      "description": "One-line summary of the meeting outcome."
-    },
-    "count": { "type": "integer", "description": "Number of action items extracted." }
+    }
   },
-  "required": ["actions", "summary", "count"]
+  "additionalProperties": false
 }

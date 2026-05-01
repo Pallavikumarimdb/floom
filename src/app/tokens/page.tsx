@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import TokensPage from "./TokensPage";
 
-const SITE_URL = "https://floom-60sec.vercel.app";
+const SITE_URL = "https://floom.dev";
 
 export const metadata: Metadata = {
   title: "Agent tokens",

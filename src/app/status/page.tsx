@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { SiteHeader } from "@/components/SiteHeader";
 import { FloomFooter } from "@/components/FloomFooter";
 
-const SITE_URL = "https://floom-60sec.vercel.app";
+const SITE_URL = "https://floom.dev";
 
 export const metadata: Metadata = {
   title: "Status",

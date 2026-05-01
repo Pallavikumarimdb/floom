@@ -42,8 +42,8 @@
  *     - Cursor blink during code typing in Build.
  *     - `/floomit` TYPES at Deploy — don't clear Build output, append.
  *     - Micro tension 280ms after Run button "press" before result reveal.
- *     - Count COUNTS UP 0 -> 8 (requestAnimationFrame) — no fade-in number.
- *     - Tag ("actions") fades in AFTER the count lands.
+ *     - Score COUNTS UP 0 -> 87 (requestAnimationFrame) — no fade-in number.
+ *     - Tag ("Strong fit") fades in AFTER the score lands.
  *     - 6px vertical shift + 180ms light fade on state transitions.
  *     - Tracker dot animates horizontally between active pills.
  *     - Subtle "just deployed via /floomit" cue inside Use state.
@@ -112,29 +112,20 @@ const STATE_DURATION: Record<DemoState, number> = {
 /**
  * The Python handler body typed character-by-character during Build. Kept
  * deliberately sparse: 70% whitespace so a newcomer can read it, 20% the
- * actual model call, 10% chrome. Matches the real ai-readiness-audit app's
- * shape (examples/ai-readiness-audit/main.py) so the demo is truthful.
+ * actual extraction logic, 10% chrome. Matches the meeting-action-items demo
+ * shape so the hero and live CTA point at the same product surface.
  */
 const HANDLER_CODE = `from floom import App, action
-from google import genai
 
 app = App("meeting-action-items")
-gem = genai.Client()
 
 @app.action("extract")
 def extract(notes: str):
-    prompt = f"Extract action items: {notes}"
-    resp = gem.models.generate_content(
-        model="gemini-2.5-flash-lite",
-        contents=prompt,
-    )
-    return {
-        "actions": [
-            {"owner": "Sarah", "task": "write migration docs", "due": "EOW"},
-            {"owner": "Marcus", "task": "fix /reports 500", "due": "by lunch"},
-        ],
-        "summary": "2 action items found",
-    }
+    items = []
+    for line in notes.splitlines():
+        if "action" in line.lower():
+            items.append({"owner": "Sarah", "task": line, "due": "Friday"})
+    return {"count": len(items), "items": items}
 `;
 
 /** Slash command typed at Deploy. See header comment re: `/floomit` vs
@@ -451,8 +442,8 @@ function DesktopMorphDemo({ reducedMotion }: { reducedMotion: boolean }) {
 //                     visible (font-size 11px, monospace).
 //   02  Deploy card — `$ /floomit` line, 4 step checks (all ✓), final
 //                     "Deployed" URL chip.
-//   03  Use card    — score (8/10), "Ready to ship" tag, 3 reason
-//                     bullets, "Also available as API · MCP · Analytics".
+//   03  Use card    — action-item count, owner/due bullets,
+//                     "Also available as API · MCP · Analytics".
 // -----------------------------------------------------------------------------
 function MobileStackedDemo({ reducedMotion: _reducedMotion }: { reducedMotion: boolean }) {
   const tokens = useMemo(() => tokenizePython(HANDLER_CODE), []);
@@ -524,30 +515,30 @@ function MobileStackedDemo({ reducedMotion: _reducedMotion }: { reducedMotion: b
         <header style={MOBILE_CARD_HEADER}>
           <span style={MOBILE_STEP_NUM}>03</span>
           <span style={MOBILE_STEP_LABEL} id="hd-mob-run-title">Use</span>
-          <span style={MOBILE_STEP_HINT}>Meeting → Action Items</span>
+          <span style={MOBILE_STEP_HINT}>Meeting Action Items</span>
         </header>
         <div style={MOBILE_RUN_BODY}>
           <div style={MOBILE_RUN_INPUT_ROW}>
             <span style={MOBILE_RUN_INPUT_LABEL}>Meeting notes</span>
-            <div style={MOBILE_RUN_INPUT_BOX}>Standup: Sarah ships migration docs by EOW. Marcus...</div>
+            <div style={MOBILE_RUN_INPUT_BOX}>Action: Sarah sends launch notes by Friday</div>
           </div>
           <div style={MOBILE_SCORE_ROW}>
-            <span style={MOBILE_SCORE_BIG}>8</span>
+            <span style={MOBILE_SCORE_BIG}>3</span>
             <span style={MOBILE_SCORE_OF}>items</span>
             <span style={MOBILE_TIER_PILL}>actions</span>
           </div>
           <ul style={MOBILE_REASONS_LIST}>
             <li style={MOBILE_REASON_ITEM}>
               <span style={MOBILE_REASON_BULLET} aria-hidden="true" />
-              Sarah — write migration docs · EOW
+              Sarah owns launch notes by Friday.
             </li>
             <li style={MOBILE_REASON_ITEM}>
               <span style={MOBILE_REASON_BULLET} aria-hidden="true" />
-              Marcus — fix /reports 500 · by lunch
+              Mike owns beta checklist tomorrow.
             </li>
             <li style={MOBILE_REASON_ITEM}>
               <span style={MOBILE_REASON_BULLET} aria-hidden="true" />
-              Marcus — SOC 2 questionnaire · next week
+              Priya owns demo QA before launch.
             </li>
           </ul>
           <div style={MOBILE_RUN_SECONDARY}>
@@ -641,7 +632,7 @@ function EditorSurface({ active, cycle, reducedMotion }: EditorProps) {
     <div style={surfaceStyle} aria-hidden={!active}>
       <div style={EDITOR_GRID} data-hd="editor-grid">
         <aside style={SIDEBAR_STYLE} aria-hidden="true" data-hd="sidebar">
-          <div style={SIDEBAR_SECTION}>meeting-action-items</div>
+          <div style={SIDEBAR_SECTION}>my-app</div>
           <div style={{ ...SIDEBAR_ITEM, ...SIDEBAR_ITEM_ACTIVE }}>handler.py</div>
           <div style={SIDEBAR_ITEM}>floom.yaml</div>
           <div style={SIDEBAR_ITEM}>README.md</div>
@@ -709,10 +700,10 @@ function EditorSurface({ active, cycle, reducedMotion }: EditorProps) {
  * previous implementation.
  */
 const DEPLOY_STEPS = [
-  'package handler',
-  'upload to floom',
-  'sandbox ready',
-  'live at /p/<slug>',
+  'build container',
+  'upload bundle',
+  'verify runtime',
+  'register route',
 ] as const;
 
 function DeploySurface({
@@ -956,9 +947,8 @@ function RunSurfaceDemo({
     /* eslint-enable react-hooks/set-state-in-effect */
   }, [active, cycle, reducedMotion]);
 
-  // meeting-action-items: count-up to 8 action items found. Matches the
-  // sample standup (Sarah + Marcus items) shown in the input field.
-  const score = useCountUp(8, resultReady, 700, reducedMotion);
+  // Count lands after the run completes so the output reads like the live app.
+  const score = useCountUp(3, resultReady, 700, reducedMotion);
 
   // 2026-04-29 #664: drop the bright white override that made RUN look
   // like a different product grafted in. Let RUN share the same cream
@@ -997,17 +987,17 @@ function RunSurfaceDemo({
             input 2fr left, output 3fr right. Mirror it here so the demo
             is honest about the product shape. The left panel carries the
             app chrome + input fields + primary Run button; the right
-            panel carries the score card + reasoning bullets. Both panels
+            panel carries the extracted action-item list. Both panels
             remain mounted across run states so the surface never flashes
             blank. */}
         <div data-hd="use-grid" style={RUN_GRID}>
           {/* LEFT — input column (2fr) ---------------------------------- */}
           <div style={RUN_INPUT_COL}>
             <div style={RUN_APP_HEADER}>
-              <div style={RUN_APP_BADGE} aria-hidden="true">MA</div>
+              <div style={RUN_APP_BADGE} aria-hidden="true">AR</div>
               <div>
-                <div style={RUN_TITLE}>Meeting → Action Items</div>
-                <div style={RUN_SUB}>Pull owned tasks out of any transcript</div>
+                <div style={RUN_TITLE}>Meeting Action Items</div>
+                <div style={RUN_SUB}>Pull owned tasks out of meeting notes</div>
               </div>
             </div>
 
@@ -1015,14 +1005,14 @@ function RunSurfaceDemo({
               <label style={RUN_FIELD}>
                 <span style={RUN_FIELD_LABEL}>Meeting notes</span>
                 <div style={RUN_FIELD_INPUT}>
-                  <span style={RUN_FIELD_INPUT_TEXT}>Standup: Sarah ships migration docs by EOW. Marcus...</span>
+                  <span style={RUN_FIELD_INPUT_TEXT}>Action: Sarah sends launch notes by Friday</span>
                 </div>
               </label>
             </div>
 
             <button
               type="button"
-              aria-label="Run Meeting Action Items"
+              aria-label="Run meeting action item extractor"
               style={{
                 ...RUN_BUTTON,
                 transform: pressed ? 'scale(0.98)' : 'scale(1)',
@@ -1060,7 +1050,7 @@ function RunSurfaceDemo({
                     <span style={{ ...DOT, animationDelay: '.15s' }} />
                     <span style={{ ...DOT, animationDelay: '.3s' }} />
                   </div>
-                  <div style={RUN_THINKING_LABEL}>Pulling action items&hellip;</div>
+                  <div style={RUN_THINKING_LABEL}>Extracting action items&hellip;</div>
                 </div>
               )}
               {resultReady && (
@@ -1098,15 +1088,15 @@ function RunSurfaceDemo({
                     <ul style={RUN_REASONS_LIST}>
                       <li style={RUN_REASON_ITEM}>
                         <span style={RUN_REASON_BULLET} aria-hidden="true" />
-                        Sarah — write migration docs · EOW
+                        Sarah owns launch notes by Friday.
                       </li>
                       <li style={RUN_REASON_ITEM}>
                         <span style={RUN_REASON_BULLET} aria-hidden="true" />
-                        Marcus — fix /reports 500 · by lunch
+                        Mike owns beta checklist tomorrow.
                       </li>
                       <li style={RUN_REASON_ITEM}>
                         <span style={RUN_REASON_BULLET} aria-hidden="true" />
-                        Marcus — SOC 2 questionnaire · next week
+                        Priya owns demo QA before launch.
                       </li>
                     </ul>
                   </div>

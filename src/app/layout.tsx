@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
+import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 import { SkipLink } from "@/components/SkipLink";
 
 const SITE_NAME = "Floom";
-const SITE_TAGLINE = "Localhost to live in 60 seconds";
+const SITE_TAGLINE = "Localhost to live and secure in 60 seconds";
 const SITE_DESCRIPTION =
-  "Your AI just wrote some code. Floom puts it online — as a link, an API, and a tool any agent can call.";
-const SITE_URL = "https://floom-60sec.vercel.app";
+  "Python functions become shareable browser apps backed by Supabase and E2B.";
+const SITE_URL = "https://floom.dev";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
@@ -90,10 +91,10 @@ export default function RootLayout({
         <SkipLink />
         <script
           type="application/ld+json"
-          // eslint-disable-next-line react/no-danger
           dangerouslySetInnerHTML={{ __html: JSON.stringify(STRUCTURED_DATA) }}
         />
         {children}
+        <Analytics />
       </body>
     </html>
   );

@@ -17,7 +17,7 @@ type AgentToken = {
   revoked_at: string | null;
 };
 
-const PRODUCTION_FLOOM_URL = "https://floom-60sec.vercel.app";
+const PRODUCTION_FLOOM_URL = "https://floom.dev";
 
 function relative(dateStr: string | null): string {
   if (!dateStr) return "—";
@@ -50,7 +50,7 @@ export default function TokensPage() {
 
   const publishCommand = useMemo(
     () =>
-      `FLOOM_TOKEN=YOUR_FLOOM_AGENT_TOKEN FLOOM_API_URL=${origin} npx tsx cli/deploy.ts ./fixtures/python-simple`,
+      `FLOOM_TOKEN=YOUR_FLOOM_AGENT_TOKEN FLOOM_API_URL=${origin} npx @floomhq/cli@latest deploy`,
     [origin]
   );
 
@@ -550,7 +550,7 @@ export default function TokensPage() {
           </>
         )}
 
-        {/* "Production URL: floom-60sec.vercel.app" line removed — the user
+        {/* Production URL line removed — the user
             is already on that URL; showing it as a link opens-in-new-tab to
             the same page is noise, not signal. */}
       </main>

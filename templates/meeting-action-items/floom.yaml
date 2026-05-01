@@ -1,5 +1,5 @@
+name: Meeting Action Items
 slug: meeting-action-items
-name: Meeting → Action Items
 runtime: python
 entrypoint: app.py
 handler: run

@@ -46,8 +46,8 @@ const nextConfig: NextConfig = {
       { source: "/apps", destination: "/", permanent: false },
       { source: "/security", destination: "/legal#security", permanent: false },
       // /status is now a real page; the legal anchor stays as a fallback link from inside /legal.
-      // The canonical demo migrated from pitch-coach (echo stub) to
-      // meeting-action-items (real Gemini handler). Old links keep working.
+      // The canonical demo migrated from pitch-coach to meeting-action-items.
+      // Old links keep working.
       { source: "/p/pitch-coach", destination: "/p/meeting-action-items", permanent: false },
     ];
   },

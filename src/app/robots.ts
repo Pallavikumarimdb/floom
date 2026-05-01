@@ -9,6 +9,6 @@ export default function robots(): MetadataRoute.Robots {
         disallow: ["/api/", "/auth/", "/tokens", "/login"],
       },
     ],
-    sitemap: "https://floom-60sec.vercel.app/sitemap.xml",
+    sitemap: "https://floom.dev/sitemap.xml",
   };
 }

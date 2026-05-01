@@ -1,0 +1,19 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["result", "env_present", "env_length", "message"],
+  "properties": {
+    "result": {
+      "type": "string"
+    },
+    "env_present": {
+      "type": "boolean"
+    },
+    "env_length": {
+      "type": "integer"
+    },
+    "message": {
+      "type": "string"
+    }
+  }
+}
