@@ -122,12 +122,14 @@ async function test() {
   const v01Manifest = parseManifest({
     name: 'Deps',
     slug: 'deps-app',
+    description: 'Dependency and secret smoke app.',
     runtime: 'python',
     entrypoint: 'app.py',
     handler: 'run',
     dependencies: { python: './requirements.txt' },
     secrets: ['OPENAI_API_KEY'],
   });
+  assert.equal(v01Manifest.description, 'Dependency and secret smoke app.');
   assert.deepEqual(v01Manifest.dependencies, { python: 'requirements.txt' });
   assert.deepEqual(v01Manifest.secrets, ['OPENAI_API_KEY']);
   assert.throws(
@@ -214,6 +216,7 @@ async function test() {
   const contract = parseToolResult(appContract);
   assert.equal(contract.version, 'v0.1');
   assert.match(contract.files['floom.yaml'], /runtime: python/);
+  assert.match(contract.files['floom.yaml'], /description:/);
   assert.match(contract.files['app.py'], /def run/);
   assert.equal(contract.files['input.schema.json'].type, 'object');
   assert.equal(contract.files['output.schema.json'].type, 'object');
@@ -223,6 +226,7 @@ async function test() {
   assert.match(contract.files['floom.yaml'], /secrets:/);
   assert.ok(contract.accepted_manifest_keys.includes('dependencies'));
   assert.ok(contract.accepted_manifest_keys.includes('secrets'));
+  assert.ok(contract.accepted_manifest_keys.includes('description'));
   assert.equal(contract.use_this_first.includes('get_app_contract'), true);
   assert.equal(contract.limits.max_source_bytes, 64 * 1024);
   assert.equal(contract.limits.max_input_bytes, 16 * 1024);

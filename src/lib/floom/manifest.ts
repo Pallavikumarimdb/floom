@@ -1,6 +1,7 @@
 export type FloomManifest = {
   name: string;
   slug: string;
+  description?: string;
   runtime: "python";
   entrypoint: string;
   handler: string;
@@ -18,7 +19,6 @@ const PYTHON_FILE_RE = /^[A-Za-z_][A-Za-z0-9_]*\.py$/;
 const IDENTIFIER_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
 const POST_V01_FIELDS = [
   "actions",
-  "description",
   "type",
   "visibility",
   "category",
@@ -60,6 +60,9 @@ export function parseManifest(value: unknown): FloomManifest {
   const manifest: FloomManifest = {
     name: requiredString(data.name, "name"),
     slug: requiredString(data.slug, "slug"),
+    description: typeof data.description === "string" && data.description.trim() !== ""
+      ? data.description.trim()
+      : undefined,
     runtime: requiredString(data.runtime, "runtime") as FloomManifest["runtime"],
     entrypoint: requiredString(data.entrypoint, "entrypoint"),
     handler: requiredString(data.handler, "handler"),

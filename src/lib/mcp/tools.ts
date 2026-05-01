@@ -439,6 +439,7 @@ function getAppContract(): McpToolResult {
       "floom.yaml": [
         "name: Text Demo",
         "slug: text-demo",
+        "description: Echo text and return a length.",
         "runtime: python",
         "entrypoint: app.py",
         "handler: run",
@@ -487,6 +488,7 @@ function getAppContract(): McpToolResult {
     accepted_manifest_keys: [
       "name",
       "slug",
+      "description",
       "runtime",
       "entrypoint",
       "handler",
@@ -1225,7 +1227,6 @@ function unsupportedManifestFields(manifest: JsonObject) {
   const reasons: string[] = [];
   const unsupportedFields = [
     "actions",
-    "description",
     "type",
     "visibility",
     "category",
@@ -1416,6 +1417,7 @@ function manifestToYaml(manifest: FloomManifest) {
   return yaml.dump({
     name: manifest.name,
     slug: manifest.slug,
+    ...(manifest.description ? { description: manifest.description } : {}),
     runtime: manifest.runtime,
     entrypoint: manifest.entrypoint,
     handler: manifest.handler,
