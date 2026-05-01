@@ -886,9 +886,9 @@ export default function AppPermalinkPage() { // exported as default so the serve
           >
             <div
               style={{
-                width: 36,
-                height: 36,
-                borderRadius: 9,
+                width: 32,
+                height: 32,
+                borderRadius: 8,
                 background: 'var(--bg)',
                 border: '1px solid var(--line)',
                 display: 'flex',
@@ -896,10 +896,10 @@ export default function AppPermalinkPage() { // exported as default so the serve
                 justifyContent: 'center',
                 color: 'var(--accent)',
                 flexShrink: 0,
-                marginTop: 2,
+                marginTop: 3,
               }}
             >
-              <AppIcon slug={app.slug} size={18} />
+              <AppIcon slug={app.slug} size={16} />
             </div>
             <div className="permalink-hero-title" style={{ flex: 1, minWidth: 0 }}>
               <h1
@@ -1085,7 +1085,9 @@ export default function AppPermalinkPage() { // exported as default so the serve
         {/* Run tab (DEFAULT) */}
         {activeTab === 'run' && (
           <section
-            id="run"
+            id="tabpanel-run"
+            role="tabpanel"
+            aria-labelledby="tab-run"
             ref={runSurfaceRef}
             data-testid="tab-content-run-primary"
             data-surface="run"
@@ -1218,7 +1220,11 @@ export default function AppPermalinkPage() { // exported as default so the serve
 
         {/* About tab. v26 parity: two-column layout */}
         {activeTab === 'about' && (
-        <>
+        <div
+          id="tabpanel-about"
+          role="tabpanel"
+          aria-labelledby="tab-about"
+        >
         <div
           data-testid="about-body"
           style={{
@@ -1229,7 +1235,7 @@ export default function AppPermalinkPage() { // exported as default so the serve
           className="about-body-grid"
         >
           {/* Left: prose + how-it-works + reviews */}
-          <main>
+          <div>
             {/* How it works strip */}
             {howItWorks.length > 0 && (
               <section
@@ -1301,7 +1307,7 @@ export default function AppPermalinkPage() { // exported as default so the serve
                 </section>
               );
             })()}
-          </main>
+          </div>
 
           {/* Right: aside meta panels */}
           <aside data-testid="about-aside">
@@ -1373,12 +1379,12 @@ export default function AppPermalinkPage() { // exported as default so the serve
             )}
           </aside>
         </div>
-        </>
+        </div>
         )}
 
         {/* Install tab. v26 parity: 3 install cards */}
         {activeTab === 'install' && (
-        <section id="connectors" data-testid="connectors">
+        <section id="tabpanel-install" role="tabpanel" aria-labelledby="tab-install" data-testid="connectors">
           <div
             style={{ display: 'flex', flexDirection: 'column', gap: 14, maxWidth: 880 }}
             data-testid="connectors-grid"
@@ -1424,7 +1430,7 @@ export default function AppPermalinkPage() { // exported as default so the serve
 
         {/* Source tab. v26 parity: repo card + spec card + self-host card */}
         {activeTab === 'source' && (
-          <section data-testid="tab-content-source">
+          <section id="tabpanel-source" role="tabpanel" aria-labelledby="tab-source" data-testid="tab-content-source">
             {!githubRepo && (
               <p
                 data-testid="source-no-repo-note"
@@ -1537,7 +1543,7 @@ export default function AppPermalinkPage() { // exported as default so the serve
 
         {/* R10 (2026-04-28): Earlier runs tab */}
         {activeTab === 'runs' && (
-          <section data-testid="tab-content-runs">
+          <section id="tabpanel-runs" role="tabpanel" aria-labelledby="tab-runs" data-testid="tab-content-runs">
             <div
               style={{
                 fontFamily: 'JetBrains Mono, monospace',
@@ -1632,12 +1638,37 @@ function TabBar({
     letterSpacing: isOn ? '-0.01em' : undefined,
   });
 
+  function handleKeyDown(e: React.KeyboardEvent) {
+    const idx = TABS.findIndex((t) => t.id === activeTab);
+    if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      const next = TABS[(idx + 1) % TABS.length];
+      setActiveTab(next.id);
+      tabRefs.current.get(next.id)?.focus();
+    } else if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      const prev = TABS[(idx - 1 + TABS.length) % TABS.length];
+      setActiveTab(prev.id);
+      tabRefs.current.get(prev.id)?.focus();
+    } else if (e.key === 'Home') {
+      e.preventDefault();
+      setActiveTab(TABS[0].id);
+      tabRefs.current.get(TABS[0].id)?.focus();
+    } else if (e.key === 'End') {
+      e.preventDefault();
+      const last = TABS[TABS.length - 1];
+      setActiveTab(last.id);
+      tabRefs.current.get(last.id)?.focus();
+    }
+  }
+
   return (
     <div
       role="tablist"
       aria-label="App content"
       data-testid="permalink-tabs"
       className="permalink-tab-bar"
+      onKeyDown={handleKeyDown}
       style={{
         display: 'flex',
         alignItems: 'stretch',
@@ -1661,7 +1692,10 @@ function TabBar({
             }}
             type="button"
             role="tab"
+            id={`tab-${t.id}`}
             aria-selected={isOn}
+            aria-controls={`tabpanel-${t.id}`}
+            tabIndex={isOn ? 0 : -1}
             data-testid={`permalink-tab-${t.id}`}
             data-state={isOn ? 'active' : 'inactive'}
             onClick={() => setActiveTab(t.id)}
