@@ -1,0 +1,13 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["formatted", "package"],
+  "properties": {
+    "formatted": {
+      "type": "string"
+    },
+    "package": {
+      "type": "string"
+    }
+  }
+}

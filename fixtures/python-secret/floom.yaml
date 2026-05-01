@@ -1,0 +1,10 @@
+name: Secret Redaction Probe
+slug: secret-redaction-probe
+runtime: python
+entrypoint: app.py
+handler: run
+public: false
+secrets:
+  - FLOOM_TEST_SECRET
+input_schema: input.schema.json
+output_schema: output.schema.json

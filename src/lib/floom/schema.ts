@@ -68,6 +68,15 @@ export function redactSecretOutput(outputSchema: unknown, output: unknown): unkn
   return redactSecretValue(outputSchema, output);
 }
 
+export function redactExactSecretValues(value: unknown, secretValues: string[]): unknown {
+  const values = new Set(secretValues.filter((item) => item !== ""));
+  if (values.size === 0) {
+    return cloneJsonValue(value);
+  }
+
+  return redactExactValues(value, values);
+}
+
 function getJsonComplexity(value: unknown): { ok: true } | { ok: false } {
   const seen = new WeakSet<object>();
   let nodes = 0;
@@ -260,6 +269,34 @@ function redactSuspiciousKeys(value: unknown): unknown {
     Object.entries(value).map(([key, item]) => [
       key,
       isSuspiciousSecretKey(key) ? REDACTED_OUTPUT_VALUE : redactSuspiciousKeys(item),
+    ])
+  );
+}
+
+function redactExactValues(value: unknown, secretValues: Set<string>): unknown {
+  if (typeof value === "string") {
+    let redacted = value;
+    for (const secretValue of secretValues) {
+      if (redacted === secretValue) {
+        return REDACTED_OUTPUT_VALUE;
+      }
+      redacted = redacted.split(secretValue).join(REDACTED_OUTPUT_VALUE);
+    }
+    return redacted;
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((item) => redactExactValues(item, secretValues));
+  }
+
+  if (!isJsonObject(value)) {
+    return value;
+  }
+
+  return Object.fromEntries(
+    Object.entries(value).map(([key, item]) => [
+      key,
+      redactExactValues(item, secretValues),
     ])
   );
 }

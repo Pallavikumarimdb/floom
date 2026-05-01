@@ -9,7 +9,13 @@ import {
   getPublicRunRateLimitKey,
   getRunCallerKey,
 } from "@/lib/floom/rate-limit";
-import { redactSecretInput, redactSecretOutput } from "@/lib/floom/schema";
+import { readRuntimeDependencies } from "@/lib/floom/requirements";
+import { resolveRuntimeSecrets } from "@/lib/floom/runtime-secrets";
+import {
+  redactExactSecretValues,
+  redactSecretInput,
+  redactSecretOutput,
+} from "@/lib/floom/schema";
 import Ajv from "ajv";
 
 const ajv = new Ajv({ strict: false });
@@ -90,9 +96,18 @@ export async function POST(
 
   const isOwner = userId === app.owner_id;
   const isPublic = app.public;
+  const hasRuntimeSecrets =
+    Array.isArray(latestVersion.secrets) && latestVersion.secrets.length > 0;
 
   if (!isOwner && !isPublic) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  if (hasRuntimeSecrets && !isOwner) {
+    return NextResponse.json(
+      { error: "Secret-backed apps require owner authentication" },
+      { status: 403 }
+    );
   }
 
   if (caller?.kind === "agent_token" && !callerHasScope(caller, "run")) {
@@ -187,13 +202,64 @@ export async function POST(
     );
   }
 
+  const runtimeSecrets = await resolveRuntimeSecrets(
+    admin,
+    latestVersion.secrets ?? [],
+    app.id,
+    app.owner_id
+  );
+  if (!runtimeSecrets.ok) {
+    await admin
+      .from("executions")
+      .update({
+        status: "error",
+        error: runtimeSecrets.error,
+        completed_at: new Date().toISOString(),
+      })
+      .eq("id", execution.id);
+
+    return NextResponse.json(
+      {
+        execution_id: execution.id,
+        status: "error",
+        output: null,
+        error: runtimeSecrets.error,
+      },
+      { status: 503 }
+    );
+  }
+
+  if (runtimeSecrets.missing.length > 0) {
+    const errorMessage = `Missing configured app secret(s): ${runtimeSecrets.missing.join(", ")}`;
+    await admin
+      .from("executions")
+      .update({
+        status: "error",
+        error: errorMessage,
+        completed_at: new Date().toISOString(),
+      })
+      .eq("id", execution.id);
+
+    return NextResponse.json(
+      {
+        execution_id: execution.id,
+        status: "error",
+        output: null,
+        error: errorMessage,
+      },
+      { status: 400 }
+    );
+  }
+
   // Run
   const result = await runInSandboxContained(
     bundleText,
     inputs,
     app.runtime,
     app.entrypoint,
-    app.handler
+    app.handler,
+    readRuntimeDependencies(latestVersion.dependencies),
+    runtimeSecrets.envs
   );
 
   // Validate output
@@ -201,7 +267,10 @@ export async function POST(
   const outputValid = validateOutput(result.output);
   const redactedOutput = result.error
     ? null
-    : redactSecretOutput(latestVersion.output_schema ?? {}, result.output);
+    : redactExactSecretValues(
+        redactSecretOutput(latestVersion.output_schema ?? {}, result.output),
+        Object.values(runtimeSecrets.envs)
+      );
 
   // Update execution
   await admin
