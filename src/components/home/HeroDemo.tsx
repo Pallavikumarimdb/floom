@@ -118,17 +118,17 @@ const STATE_DURATION: Record<DemoState, number> = {
 const HANDLER_CODE = `from floom import App, action
 from google import genai
 
-app = App("ai-readiness-audit")
+app = App("pitch-coach")
 gem = genai.Client()
 
-@app.action("audit")
-def audit(url: str):
-    prompt = f"Score {url} for AI readiness."
+@app.action("coach")
+def coach(pitch: str):
+    prompt = f"Coach this pitch: {pitch}"
     resp = gem.models.generate_content(
         model="gemini-2.5-flash-lite",
         contents=prompt,
     )
-    return {"score": 8, "tier": "Ready to ship"}
+    return {"score": 8, "tier": "Concise"}
 `;
 
 /** Slash command typed at Deploy. See header comment re: `/floomit` vs
@@ -518,30 +518,30 @@ function MobileStackedDemo({ reducedMotion: _reducedMotion }: { reducedMotion: b
         <header style={MOBILE_CARD_HEADER}>
           <span style={MOBILE_STEP_NUM}>03</span>
           <span style={MOBILE_STEP_LABEL} id="hd-mob-run-title">Use</span>
-          <span style={MOBILE_STEP_HINT}>AI Readiness Audit</span>
+          <span style={MOBILE_STEP_HINT}>Pitch Coach</span>
         </header>
         <div style={MOBILE_RUN_BODY}>
           <div style={MOBILE_RUN_INPUT_ROW}>
-            <span style={MOBILE_RUN_INPUT_LABEL}>Company URL</span>
-            <div style={MOBILE_RUN_INPUT_BOX}>stripe.com</div>
+            <span style={MOBILE_RUN_INPUT_LABEL}>Your pitch</span>
+            <div style={MOBILE_RUN_INPUT_BOX}>We make AI tools for developers.</div>
           </div>
           <div style={MOBILE_SCORE_ROW}>
             <span style={MOBILE_SCORE_BIG}>8</span>
             <span style={MOBILE_SCORE_OF}>/ 10</span>
-            <span style={MOBILE_TIER_PILL}>Ready to ship</span>
+            <span style={MOBILE_TIER_PILL}>Concise</span>
           </div>
           <ul style={MOBILE_REASONS_LIST}>
             <li style={MOBILE_REASON_ITEM}>
               <span style={MOBILE_REASON_BULLET} aria-hidden="true" />
-              Clear AI story across docs, ship-ready positioning.
+              Clear value prop, audience named upfront.
             </li>
             <li style={MOBILE_REASON_ITEM}>
               <span style={MOBILE_REASON_BULLET} aria-hidden="true" />
-              Surfaces real evals + customer case studies publicly.
+              Tight: 32 words gets the point across.
             </li>
             <li style={MOBILE_REASON_ITEM}>
               <span style={MOBILE_REASON_BULLET} aria-hidden="true" />
-              Risk: no published latency / error guardrails yet.
+              Lift: name the user pain you solve, not the offering.
             </li>
           </ul>
           <div style={MOBILE_RUN_SECONDARY}>
@@ -998,25 +998,25 @@ function RunSurfaceDemo({
           {/* LEFT — input column (2fr) ---------------------------------- */}
           <div style={RUN_INPUT_COL}>
             <div style={RUN_APP_HEADER}>
-              <div style={RUN_APP_BADGE} aria-hidden="true">AR</div>
+              <div style={RUN_APP_BADGE} aria-hidden="true">PC</div>
               <div>
-                <div style={RUN_TITLE}>AI Readiness Audit</div>
-                <div style={RUN_SUB}>Score a company&apos;s AI readiness</div>
+                <div style={RUN_TITLE}>Pitch Coach</div>
+                <div style={RUN_SUB}>Tighten your elevator pitch</div>
               </div>
             </div>
 
             <div style={RUN_FIELDS}>
               <label style={RUN_FIELD}>
-                <span style={RUN_FIELD_LABEL}>Company URL</span>
+                <span style={RUN_FIELD_LABEL}>Your pitch</span>
                 <div style={RUN_FIELD_INPUT}>
-                  <span style={RUN_FIELD_INPUT_TEXT}>stripe.com</span>
+                  <span style={RUN_FIELD_INPUT_TEXT}>We make AI tools for developers.</span>
                 </div>
               </label>
             </div>
 
             <button
               type="button"
-              aria-label="Run AI readiness audit"
+              aria-label="Run Pitch Coach"
               style={{
                 ...RUN_BUTTON,
                 transform: pressed ? 'scale(0.98)' : 'scale(1)',
@@ -1054,7 +1054,7 @@ function RunSurfaceDemo({
                     <span style={{ ...DOT, animationDelay: '.15s' }} />
                     <span style={{ ...DOT, animationDelay: '.3s' }} />
                   </div>
-                  <div style={RUN_THINKING_LABEL}>Auditing AI readiness&hellip;</div>
+                  <div style={RUN_THINKING_LABEL}>Coaching your pitch&hellip;</div>
                 </div>
               )}
               {resultReady && (
@@ -1072,7 +1072,7 @@ function RunSurfaceDemo({
                           : 'opacity .25s ease, transform .25s ease',
                       }}
                     >
-                      Ready to ship
+                      Concise
                     </span>
                   </div>
 
@@ -1088,19 +1088,19 @@ function RunSurfaceDemo({
                         : 'opacity .3s ease .1s, transform .3s ease .1s',
                     }}
                   >
-                    <div style={RUN_REASONS_TITLE}>Why this score</div>
+                    <div style={RUN_REASONS_TITLE}>Pitch feedback</div>
                     <ul style={RUN_REASONS_LIST}>
                       <li style={RUN_REASON_ITEM}>
                         <span style={RUN_REASON_BULLET} aria-hidden="true" />
-                        Clear AI story across docs, ship-ready positioning.
+                        Clear value prop, audience named upfront.
                       </li>
                       <li style={RUN_REASON_ITEM}>
                         <span style={RUN_REASON_BULLET} aria-hidden="true" />
-                        Surfaces real evals + customer case studies publicly.
+                        Tight: 32 words gets the point across.
                       </li>
                       <li style={RUN_REASON_ITEM}>
                         <span style={RUN_REASON_BULLET} aria-hidden="true" />
-                        Risk: no published latency / error guardrails yet.
+                        Lift: name the user pain you solve, not the offering.
                       </li>
                     </ul>
                   </div>
