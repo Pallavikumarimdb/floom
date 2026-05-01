@@ -33,7 +33,9 @@ import { useSession } from '@/hooks/useSession';
 // (eyebrow, H1, sub, npx command). Caption + MCP/CLI popover removed —
 // Federico's "the landing page hero header still looks a bit overwhelming".
 // Advanced install paths (MCP config, CLI snippet) live on /home and /docs.
-const NPX_SETUP_COMMAND = 'npx @floomhq/cli@latest setup';
+// Drop @latest — npx defaults to it, and the shorter form fits 375px viewport
+// without horizontal scroll inside the install card.
+const NPX_SETUP_COMMAND = 'npx @floomhq/cli setup';
 
 async function copyText(text: string) {
   try {
