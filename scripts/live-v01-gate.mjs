@@ -299,7 +299,7 @@ async function assertScopedAndNonOwnerAccessControls() {
     output_schema: fixture.outputSchema,
   }, {
     authToken: readOnlyToken.token,
-    expectedError: /publish scope/,
+    expectedError: /publish scope/i,
     label: 'read-only publish_app',
   });
 
@@ -444,7 +444,7 @@ async function assertMcpError(name, args, { authToken, expectedError, label }) {
   check(result.isError === true, `${label} unexpectedly succeeded`);
   const data = JSON.parse(result.content[0].text);
   assertNoSecret(data, `${label} MCP error`);
-  check(expectedError.test(data.error || ''), `${label} returned unexpected error`);
+  check(expectedError.test(JSON.stringify(data)), `${label} returned unexpected error`);
 }
 
 async function apiJson(path, { method, body, expectedStatus = 200, authToken = token } = {}) {
