@@ -19,7 +19,7 @@ function Section({
 export default function LegalPage() {
   return (
     <main className="min-h-screen overflow-x-hidden bg-[#faf9f5] text-[#11110f]">
-      <SiteHeader showProductLinks />
+      <SiteHeader />
 
       <article className="mx-auto max-w-3xl px-5 py-14">
         <p className="mb-3 text-sm font-semibold text-emerald-700">

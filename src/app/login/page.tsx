@@ -1,16 +1,19 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, Suspense, useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { SiteHeader } from "@/components/SiteHeader";
+import { FloomFooter } from "@/components/FloomFooter";
 import { createClient } from "@/lib/supabase/client";
 
 type Mode = "signin" | "signup";
 
-export default function LoginPage() {
+function LoginContent() {
   const router = useRouter();
-  const [mode, setMode] = useState<Mode>("signin");
+  const searchParams = useSearchParams();
+  const initialMode: Mode = searchParams.get("mode") === "signup" ? "signup" : "signin";
+  const [mode, setMode] = useState<Mode>(initialMode);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState<string | null>(null);
@@ -82,56 +85,136 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#faf9f5] text-[#11110f]">
-      <SiteHeader showProductLinks />
-      <section className="mx-auto max-w-md px-5 py-14">
-        <p className="mb-3 text-sm font-semibold text-emerald-700">
-          Floom builder access
-        </p>
-        <h1 className="text-4xl font-black tracking-tight">
-          {mode === "signin" ? "Sign in" : "Create account"}
-        </h1>
-        <p className="mt-3 text-neutral-600">
-          Sign in to create a Floom agent token and publish local Python apps.
-        </p>
+    <div style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--ink)' }}>
+      <SiteHeader />
+      {/* v11: Apple-style centered login card */}
+      <section
+        style={{
+          maxWidth: 400,
+          margin: '0 auto',
+          padding: '64px 24px 80px',
+        }}
+      >
+        <div style={{ textAlign: 'center', marginBottom: 32 }}>
+          <img src="/floom-mark-glow.svg" alt="Floom" width={40} height={40} style={{ marginBottom: 16, display: 'inline-block' }} />
+          <h1 style={{ fontSize: 26, fontWeight: 800, letterSpacing: '-0.025em', margin: '0 0 8px', color: 'var(--ink)' }}>
+            {mode === "signin" ? "Sign in" : "Create account"}
+          </h1>
+          <p style={{ fontSize: 14, color: 'var(--muted)', margin: 0, lineHeight: 1.5 }}>
+            {mode === "signin"
+              ? "Sign in to manage your Floom agent tokens."
+              : "Publish local Python apps as live URLs."}
+          </p>
+        </div>
 
-        <form onSubmit={submit} className="mt-8 rounded-2xl border border-[#ded8cc] bg-white p-6 shadow-xl shadow-neutral-200/50">
-          <label className="block text-sm font-bold text-neutral-800" htmlFor="email">
-            Email
-          </label>
-          <input
-            id="email"
-            type="email"
-            autoComplete="email"
-            required
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            className="mt-2 w-full rounded-lg border border-[#cfc7b8] bg-[#fffdf8] px-3 py-3 outline-none focus:border-emerald-700"
-          />
+        <form
+          onSubmit={submit}
+          style={{
+            background: 'var(--card)',
+            border: '1px solid var(--line)',
+            borderRadius: 16,
+            padding: '24px',
+            boxShadow: 'var(--shadow-3)',
+          }}
+        >
+          <div style={{ marginBottom: 16 }}>
+            <label
+              style={{ display: 'block', fontSize: 12.5, fontWeight: 600, color: 'var(--muted)', marginBottom: 6 }}
+              htmlFor="email"
+            >
+              Email
+            </label>
+            <input
+              id="email"
+              type="email"
+              autoComplete="email"
+              required
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              className="input-field"
+              placeholder="you@example.com"
+              style={{ width: '100%', boxSizing: 'border-box' }}
+            />
+          </div>
 
-          <label className="mt-5 block text-sm font-bold text-neutral-800" htmlFor="password">
-            Password
-          </label>
-          <input
-            id="password"
-            type="password"
-            autoComplete={mode === "signin" ? "current-password" : "new-password"}
-            required
-            minLength={6}
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            className="mt-2 w-full rounded-lg border border-[#cfc7b8] bg-[#fffdf8] px-3 py-3 outline-none focus:border-emerald-700"
-          />
+          <div style={{ marginBottom: 20 }}>
+            <label
+              style={{ display: 'block', fontSize: 12.5, fontWeight: 600, color: 'var(--muted)', marginBottom: 6 }}
+              htmlFor="password"
+            >
+              Password
+            </label>
+            <input
+              id="password"
+              type="password"
+              autoComplete={mode === "signin" ? "current-password" : "new-password"}
+              required
+              minLength={6}
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              className="input-field"
+              placeholder={mode === "signup" ? "At least 6 characters" : "Your password"}
+              style={{ width: '100%', boxSizing: 'border-box' }}
+            />
+          </div>
 
-          {error && <p className="mt-4 text-sm font-medium text-red-700">{error}</p>}
-          {message && <p className="mt-4 text-sm font-medium text-emerald-700">{message}</p>}
+          {/* Error callout */}
+          {error && (
+            <div
+              role="alert"
+              style={{
+                marginBottom: 16,
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: 10,
+                borderRadius: 8,
+                border: '1px solid var(--danger-border)',
+                background: 'var(--danger-soft)',
+                padding: '10px 14px',
+              }}
+            >
+              <svg className="mt-0.5" width={14} height={14} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true" style={{ flexShrink: 0, color: 'var(--danger)', marginTop: 2 }}>
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="8" x2="12" y2="12" />
+                <line x1="12" y1="16" x2="12.01" y2="16" />
+              </svg>
+              <p style={{ fontSize: 13, fontWeight: 500, color: 'var(--danger)', margin: 0 }}>{error}</p>
+            </div>
+          )}
+
+          {/* Success callout */}
+          {message && (
+            <div
+              role="status"
+              style={{
+                marginBottom: 16,
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: 10,
+                borderRadius: 8,
+                border: '1px solid var(--accent-border)',
+                background: 'var(--accent-soft)',
+                padding: '10px 14px',
+              }}
+            >
+              <svg width={14} height={14} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true" style={{ flexShrink: 0, color: 'var(--accent)', marginTop: 2 }}>
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+              <p style={{ fontSize: 13, fontWeight: 500, color: 'var(--accent)', margin: 0 }}>{message}</p>
+            </div>
+          )}
 
           <button
             type="submit"
             disabled={loading || googleLoading}
-            className="mt-6 w-full rounded-lg bg-emerald-700 px-5 py-3 font-semibold text-white disabled:opacity-50"
+            className="btn-primary full"
+            style={{ opacity: (loading || googleLoading) ? 0.6 : 1, width: '100%', height: 46, fontSize: 15 }}
           >
-            {loading ? "Working..." : mode === "signin" ? "Sign in" : "Create account"}
+            {loading
+              ? "Working…"
+              : mode === "signin"
+              ? "Sign in"
+              : "Create account"}
           </button>
 
           <div className="my-5 flex items-center gap-3 text-xs font-semibold uppercase text-neutral-400">
@@ -157,19 +240,40 @@ export default function LoginPage() {
             setError(null);
             setMessage(null);
           }}
-          className="mt-5 text-sm font-semibold text-emerald-700"
+          className="btn-outline"
+          style={{ width: '100%', marginTop: 10, justifyContent: 'center', height: 42 }}
         >
-          {mode === "signin" ? "Need an account? Sign up" : "Have an account? Sign in"}
+          {mode === "signin"
+            ? "Need an account? Sign up"
+            : "Have an account? Sign in"}
         </button>
 
-        <p className="mt-8 text-sm text-neutral-500">
-          Already have a token? Use the{" "}
-          <Link href="/p/smoke-1777538613152" className="font-semibold text-emerald-700">
-            live app
+        <p style={{ marginTop: 24, fontSize: 13, color: 'var(--muted)', textAlign: 'center' }}>
+          Already have a token?{" "}
+          <Link
+            href="/p/pitch-coach"
+            style={{ fontWeight: 600, color: 'var(--accent)', textDecoration: 'none' }}
+          >
+            Try the live app
           </Link>{" "}
           or publish with the CLI.
         </p>
       </section>
-    </main>
+      <FloomFooter />
+    </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-[#faf9f5]">
+          <SiteHeader />
+        </div>
+      }
+    >
+      <LoginContent />
+    </Suspense>
   );
 }
