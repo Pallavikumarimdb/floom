@@ -704,6 +704,10 @@ async function testV01DependencyAndSecretMetadata() {
     /exact package pins/
   );
   assert.throws(
+    () => validatePythonRequirementsText('requests==2.*\n'),
+    /exact package pins/
+  );
+  assert.throws(
     () => validatePythonRequirementsText('--extra-index-url https://example.com\nrequests\n'),
     /exact package pins/
   );

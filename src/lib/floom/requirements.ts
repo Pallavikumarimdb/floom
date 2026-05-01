@@ -2,7 +2,7 @@ import { MAX_REQUIREMENTS_BYTES } from "./limits";
 
 const UNSAFE_REQUIREMENT = /(^\s*-)|:\/\/|(^|\s)(git\+|file:|\.{1,2}\/)/i;
 const EXACT_PINNED_REQUIREMENT_LINE =
-  /^[A-Za-z0-9_.-]+(\[[A-Za-z0-9_,.-]+\])?==[A-Za-z0-9_.!+*-]+(\s*;[A-Za-z0-9_ ."'()<>=!-]+)?$/;
+  /^[A-Za-z0-9_.-]+(\[[A-Za-z0-9_,.-]+\])?==[A-Za-z0-9_.!+-]+(\s*;[A-Za-z0-9_ ."'()<>=!-]+)?$/;
 
 export type RuntimeDependencies = {
   python_requirements?: string;
