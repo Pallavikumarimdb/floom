@@ -8,11 +8,8 @@ Production URL: `https://floom.dev`
 
 Scope: v0.1 Python function apps with JSON Schema input/output, optional exact-pinned hash-locked `requirements.txt`, encrypted app secrets, agent tokens, browser/API/CLI/MCP run paths, public/private access, Supabase, and E2B.
 
-Raw evidence, screenshots, and one-off run logs belong outside the public repo:
-
-```text
-/root/floom-internal/launch-evidence/floom-minimal/YYYY-MM-DD/
-```
+Raw evidence, screenshots, and one-off run logs belong outside the public repo
+in the private launch evidence store.
 
 ## Required Inputs
 
@@ -29,7 +26,7 @@ Never print raw tokens, JWTs, Supabase keys, E2B keys, Vercel tokens, or secret 
 1. Open `https://floom.dev/login`.
 2. Verify email/password sign-in renders.
 3. Verify Google sign-in hands off to Google and returns to `/tokens` when completed.
-4. For fresh signup, verify the email confirmation link returns to `https://floom.dev`, not localhost or a Vercel alias.
+4. For fresh signup, verify the email confirmation link returns to `https://floom.dev`, not localhost or any non-canonical origin.
 5. Open `/tokens`.
 6. Create an agent token.
 7. Verify the raw token appears once.

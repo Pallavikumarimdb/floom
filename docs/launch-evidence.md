@@ -5,8 +5,6 @@ Public repo policy: keep reusable launch gates and sanitized summaries here, not
 Public artifacts kept in this repo:
 
 - `docs/launch-readiness-checklist.md`
-- `docs/agent-browser-qa-runbook.md`
-- `docs/launch-env-auth-map.md`
 - `docs/architecture-v0.md`
 - `docs/quality-bar.md`
 - product-facing docs under `src/app/docs`
@@ -18,12 +16,10 @@ Internal evidence moved out of the public repo:
 - screenshots
 - one-off verification notes
 - provider/env/debug notes
+- operator browser handoff notes
+- deployment origin and provider configuration maps
 
-Internal path on AX41:
-
-```text
-/root/floom-internal/launch-evidence/floom-minimal/2026-05-01/
-```
+Internal evidence lives in the private Floom internal repository/evidence store.
 
 Before making this repo public, run:
 

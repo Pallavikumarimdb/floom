@@ -6,9 +6,8 @@ Scope: production Floom v0.1 at `https://floom.dev`, single-file Python function
 
 Do not run this protocol against production until the coordinator explicitly assigns a run.
 
-Browser/session handoff is defined in `docs/agent-browser-qa-runbook.md`.
-
-Environment/auth ownership is defined in `docs/launch-env-auth-map.md`.
+Browser session handoff and provider ownership notes are operator-only records
+kept in the private launch evidence store.
 
 ## No-Secret Rules
 

@@ -25,11 +25,8 @@ Current checklist artifact score after the 2026-05-01 state audit: `92/100`.
 
 Current product launch score is lower until every P0 row below has fresh production evidence. Do not treat older audit logs, stale PR notes, or pre-deploy results as current launch evidence.
 
-Internal evidence path on AX41:
-
-```text
-/root/floom-internal/launch-evidence/floom-minimal/2026-05-01/
-```
+Detailed run evidence is kept outside the public repo in the private launch
+evidence store.
 
 ## P0 Product Path
 
@@ -41,21 +38,21 @@ Internal evidence path on AX41:
 | Architecture diagram exists | docs include Mermaid architecture for browser/API/CLI/MCP/Supabase/E2B/runtime secrets | Needs current evidence |
 | 60-second claim stopwatch | Fresh user with token already available can publish and run a documented template from local folder to live `/p/:slug` in <= 60 seconds; log exact stopwatch start/stop | Needs current evidence |
 | First-run intuition | Virgin agent follows `/docs` and CLI/MCP instructions without coordinator explanation or hidden commands | Needs current evidence |
-| No legacy-stack split | user-visible docs, CLI output, MCP output, landing CTAs, and app URLs all point to `https://floom.dev`, not `preview.floom.dev` or a Vercel alias | Needs current evidence |
+| No legacy-stack split | user-visible docs, CLI output, MCP output, landing CTAs, and app URLs all point to `https://floom.dev`, not a legacy or non-canonical origin | Needs current evidence |
 
 ## P0 Auth And Tokens
 
 | Gate | Required Evidence | Status |
 | --- | --- | --- |
 | Email/password signup | Fresh account creation from `https://floom.dev/login`, or provider-limit failure recorded with exact copy and SMTP issue link | Needs current evidence |
-| Email confirmation | Confirmation lands on `https://floom.dev`, never localhost or Vercel alias | Needs current evidence |
+| Email confirmation | Confirmation lands on `https://floom.dev`, never localhost or a non-canonical origin | Needs current evidence |
 | Google sign-in | Google OAuth completes through Supabase and returns to `https://floom.dev/tokens`, no 502 | Needs current evidence |
 | Sign-in with existing user | Known user signs in and lands on `/tokens` | Needs current evidence |
 | Token create | `/tokens` creates an agent token, raw token appears once | Needs current evidence |
 | Token copy/list | copy state works; refresh hides raw token and shows prefix/metadata only | Needs current evidence |
 | Token revoke | revoke works; revoked token fails publish and run | Needs current evidence |
 | Token API boundary | agent tokens cannot create more agent tokens; `/api/agent-tokens` requires Supabase user bearer | Needs current evidence |
-| OAuth cookie/proxy regression | Google OAuth callback completes with production cookies through Cloudflare/AX41/nginx without `502` | Needs current evidence |
+| OAuth cookie/proxy regression | Google OAuth callback completes with production cookies through the production proxy path without `502` | Needs current evidence |
 | Broken image regression | Google logo and signed-in avatar render without broken image icons | Needs current evidence |
 | Signup volume truth | Supabase SMTP/rate-limit status is tested and documented; if SMTP is absent, public self-serve launch is marked blocked | Needs current evidence |
 
@@ -64,7 +61,7 @@ Internal evidence path on AX41:
 | Gate | Required Evidence | Status |
 | --- | --- | --- |
 | Published CLI version | `npx @floomhq/cli@latest --version` returns expected v0.1-capable version | Needs current evidence |
-| CLI default/origin clarity | docs and CLI setup use `https://floom.dev`; no silent fallback to `preview.floom.dev` for launch path | Needs current evidence |
+| CLI default/origin clarity | docs and CLI setup use `https://floom.dev`; no silent fallback to a legacy origin for launch path | Needs current evidence |
 | CLI auth | isolated HOME can run `auth login --token ... --api-url https://floom.dev` and `auth whoami` | Needs current evidence |
 | CLI init/template path | a user can create or copy a working app from documented templates | Needs current evidence |
 | CLI deploy dry run | `deploy --dry-run` validates manifest/source/requirements/secrets without publishing | Needs current evidence |
@@ -147,12 +144,12 @@ Internal evidence path on AX41:
 | --- | --- | --- |
 | `main` contains v0.1 | GitHub `main` includes dependencies, encrypted secrets, runbooks, and QA docs | Verified on `main`; rerun after every commit |
 | Vercel deployment | Vercel prod deploy succeeds from `main` | Verified on production; rerun after every commit |
-| `floom.dev` routing | `floom.dev` serves the deployed Vercel build through AX41/Cloudflare path | Needs current evidence |
+| `floom.dev` routing | `floom.dev` serves the deployed Vercel build through the production routing path | Needs current evidence |
 | Supabase migration | app secrets migration is applied in production | Pre-merge evidence exists; needs current evidence |
 | Env completeness | required production env names exist in Vercel, no values in repo | Needs current evidence |
 | SMTP limit | Supabase SMTP/rate-limit status is documented; public signup volume is either fixed or explicitly blocked | Needs current evidence |
 | Observability | Sentry/Vercel Analytics status is documented | Needs current evidence |
-| DNS/proxy map | Cloudflare, AX41 nginx, Vercel alias, Supabase redirects, and Google OAuth callback are documented and checked from production | Needs current evidence |
+| DNS/proxy map | DNS/proxy routing, Supabase redirects, and Google OAuth callback are documented in the private operator notes and checked from production | Needs current evidence |
 | Health/status | `/api/status` or equivalent health endpoint exists or its absence is explicitly accepted; status-page decision recorded | Needs current evidence |
 | Rollback | last known good deployment, rollback command, and cleanup command are documented | Needs current evidence |
 | Cleanup tooling | coordinator can delete QA-created apps, tokens, secrets, auth users, executions, and storage bundles without manual DB spelunking | Needs current evidence |
@@ -161,7 +158,7 @@ Internal evidence path on AX41:
 
 | Gate | Required Evidence | Status |
 | --- | --- | --- |
-| Virgin browser QA | at least one agent uses `docs/agent-browser-qa-runbook.md` to test login/token/browser flows | Needs current evidence |
+| Virgin browser QA | at least one agent uses the private browser handoff notes to test login/token/browser flows | Needs current evidence |
 | Virgin CLI QA | at least one agent uses isolated HOME and published CLI from scratch | Needs current evidence |
 | Virgin MCP QA | at least one agent publishes and runs through MCP from scratch | Needs current evidence |
 | Adversarial unsupported-app QA | at least one agent tries unsupported apps and confirms clear rejection | Needs current evidence |

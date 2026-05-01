@@ -157,9 +157,8 @@ default `extract` fallback. Exit 0 = all pass.
 
 ## Environment
 
-`GEMINI_API_KEY` — set this in the sandbox environment (or in
-`~/.config/ai-sidecar/keys.json` on AX41). The handler reads from the env var
-first, then falls back to the sidecar keys file.
+`GEMINI_API_KEY` — set this in the sandbox environment. The local prototype can
+also read from a private sidecar keys file when present.
 
 Model used: `gemini-3-flash-preview` (Gemini 3 only — no 2.x).
 

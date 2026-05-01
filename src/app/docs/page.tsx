@@ -141,11 +141,8 @@ export default function DocsPage() {
           </ol>
           <CodeBlock>{launchCommand}</CodeBlock>
           <p className="text-sm text-neutral-500">
-            The launch origin is <code>https://floom.dev</code>. If an existing
-            CLI config points at <code>preview.floom.dev</code> or a Vercel
-            alias, run setup again or set{" "}
-            <code>FLOOM_API_URL=https://floom.dev</code> for the publish
-            command.
+            The launch origin is <code>https://floom.dev</code>. Run setup
+            again if an older local CLI config points somewhere else.
           </p>
         </Section>
 

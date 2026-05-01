@@ -35,7 +35,7 @@ def _gemini_key() -> str:
     key = os.environ.get("GEMINI_API_KEY", "").strip()
     if key:
         return key
-    # Fall back to ai-sidecar keys file (AX41 convention)
+    # Local prototype fallback; production v0.1 injects declared secrets.
     keys_path = os.path.expanduser("~/.config/ai-sidecar/keys.json")
     if os.path.exists(keys_path):
         with open(keys_path) as fh:

@@ -104,7 +104,7 @@ npx @floomhq/cli@latest deploy
 For local development, set `FLOOM_API_URL=http://localhost:3000` after `npm run dev`. For one-off scripts, set `FLOOM_TOKEN=YOUR_FLOOM_AGENT_TOKEN`.
 Without Supabase env, visit `/p/demo-app` for the local demo. In the hosted v0.1 launch app, use the homepage CTA to open the retained live app.
 
-`setup` must store `api_url` as `https://floom.dev` for launch testing. If a local config points at `https://preview.floom.dev` or a Vercel alias, run setup again or set `FLOOM_API_URL=https://floom.dev` for the publish command.
+`setup` must store `api_url` as `https://floom.dev` for launch testing. If an older local config points somewhere else, run setup again or set `FLOOM_API_URL=https://floom.dev` for the publish command.
 
 ### 6. Manage app secrets
 
