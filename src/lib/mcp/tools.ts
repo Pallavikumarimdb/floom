@@ -423,7 +423,7 @@ function getAppContract(): McpToolResult {
       },
       {
         case: "manifest field actions",
-        reason: "Multiple actions are post-v0. v0.1 still exposes one handler.",
+        reason: "Multiple actions are post-v0.1. v0.1 still exposes one handler.",
       },
       {
         case: "OpenBlog/OpenAPI apps",
@@ -1106,7 +1106,7 @@ function findCandidateApps(args: JsonObject): McpToolResult {
         const pythonFiles = pythonFilesInAppDir(appDir, files);
         if (pythonFiles.length > 1) {
           errors.push(
-            `Multiple Python files are not supported in v0: ${pythonFiles.join(", ")}. Use one stdlib entrypoint file or wait for post-v0 multi-file bundles.`
+            `Multiple Python files are not supported in v0.1: ${pythonFiles.join(", ")}. Use one entrypoint file or wait for post-v0.1 multi-file bundles.`
           );
         }
 
@@ -1215,7 +1215,7 @@ function unsupportedRepositoryCandidates(files: Record<string, string>) {
   const candidates = [];
 
   if (fileNames.has("openapi.json") || /FastAPI\s*\(/.test(fileText)) {
-    candidates.push(unsupportedCandidate("FastAPI/OpenAPI apps require the post-v0 HTTP app runner"));
+    candidates.push(unsupportedCandidate("FastAPI/OpenAPI apps require the post-v0.1 HTTP app runner"));
   }
 
   if (fileNames.has("requirements.txt") || fileNames.has("pyproject.toml")) {
@@ -1223,13 +1223,13 @@ function unsupportedRepositoryCandidates(files: Record<string, string>) {
   }
 
   if (fileNames.has("package.json")) {
-    candidates.push(unsupportedCandidate("TypeScript/Node apps require the post-v0 TypeScript runner"));
+    candidates.push(unsupportedCandidate("TypeScript/Node apps require the post-v0.1 TypeScript runner"));
   }
 
   if (pythonFiles.length > 1) {
     candidates.push(
       unsupportedCandidate(
-        `Multi-file Python apps require the post-v0 multi-file bundle path: ${pythonFiles.sort().join(", ")}`
+        `Multi-file Python apps require the post-v0.1 multi-file bundle path: ${pythonFiles.sort().join(", ")}`
       )
     );
   }

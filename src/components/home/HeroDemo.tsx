@@ -331,7 +331,7 @@ export function HeroDemo() {
   // Both branches mount different component subtrees, so the desktop hooks
   // below stay unconditionally ordered inside the desktop branch.
   return isMobile ? (
-    <MobileStackedDemo reducedMotion={reducedMotion} />
+    <MobileStackedDemo />
   ) : (
     <DesktopMorphDemo reducedMotion={reducedMotion} />
   );
@@ -445,7 +445,7 @@ function DesktopMorphDemo({ reducedMotion }: { reducedMotion: boolean }) {
 //   03  Use card    — action-item count, owner/due bullets,
 //                     "Also available as API · MCP · Analytics".
 // -----------------------------------------------------------------------------
-function MobileStackedDemo({ reducedMotion: _reducedMotion }: { reducedMotion: boolean }) {
+function MobileStackedDemo() {
   const tokens = useMemo(() => tokenizePython(HANDLER_CODE), []);
   const lineCount = useMemo(() => countLines(HANDLER_CODE, HANDLER_CODE.length), []);
 

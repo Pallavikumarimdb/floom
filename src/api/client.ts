@@ -14,18 +14,18 @@ export class ApiError extends Error {
 
 // These functions are not called in the v5 port (replaced by fetch()),
 // but are kept for type-compatibility with any future stub imports.
-export async function getApp(_slug: string): Promise<never> {
+export async function getApp(): Promise<never> {
   throw new ApiError('Use fetch() directly — api/client is stubbed', 501);
 }
 
-export async function getAppReviews(_slug: string, _page?: number): Promise<{ summary: { count: number; avg: number } }> {
+export async function getAppReviews(): Promise<{ summary: { count: number; avg: number } }> {
   return { summary: { count: 0, avg: 0 } };
 }
 
-export async function getRun(_runId: string): Promise<never> {
+export async function getRun(): Promise<never> {
   throw new ApiError('Use fetch() directly — api/client is stubbed', 501);
 }
 
-export async function shareRun(_runId: string): Promise<void> {
+export async function shareRun(): Promise<void> {
   // no-op stub
 }

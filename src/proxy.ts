@@ -4,9 +4,8 @@ import { NextResponse, type NextRequest } from "next/server";
 // unauthenticated request hits a gated route. Server-component `redirect()`
 // from `/tokens/page.tsx` works for browsers (they handle the RSC payload)
 // but curl + crawlers see HTTP 200 with redirect logic in the payload, which
-// the audit caught. Middleware runs before the page handler, so this is
-// belt + suspenders: middleware emits 307, the server component would
-// re-emit it if the cookie ever lies.
+// the audit caught. Proxy runs before the page handler, then the server
+// component re-validates the session.
 //
 // Detection: Supabase SSR sets one of two cookies — `sb-<project>-auth-token`
 // or a chunked variant. We don't validate the JWT here (avoid the round-trip
@@ -31,7 +30,7 @@ function hasSupabaseSession(req: NextRequest): boolean {
   return false;
 }
 
-export function middleware(req: NextRequest) {
+export function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
   if (!GATED_PATHS.has(pathname)) {
     return NextResponse.next();

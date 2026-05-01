@@ -66,6 +66,7 @@ export function FloomFooter() {
               gap: 8,
             }}
           >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/floom-mark-glow.svg"
               alt=""

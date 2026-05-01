@@ -14,7 +14,7 @@ export function classifyPermalinkLoadError(err: unknown): PermalinkLoadOutcome {
   return 'not_found';
 }
 
-export function getPermalinkLoadErrorMessage(_target: string): string {
+export function getPermalinkLoadErrorMessage(): string {
   return 'This app is temporarily unavailable. Please try again in a moment.';
 }
 

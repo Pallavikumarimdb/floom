@@ -8,7 +8,7 @@ If the issue is sensitive (RCE, auth bypass, data exposure), please do not file 
 
 ## Scope
 
-- `floom-60sec.vercel.app` (the canonical launch site)
+- `floom.dev` (the canonical launch site)
 - `@floomhq/cli` on npm
 - Floom API endpoints under `/api/*`
 - The Floom MCP endpoint at `/mcp`
@@ -21,9 +21,9 @@ Out of scope: third-party services Floom depends on (Supabase, E2B, Vercel) — 
 - Acknowledgement within 24 hours
 - A clear status update within 72 hours
 - Coordinated disclosure: we will not publish a fix advisory before patching, and we will credit reporters who want credit
-- No bug bounty in v0; we may add one in v0.1+
+- No bug bounty in v0.1; we may add one later
 
-## Floom v0 security primitives
+## Floom v0.1 security primitives
 
 - Each app run executes in an **isolated E2B sandbox** — no shared filesystem or process state across runs
 - All traffic over **HTTPS** with strict CSP, HSTS, X-Frame-Options, and Permissions-Policy headers

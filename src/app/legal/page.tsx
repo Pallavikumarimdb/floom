@@ -98,12 +98,9 @@ export default function LegalPage() {
 
         <Section title="Cookies and tracking">
           <p>
-            Floom does not use third-party analytics, advertising, or tracking
-            cookies. The only cookies we set are Supabase Auth session cookies
-            (issued after sign-in, scoped to floom.dev) and a
-            small CSRF cookie used by the auth callback. No banner is shown
-            because no consent is required for strictly necessary auth
-            cookies.
+            Floom uses strictly necessary Supabase Auth session cookies after
+            sign-in and lightweight Vercel Analytics for aggregate product
+            metrics. We do not use advertising cookies or sell personal data.
           </p>
         </Section>
 
@@ -121,15 +118,21 @@ export default function LegalPage() {
 
         <Section title="Status and outages">
           <p>
-            For service status and outage updates, follow{" "}
+            For live service health, visit{" "}
+            <a
+              href="/status"
+              className="font-semibold text-[var(--accent)] underline underline-offset-2"
+            >
+              /status
+            </a>
+            . For release notes and outage context, follow{" "}
             <a
               href="https://github.com/floomhq/floom-minimal"
               className="font-semibold text-[var(--accent)] underline underline-offset-2"
             >
               floomhq/floom-minimal
             </a>{" "}
-            on GitHub or watch our Discord. A dedicated status page lands in
-            v0.1.
+            on GitHub.
           </p>
         </Section>
 

@@ -327,8 +327,8 @@ async function test() {
     assert.equal(init.headers.Authorization, 'Bearer test-token');
     const form = init.body;
     assert.equal(await form.get('bundle').text(), sourceText);
-    assert.match(await form.get('manifest').text(), /slug: pitch-coach/);
-    return new Response(JSON.stringify({ app: { slug: 'pitch-coach' } }), {
+    assert.match(await form.get('manifest').text(), /slug: python-hello/);
+    return new Response(JSON.stringify({ app: { slug: 'python-hello' } }), {
       status: 200,
       headers: { 'content-type': 'application/json' },
     });
@@ -346,7 +346,7 @@ async function test() {
       { baseUrl: 'http://localhost:3000', authorization: 'Bearer test-token' }
     );
     assert.notEqual(publishResult.isError, true);
-    assert.equal(parseToolResult(publishResult).app.slug, 'pitch-coach');
+    assert.equal(parseToolResult(publishResult).app.slug, 'python-hello');
   } finally {
     globalThis.fetch = originalFetch;
   }

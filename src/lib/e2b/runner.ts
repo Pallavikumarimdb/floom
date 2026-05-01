@@ -35,7 +35,7 @@ export async function runInSandbox(
   }
 
   if (runtime !== "python") {
-    return { output: {}, error: "v0 only supports runtime: python" };
+    return { output: {}, error: "v0.1 only supports runtime: python" };
   }
 
   if (!isSafePythonEntrypoint(entrypoint) || !isSafePythonIdentifier(handler)) {

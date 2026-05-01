@@ -14,24 +14,6 @@ const WORDMARK_SIZE = 17;
 const MARK_SIZE_DEFAULT = 22;
 const MARK_SIZE_COMPACT = 18;
 
-const navLinkBase: CSSProperties = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  padding: '7px 10px',
-  borderRadius: 6,
-  fontSize: 13,
-  fontWeight: 500,
-  lineHeight: 1,
-  textDecoration: 'none',
-  color: MUTED,
-  transition: 'color 0.12s',
-};
-
-function navLinkStyle(active: boolean): CSSProperties {
-  return { ...navLinkBase, color: active ? INK : MUTED, fontWeight: active ? 600 : 500 };
-}
-
 const signInStyle: CSSProperties = {
   display: 'inline-flex',
   alignItems: 'center',
@@ -77,11 +59,10 @@ interface Props {
   onStudioMenuOpen?: () => void;
 }
 
-// TODO(v5-port): Logo component — using inline img from public assets
 function FloomLogoMark({ size }: { size: number }) {
   return (
+    // eslint-disable-next-line @next/next/no-img-element
     <img
-      // TODO(v5-port): floom-mark-glow.svg for 'glow' variant; using plain here
       src="/floom-mark-glow.svg"
       alt=""
       width={size}
@@ -110,8 +91,6 @@ export function SiteHeader({ compact = false, onStudioMenuOpen }: Props = {}) {
   const isSignUpRoute = pathname === '/signup';
   const isAppPermalinkRoute = pathname?.startsWith('/p/') ?? false;
 
-  const isApps = pathname === '/apps' || pathname?.startsWith('/apps/') || pathname?.startsWith('/p/');
-  const isDocs = pathname?.startsWith('/protocol') || pathname?.startsWith('/docs');
   const isStudio = pathname?.startsWith('/studio');
 
   useEffect(() => {
@@ -282,6 +261,7 @@ export function SiteHeader({ compact = false, onStudioMenuOpen }: Props = {}) {
                   }}
                 >
                   {user?.image ? (
+                    // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={user.image}
                       alt=""
@@ -465,7 +445,6 @@ function DropdownItem({
   active?: boolean;
 }) {
   const INK = '#0e0e0c';
-  const MUTED = '#585550';
   return (
     <Link
       href={href}

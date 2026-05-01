@@ -480,23 +480,23 @@ export default function LandingV17PageMvp() {
 const STEPS = [
   {
     num: '01',
-    kicker: 'BRING YOUR APP',
-    title: 'Got an idea or a GitHub link?',
-    body: 'Paste it. Floom takes care of the rest.',
-    mono: 'paste anything',
+    kicker: 'WRITE',
+    title: 'A Python function. Yours or your AI&rsquo;s.',
+    body: 'A floom.yaml + app.py + JSON Schema for inputs. Or copy a template from MCP.',
+    mono: 'floom init',
   },
   {
     num: '02',
-    kicker: 'PUBLISH FROM CLI',
-    title: 'Sign up, mint a token, ship.',
-    body: 'One npx command sets up MCP and mints your agent token. Floom hosts the UI, the REST endpoint, and the MCP tool.',
+    kicker: 'PUBLISH',
+    title: 'One CLI command.',
+    body: 'Floom hosts the UI, the REST endpoint, and an MCP tool agents can call.',
     mono: 'floom publish ./my-app',
   },
   {
     num: '03',
-    kicker: 'SHARE ANYWHERE',
+    kicker: 'SHARE',
     title: 'Send the link.',
-    body: 'People run your app from any MCP client, browser, or with curl.',
+    body: 'People run it from a browser. Agents run it via MCP. Anyone runs it via curl.',
     mono: 'one link, every tool',
   },
 ];

@@ -1,5 +1,5 @@
-name: Pitch Coach
-slug: pitch-coach
+name: Python Hello
+slug: python-hello
 runtime: python
 entrypoint: app.py
 handler: run

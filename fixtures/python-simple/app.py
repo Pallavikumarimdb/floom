@@ -1,6 +1,6 @@
 def run(inputs: dict) -> dict:
-    pitch = inputs.get("pitch", "")
+    text = inputs.get("text", "")
     return {
-        "result": f"Great pitch! You said: {pitch}",
-        "length": len(pitch),
+        "result": f"Hello: {text}",
+        "length": len(text),
     }

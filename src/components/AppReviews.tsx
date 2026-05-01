@@ -4,10 +4,6 @@
 // This stub renders nothing (no reviews in floom-minimal yet).
 // See docs/v5-port-stubs.md for full stub list.
 
-interface AppReviewsProps {
-  slug: string;
-}
-
-export function AppReviews({ slug: _slug }: AppReviewsProps) {
+export function AppReviews() {
   return null;
 }

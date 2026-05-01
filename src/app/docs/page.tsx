@@ -1,6 +1,21 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { SiteHeader } from "@/components/SiteHeader";
+
+const SITE_URL = "https://floom.dev";
+
+export const metadata: Metadata = {
+  title: "Docs",
+  description: "Build, publish, and run Floom v0.1 apps with CLI, MCP, API, secrets, and hash-locked Python dependencies.",
+  alternates: { canonical: `${SITE_URL}/docs` },
+  openGraph: {
+    title: "Floom Docs",
+    description: "The exact v0.1 contract for localhost to live and secure apps.",
+    url: `${SITE_URL}/docs`,
+    images: [{ url: `${SITE_URL}/opengraph-image`, width: 1200, height: 630 }],
+  },
+};
 
 const manifestExample = `name: Meeting Action Items
 slug: meeting-action-items
@@ -16,7 +31,7 @@ mkdir my-floom-app && cd my-floom-app
 npx @floomhq/cli@latest init --name "Meeting Notes" --slug meeting-notes-demo --description "Extract action items from meeting notes." --type custom
 npx @floomhq/cli@latest deploy --dry-run
 npx @floomhq/cli@latest deploy
-npx @floomhq/cli@latest run meeting-notes-demo '{"text":"Action: Sarah sends launch notes by Friday"}' --json`;
+npx @floomhq/cli@latest run meeting-notes-demo '{"transcript":"Action: Sarah sends launch notes by Friday"}' --json`;
 
 const apiExample = `curl -X POST https://floom.dev/api/apps/meeting-action-items/run \\
   -H 'Content-Type: application/json' \\
@@ -25,7 +40,7 @@ const apiExample = `curl -X POST https://floom.dev/api/apps/meeting-action-items
 const privateApiExample = `curl -X POST https://floom.dev/api/apps/YOUR_PRIVATE_SLUG/run \\
   -H 'Authorization: Bearer YOUR_FLOOM_AGENT_TOKEN' \\
   -H 'Content-Type: application/json' \\
-  -d '{"inputs":{"text":"Send this from n8n or any HTTP client"}}'`;
+  -d '{"inputs":{"transcript":"Send this from n8n or any HTTP client"}}'`;
 
 const mcpExample = `POST https://floom.dev/mcp
 tool: get_app_contract

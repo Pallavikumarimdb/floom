@@ -60,9 +60,14 @@ function fieldsFromSchema(schema: InputSchema | undefined) {
   }));
 }
 
+type RunField = ReturnType<typeof fieldsFromSchema>[number];
+
 export function RunSurface({ app, initialRun, initialInputs, examplePrefillInputs, onResult }: RunSurfaceProps) {
   const schema = (app.input_schema ?? null) as InputSchema | null;
   const fields = useMemo(() => fieldsFromSchema(schema ?? undefined), [schema]);
+  const requiredFields = useMemo(() => fields.filter((f) => f.required), [fields]);
+  const optionalFields = useMemo(() => fields.filter((f) => !f.required), [fields]);
+  const [showOptional, setShowOptional] = useState(false);
 
   const [values, setValues] = useState<Record<string, string>>(() => {
     const seed: Record<string, string> = {};
@@ -176,6 +181,61 @@ export function RunSurface({ app, initialRun, initialInputs, examplePrefillInput
     setState({ kind: 'idle' });
   }
 
+  function renderField(f: RunField) {
+    return (
+      <label
+        key={f.name}
+        style={{ display: 'flex', flexDirection: 'column', gap: 6 }}
+      >
+        <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)' }}>
+          {f.title}
+          {f.required && (
+            <span aria-hidden="true" style={{ color: 'var(--accent)', marginLeft: 4 }}>
+              *
+            </span>
+          )}
+        </span>
+        {f.description && (
+          <span style={{ fontSize: 12, color: 'var(--muted)' }}>{f.description}</span>
+        )}
+        {f.enum ? (
+          <select
+            value={values[f.name] ?? ''}
+            onChange={(e) =>
+              setValues((v) => ({ ...v, [f.name]: e.target.value }))
+            }
+            style={inputStyle}
+          >
+            <option value="">—</option>
+            {f.enum.map((opt) => (
+              <option key={opt} value={opt}>
+                {opt}
+              </option>
+            ))}
+          </select>
+        ) : f.type === 'string' && (f.title.toLowerCase().includes('pitch') || f.description.length > 40) ? (
+          <textarea
+            value={values[f.name] ?? ''}
+            onChange={(e) =>
+              setValues((v) => ({ ...v, [f.name]: e.target.value }))
+            }
+            rows={4}
+            style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit' }}
+          />
+        ) : (
+          <input
+            type={f.type === 'integer' || f.type === 'number' ? 'number' : 'text'}
+            value={values[f.name] ?? ''}
+            onChange={(e) =>
+              setValues((v) => ({ ...v, [f.name]: e.target.value }))
+            }
+            style={inputStyle}
+          />
+        )}
+      </label>
+    );
+  }
+
   return (
     <div
       style={{
@@ -256,58 +316,40 @@ export function RunSurface({ app, initialRun, initialInputs, examplePrefillInput
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              {fields.map((f) => (
-                <label
-                  key={f.name}
-                  style={{ display: 'flex', flexDirection: 'column', gap: 6 }}
-                >
-                  <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)' }}>
-                    {f.title}
-                    {f.required && (
-                      <span aria-hidden="true" style={{ color: 'var(--accent)', marginLeft: 4 }}>
-                        *
-                      </span>
-                    )}
-                  </span>
-                  {f.description && (
-                    <span style={{ fontSize: 12, color: 'var(--muted)' }}>{f.description}</span>
-                  )}
-                  {f.enum ? (
-                    <select
-                      value={values[f.name] ?? ''}
-                      onChange={(e) =>
-                        setValues((v) => ({ ...v, [f.name]: e.target.value }))
-                      }
-                      style={inputStyle}
-                    >
-                      <option value="">—</option>
-                      {f.enum.map((opt) => (
-                        <option key={opt} value={opt}>
-                          {opt}
-                        </option>
-                      ))}
-                    </select>
-                  ) : f.type === 'string' && (f.title.toLowerCase().includes('pitch') || f.description.length > 40) ? (
-                    <textarea
-                      value={values[f.name] ?? ''}
-                      onChange={(e) =>
-                        setValues((v) => ({ ...v, [f.name]: e.target.value }))
-                      }
-                      rows={4}
-                      style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit' }}
-                    />
-                  ) : (
-                    <input
-                      type={f.type === 'integer' || f.type === 'number' ? 'number' : 'text'}
-                      value={values[f.name] ?? ''}
-                      onChange={(e) =>
-                        setValues((v) => ({ ...v, [f.name]: e.target.value }))
-                      }
-                      style={inputStyle}
-                    />
-                  )}
-                </label>
-              ))}
+              {/* Required fields shown by default. Optional fields collapsed
+                  behind a 'Show optional fields' toggle so the form reads
+                  short on first glance — Federico's note: a multi-input
+                  meeting-action-items form had a 'default owner' field
+                  cluttering the surface. */}
+              {requiredFields.map((f) => renderField(f))}
+              {optionalFields.length > 0 && (
+                <>
+                  {showOptional &&
+                    optionalFields.map((f) => renderField(f))}
+                  <button
+                    type="button"
+                    onClick={() => setShowOptional((v) => !v)}
+                    style={{
+                      alignSelf: 'flex-start',
+                      marginTop: showOptional ? 0 : 4,
+                      padding: '4px 0',
+                      fontSize: 12.5,
+                      fontWeight: 500,
+                      color: 'var(--muted)',
+                      background: 'transparent',
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontFamily: 'inherit',
+                    }}
+                  >
+                    {showOptional
+                      ? '− Hide optional fields'
+                      : `+ Show ${optionalFields.length} optional ${
+                          optionalFields.length === 1 ? 'field' : 'fields'
+                        }`}
+                  </button>
+                </>
+              )}
             </div>
           )}
 

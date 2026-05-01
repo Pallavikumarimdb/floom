@@ -1,11 +1,11 @@
 {
   "type": "object",
   "properties": {
-    "pitch": {
+    "text": {
       "type": "string",
-      "title": "Your Pitch",
-      "description": "Enter your elevator pitch"
+      "title": "Text",
+      "description": "Any string. The handler echoes it back with a length count."
     }
   },
-  "required": ["pitch"]
+  "required": ["text"]
 }

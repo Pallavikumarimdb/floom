@@ -71,7 +71,7 @@ export function parseManifest(value: unknown): FloomManifest {
   };
 
   if (manifest.runtime !== "python") {
-    throw new Error("v0 only supports runtime: python");
+    throw new Error("v0.1 only supports runtime: python");
   }
 
   if (!SLUG_RE.test(manifest.slug)) {
