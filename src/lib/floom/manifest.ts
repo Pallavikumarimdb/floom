@@ -12,6 +12,19 @@ export type FloomManifest = {
 const SLUG_RE = /^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$/;
 const PYTHON_FILE_RE = /^[A-Za-z_][A-Za-z0-9_]*\.py$/;
 const IDENTIFIER_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
+const POST_V0_FIELDS = [
+  "actions",
+  "dependencies",
+  "secrets",
+  "description",
+  "type",
+  "visibility",
+  "category",
+  "manifest_version",
+  "python_dependencies",
+  "secrets_needed",
+  "openapi_spec_url",
+];
 
 function requiredString(value: unknown, field: string): string {
   if (typeof value !== "string" || value.trim() === "") {
@@ -26,14 +39,19 @@ export function parseManifest(value: unknown): FloomManifest {
   }
 
   const data = value as Record<string, unknown>;
-  if (data.actions !== undefined) {
-    throw new Error("v0 only supports one handler per app; actions are not supported");
+  for (const field of POST_V0_FIELDS) {
+    if (data[field] !== undefined) {
+      throw new Error(`v0 does not support floom.yaml field: ${field}`);
+    }
   }
-  if (data.dependencies !== undefined) {
-    throw new Error("v0 only supports stdlib single-file Python apps; dependencies are not supported");
+  if (data.input_schema !== undefined && typeof data.input_schema !== "string") {
+    throw new Error("input_schema must be a file path string in v0");
   }
-  if (data.secrets !== undefined) {
-    throw new Error("v0 does not support app secrets yet");
+  if (data.output_schema !== undefined && typeof data.output_schema !== "string") {
+    throw new Error("output_schema must be a file path string in v0");
+  }
+  if (data.public !== undefined && typeof data.public !== "boolean") {
+    throw new Error("public must be true or false in v0");
   }
 
   const manifest: FloomManifest = {

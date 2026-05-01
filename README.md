@@ -91,10 +91,13 @@ Create a token and copy it. The raw token is shown once.
 ### 5. Publish the fixture app
 
 ```bash
-FLOOM_TOKEN=YOUR_FLOOM_AGENT_TOKEN FLOOM_API_URL=https://floom-60sec.vercel.app npx tsx cli/deploy.ts ./fixtures/python-simple
+npx @floomhq/cli@latest setup
+cd fixtures/python-simple
+npx @floomhq/cli@latest deploy --dry-run
+npx @floomhq/cli@latest deploy
 ```
 
-For local development, set `FLOOM_API_URL=http://localhost:3000` after `npm run dev`.
+For local development, set `FLOOM_API_URL=http://localhost:3000` after `npm run dev`. For one-off scripts, set `FLOOM_TOKEN=YOUR_FLOOM_AGENT_TOKEN`.
 Without Supabase env, visit `/p/demo-app` for the local demo. In the hosted v0, use the homepage CTA to open the retained live app.
 
 ## Launch Claim Contract
@@ -134,7 +137,7 @@ def run(inputs: dict) -> dict:
 ## Runtime Flow
 
 1. CLI packages local app directory.
-2. CLI validates `floom.yaml`, input JSON Schema, output JSON Schema.
+2. CLI validates `floom.yaml`, input JSON Schema, output JSON Schema, and the Python handler.
 3. CLI sends the Python entrypoint to Floom API (`POST /api/apps`).
 4. With Supabase env configured, Floom API creates app/version records in Supabase.
 5. Floom runs through E2B when `E2B_API_KEY` is configured.

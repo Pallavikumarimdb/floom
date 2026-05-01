@@ -2,8 +2,8 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { SiteHeader } from "@/components/SiteHeader";
 
-const manifestExample = `name: pitch-coach
-slug: pitch-coach
+const manifestExample = `name: Meeting Action Items
+slug: meeting-action-items
 runtime: python
 entrypoint: app.py
 handler: run
@@ -11,9 +11,21 @@ public: true
 input_schema: input.schema.json
 output_schema: output.schema.json`;
 
-const apiExample = `curl -X POST https://floom-60sec.vercel.app/api/apps/pitch-coach/run \\
+const launchCommand = `npx @floomhq/cli@latest setup
+mkdir my-floom-app && cd my-floom-app
+npx @floomhq/cli@latest init --name "Meeting Notes" --slug meeting-notes-demo --description "Extract action items from meeting notes." --type custom
+npx @floomhq/cli@latest deploy --dry-run
+npx @floomhq/cli@latest deploy
+npx @floomhq/cli@latest run meeting-notes-demo '{"text":"Action: Sarah sends launch notes by Friday"}' --json`;
+
+const apiExample = `curl -X POST https://floom-60sec.vercel.app/api/apps/meeting-action-items/run \\
   -H 'Content-Type: application/json' \\
-  -d '{"inputs":{"pitch":"AI app hosting for agents"}}'`;
+  -d '{"inputs":{"transcript":"Action: Sarah sends launch notes by Friday"}}'`;
+
+const privateApiExample = `curl -X POST https://floom-60sec.vercel.app/api/apps/YOUR_PRIVATE_SLUG/run \\
+  -H 'Authorization: Bearer YOUR_FLOOM_AGENT_TOKEN' \\
+  -H 'Content-Type: application/json' \\
+  -d '{"inputs":{"text":"Send this from n8n or any HTTP client"}}'`;
 
 const mcpExample = `POST https://floom-60sec.vercel.app/mcp
 tool: get_app_contract
@@ -27,7 +39,7 @@ arguments: { "key": "invoice_calculator" }
 
 POST https://floom-60sec.vercel.app/mcp
 tool: run_app
-arguments: { "slug": "pitch-coach", "inputs": { ... } }`;
+arguments: { "slug": "meeting-action-items", "inputs": { ... } }`;
 
 function Section({
   title,
@@ -92,16 +104,12 @@ export default function DocsPage() {
               Place <code>app.py</code>, <code>floom.yaml</code>, and JSON
               Schema files in a folder.
             </li>
-            <li>Publish with the CLI command below.</li>
+            <li>Publish with the CLI commands below.</li>
             <li>
               Open the returned <code>/p/:slug</code> URL and run the app.
             </li>
           </ol>
-          <CodeBlock>
-            {
-              "FLOOM_TOKEN=YOUR_FLOOM_AGENT_TOKEN FLOOM_API_URL=https://floom-60sec.vercel.app npx tsx cli/deploy.ts ./fixtures/python-simple"
-            }
-          </CodeBlock>
+          <CodeBlock>{launchCommand}</CodeBlock>
         </Section>
 
         <Section title="v0 app contract">
@@ -112,10 +120,14 @@ export default function DocsPage() {
             <li>Inputs: JSON Schema rendered into a browser form.</li>
             <li>Outputs: JSON object displayed in the app page.</li>
             <li>Dependencies: Python standard library only in v0.</li>
+            <li>Config: only the keys shown in the manifest example are active in v0.</li>
           </ul>
           <p className="text-sm text-neutral-500">
             TypeScript, FastAPI/OpenAPI, multiple Python files, custom packages,
-            and secrets are outside the v0 contract.
+            secrets, inline schemas in <code>floom.yaml</code>,{" "}
+            <code>visibility</code>, <code>actions</code>,{" "}
+            <code>dependencies</code>, and <code>manifest_version</code> are
+            outside the v0 contract.
           </p>
         </Section>
 
@@ -135,6 +147,11 @@ export default function DocsPage() {
             session or an agent token with run access.
           </p>
           <CodeBlock>{apiExample}</CodeBlock>
+          <p>
+            The same endpoint works from curl, n8n, Zapier, or any HTTP client.
+            For private apps, add the bearer token header.
+          </p>
+          <CodeBlock>{privateApiExample}</CodeBlock>
         </Section>
 
         <Section title="Run through MCP">
@@ -175,7 +192,8 @@ export default function DocsPage() {
             Every template uses one stdlib-only Python file and includes
             <code> floom.yaml</code>, <code>app.py</code>,{" "}
             <code>input.schema.json</code>, and{" "}
-            <code>output.schema.json</code>.
+            <code>output.schema.json</code>. Before publishing a template, change
+            the slug to a unique value.
           </p>
         </Section>
 

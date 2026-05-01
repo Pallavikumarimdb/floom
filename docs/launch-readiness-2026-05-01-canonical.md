@@ -116,10 +116,10 @@ Remaining blockers are: (1) OG image 404 breaks social sharing, (2) app pages se
 - **Fix:** Add `export async function generateMetadata({ params })` to the page, and ensure the opengraph-image is properly linked.
 - **Effort:** 1-2 hours.
 
-### P1-7: Docs hardcode `FLOOM_API_URL=https://floom-60sec.vercel.app` in publish command
+### P1-7: Docs hardcode the launch origin in publish commands
 
-- **Description:** The `/docs` page shows a CLI command with the production URL hardcoded. Self-hosters or testers will copy this exact command. This is fine for public launch but creates a maintenance burden if the URL ever changes.
-- **Evidence:** `/docs` HTML contains `FLOOM_TOKEN=YOUR_FLOOM_AGENT_TOKEN FLOOM_API_URL=https://floom-60sec.vercel.app npx tsx cli/deploy.ts`.
+- **Description:** The `/docs` page uses the npm CLI path and the current launch origin. Self-hosters or testers need to override `FLOOM_API_URL` for non-production hosts.
+- **Evidence:** The current docs copy now uses `npx @floomhq/cli@latest setup`, `init`, `deploy --dry-run`, `deploy`, and `run`.
 - **Severity:** Low — works correctly for the current launch, just fragile if domain changes.
 
 ### P1-8: MCP GET /mcp returns 200 with app JSON (not 405)

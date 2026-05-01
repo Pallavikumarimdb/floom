@@ -441,13 +441,33 @@ function getAppContract(): McpToolResult {
         },
       },
     },
+    accepted_manifest_keys: [
+      "name",
+      "slug",
+      "runtime",
+      "entrypoint",
+      "handler",
+      "public",
+      "input_schema",
+      "output_schema",
+    ],
+    setup_commands: [
+      "npx @floomhq/cli@latest setup",
+      "mkdir my-floom-app && cd my-floom-app",
+      "npx @floomhq/cli@latest init --name \"Hello Floom\" --slug hello-floom-<unique-suffix> --description \"Return a JSON greeting.\" --type custom",
+      "npx @floomhq/cli@latest deploy --dry-run",
+      "npx @floomhq/cli@latest deploy",
+      "npx @floomhq/cli@latest run hello-floom-<unique-suffix> '{\"name\":\"Federico\"}' --json",
+    ],
+    template_guidance:
+      "Templates include fixed example slugs. Change the slug to a unique 3-64 character lowercase slug before publishing.",
     templates_tool: {
       list: "list_app_templates",
       get: "get_app_template",
       available_keys: Object.keys(APP_TEMPLATES),
     },
     publish_command:
-      "FLOOM_TOKEN=<agent-token> FLOOM_API_URL=https://floom-60sec.vercel.app npx tsx cli/deploy.ts <app-dir>",
+      "FLOOM_TOKEN=<agent-token> FLOOM_API_URL=https://floom-60sec.vercel.app npx @floomhq/cli@latest deploy",
   });
 }
 
@@ -1054,14 +1074,32 @@ function unsupportedV0Files(appDir: string, files: Record<string, string>) {
 
 function unsupportedManifestFields(manifest: JsonObject) {
   const reasons: string[] = [];
-  if (manifest.actions !== undefined) {
-    reasons.push("floom.yaml field actions is not supported in v0; multiple actions are post-v0.");
+  const unsupportedFields = [
+    "actions",
+    "dependencies",
+    "secrets",
+    "description",
+    "type",
+    "visibility",
+    "category",
+    "manifest_version",
+    "python_dependencies",
+    "secrets_needed",
+    "openapi_spec_url",
+  ];
+  for (const field of unsupportedFields) {
+    if (manifest[field] !== undefined) {
+      reasons.push(`floom.yaml field ${field} is not supported in v0.`);
+    }
   }
-  if (manifest.dependencies !== undefined) {
-    reasons.push("floom.yaml field dependencies is not supported in v0; dependency installation is post-v0.");
+  if (manifest.input_schema !== undefined && typeof manifest.input_schema !== "string") {
+    reasons.push("floom.yaml field input_schema must be a file path string in v0.");
   }
-  if (manifest.secrets !== undefined) {
-    reasons.push("floom.yaml field secrets is not supported in v0; app secret injection is post-v0.");
+  if (manifest.output_schema !== undefined && typeof manifest.output_schema !== "string") {
+    reasons.push("floom.yaml field output_schema must be a file path string in v0.");
+  }
+  if (manifest.public !== undefined && typeof manifest.public !== "boolean") {
+    reasons.push("floom.yaml field public must be true or false in v0.");
   }
   return reasons;
 }

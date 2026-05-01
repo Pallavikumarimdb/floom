@@ -83,7 +83,7 @@ async function test() {
   );
   assert.throws(
     () => parseManifest({ name: 'Bad', slug: 'bad-app', runtime: 'python', entrypoint: 'app.py', handler: 'run', dependencies: { python: ['requests'] } }),
-    /dependencies are not supported/
+    /field: dependencies/
   );
   assert.throws(
     () => parseManifest({ name: 'Bad', slug: 'bad-app', runtime: 'python', entrypoint: 'app.py', handler: 'run', secrets: ['API_KEY'] }),
@@ -91,7 +91,15 @@ async function test() {
   );
   assert.throws(
     () => parseManifest({ name: 'Bad', slug: 'bad-app', runtime: 'python', entrypoint: 'app.py', handler: 'run', actions: { run: {} } }),
-    /actions are not supported/
+    /field: actions/
+  );
+  assert.throws(
+    () => parseManifest({ name: 'Bad', slug: 'bad-app', runtime: 'python', entrypoint: 'app.py', handler: 'run', visibility: 'public' }),
+    /field: visibility/
+  );
+  assert.throws(
+    () => parseManifest({ name: 'Bad', slug: 'bad-app', runtime: 'python', entrypoint: 'app.py', handler: 'run', input_schema: { type: 'object' } }),
+    /input_schema must be a file path/
   );
 
   const sourceManifest = parseManifest({

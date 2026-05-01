@@ -55,7 +55,7 @@ export default function TokensPage() {
 
   const publishCommand = useMemo(
     () =>
-      `FLOOM_TOKEN=YOUR_FLOOM_AGENT_TOKEN FLOOM_API_URL=${origin} npx tsx cli/deploy.ts ./fixtures/python-simple`,
+      `FLOOM_TOKEN=YOUR_FLOOM_AGENT_TOKEN FLOOM_API_URL=${origin} npx @floomhq/cli@latest deploy`,
     [origin]
   );
 

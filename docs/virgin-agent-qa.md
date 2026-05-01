@@ -106,16 +106,18 @@ Pass criteria:
 
 ### 4. CLI Publish With Token
 
-- Create a new temporary app directory from scratch.
-- Include:
-  - `floom.yaml`
-  - single Python file
-  - `input.schema.json`
-  - `output.schema.json`
-- Publish with:
+- Create a new temporary app directory from scratch with the npm CLI:
 
 ```bash
-FLOOM_TOKEN=<redacted> FLOOM_API_URL=https://floom-60sec.vercel.app npx tsx cli/deploy.ts /tmp/floom-virgin-qa/<run-id>/<app-dir>
+mkdir -p /tmp/floom-virgin-qa/<run-id>/<app-dir>
+cd /tmp/floom-virgin-qa/<run-id>/<app-dir>
+FLOOM_API_URL=https://floom-60sec.vercel.app npx @floomhq/cli@latest init \
+  --name "QA App <run-id>" \
+  --slug "qa-app-<unique-suffix>" \
+  --description "QA app for launch verification." \
+  --type custom
+FLOOM_TOKEN=<redacted> FLOOM_API_URL=https://floom-60sec.vercel.app npx @floomhq/cli@latest deploy --dry-run
+FLOOM_TOKEN=<redacted> FLOOM_API_URL=https://floom-60sec.vercel.app npx @floomhq/cli@latest deploy
 ```
 
 - Record returned slug and page URL.
