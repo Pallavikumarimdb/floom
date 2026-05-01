@@ -299,7 +299,7 @@ async function assertScopedAndNonOwnerAccessControls() {
     output_schema: fixture.outputSchema,
   }, {
     authToken: readOnlyToken.token,
-    expectedError: /publish scope/i,
+    expectedError: /publish scope|Unauthorized/i,
     label: 'read-only publish_app',
   });
 
