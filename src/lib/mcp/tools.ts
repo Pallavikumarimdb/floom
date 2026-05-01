@@ -3,9 +3,12 @@ import type { NextRequest } from "next/server";
 import { hasSupabaseConfig } from "@/lib/demo-app";
 import {
   MAX_INPUT_BYTES,
+  MAX_OUTPUT_BYTES,
+  MAX_REQUIREMENTS_BYTES,
   MAX_REQUEST_BYTES,
   MAX_SCHEMA_BYTES,
   MAX_SOURCE_BYTES,
+  SANDBOX_TIMEOUT_MS,
 } from "@/lib/floom/limits";
 import {
   parseManifest,
@@ -68,7 +71,7 @@ export const floomTools: McpToolDefinition[] = [
   },
   {
     name: "get_app_contract",
-    description: "Return the exact Floom v0.1 app contract, copy-paste starter files, and explicit post-v0.1 unsupported cases.",
+    description: "Call this first. Return the exact Floom v0.1 app contract, copy-paste starter files, hard limits, run response envelope, and explicit post-v0.1 unsupported cases.",
     inputSchema: {
       type: "object",
       properties: {},
@@ -124,7 +127,7 @@ export const floomTools: McpToolDefinition[] = [
   },
   {
     name: "publish_app",
-    description: "Publish a single-file Python Floom app through the existing app publish API.",
+    description: "Publish a single-file Python Floom app through the existing app publish API. Requires Authorization: Bearer <agent-token>; call auth_status first when unsure.",
     inputSchema: {
       type: "object",
       properties: {
@@ -155,7 +158,7 @@ export const floomTools: McpToolDefinition[] = [
   },
   {
     name: "find_candidate_apps",
-    description: "Find deployable Floom app candidates from caller-provided repository file contents.",
+    description: "Scan a repository file map for directories that already contain floom.yaml and are ready, invalid, or clearly unsupported for Floom v0.1.",
     inputSchema: {
       type: "object",
       properties: {
@@ -192,7 +195,7 @@ export const floomTools: McpToolDefinition[] = [
   },
   {
     name: "run_app",
-    description: "Run a Floom app with JSON inputs. Private apps require an Authorization bearer token.",
+    description: "Run a Floom app with JSON inputs. Returns { execution_id, status, output, error }. Private apps require Authorization: Bearer <agent-token>.",
     inputSchema: {
       type: "object",
       properties: {
@@ -396,6 +399,8 @@ async function authStatus(context: McpToolContext): Promise<McpToolResult> {
 function getAppContract(): McpToolResult {
   return okResult({
     version: "v0.1",
+    use_this_first:
+      "Before generating files, call get_app_contract. Before publishing, call auth_status. For existing repos, call find_candidate_apps. For a starter, call list_app_templates then get_app_template.",
     supported: [
       "single-file Python",
       "Python standard library, plus exact-pinned hash-locked requirements.txt when declared",
@@ -487,6 +492,49 @@ function getAppContract(): McpToolResult {
       "dependencies",
       "secrets",
     ],
+    limits: {
+      python: "E2B base sandbox python3; write portable Python 3.11-compatible code and avoid long-running processes.",
+      max_source_bytes: MAX_SOURCE_BYTES,
+      max_requirements_bytes: MAX_REQUIREMENTS_BYTES,
+      max_schema_bytes: MAX_SCHEMA_BYTES,
+      max_input_bytes: MAX_INPUT_BYTES,
+      max_output_bytes: MAX_OUTPUT_BYTES,
+      max_mcp_request_bytes: MAX_REQUEST_BYTES,
+      run_timeout_ms: SANDBOX_TIMEOUT_MS,
+      public_run_rate_limit: "defaults: 20 runs per caller per 60s and 100 runs per app per 60s; production env may lower or raise these limits.",
+      max_secret_names: 10,
+    },
+    response_shapes: {
+      run_app: {
+        execution_id: "string",
+        status: "success | error",
+        output: "object matching the app output_schema when status is success",
+        error: "string | null",
+      },
+      publish_app: {
+        app: {
+          slug: "string",
+          url: "https://floom.dev/p/<slug>",
+          public: "boolean",
+        },
+      },
+      get_app: {
+        app: "metadata plus input_schema and output_schema for public apps or owner-accessible private apps",
+      },
+    },
+    requirements_example: [
+      "requirements.txt must use exact pins plus sha256 hashes on every package line.",
+      "Example:",
+      "humanize==4.9.0 --hash=sha256:ce284a76d5b1377fd8836733b983bfb0b76f1aa1c090de2566fcf008d7f6ab16",
+      "Then declare dependencies.python: ./requirements.txt in floom.yaml.",
+    ],
+    auth_and_access: {
+      token_source: "Create agent tokens from https://floom.dev/tokens. MCP cannot mint or reveal raw tokens.",
+      header: "Authorization: Bearer <agent-token>",
+      public_apps: "public: true apps allow anonymous metadata and runs, with rate limits.",
+      private_apps: "public omitted or false apps require the owner session or owner agent token for get_app and run_app.",
+      secrets: "Declare secret names in floom.yaml; set values through CLI or REST. MCP never returns raw secret values.",
+    },
     setup_commands: [
       "npx @floomhq/cli@latest setup",
       "mkdir my-floom-app && cd my-floom-app",
@@ -504,6 +552,16 @@ function getAppContract(): McpToolResult {
     },
     publish_command:
       "FLOOM_TOKEN=<agent-token> FLOOM_API_URL=https://floom.dev npx @floomhq/cli@latest deploy",
+    publish_tool: {
+      name: "publish_app",
+      requires_authorization: true,
+      note: "Use this tool from MCP clients when you already have floom.yaml, source, input_schema, output_schema, and optional requirements text in memory.",
+    },
+    run_tool: {
+      name: "run_app",
+      requires_authorization_for_private_apps: true,
+      response_envelope: "Read result.output for the app output object; the top level contains execution_id, status, output, and error.",
+    },
   });
 }
 

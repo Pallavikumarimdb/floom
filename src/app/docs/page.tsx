@@ -56,6 +56,22 @@ POST https://floom.dev/mcp
 tool: run_app
 arguments: { "slug": "meeting-action-items", "inputs": { ... } }`;
 
+const mcpJsonRpcExample = `curl -sS https://floom.dev/mcp \\
+  -H 'Content-Type: application/json' \\
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'
+
+curl -sS https://floom.dev/mcp \\
+  -H 'Authorization: Bearer YOUR_FLOOM_AGENT_TOKEN' \\
+  -H 'Content-Type: application/json' \\
+  -d '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"auth_status","arguments":{}}}'`;
+
+const requirementsExample = `# requirements.txt
+humanize==4.9.0 --hash=sha256:ce284a76d5b1377fd8836733b983bfb0b76f1aa1c090de2566fcf008d7f6ab16
+
+# floom.yaml
+dependencies:
+  python: ./requirements.txt`;
+
 function Section({
   title,
   children,
@@ -124,6 +140,13 @@ export default function DocsPage() {
             </li>
           </ol>
           <CodeBlock>{launchCommand}</CodeBlock>
+          <p className="text-sm text-neutral-500">
+            The launch origin is <code>https://floom.dev</code>. If an existing
+            CLI config points at <code>preview.floom.dev</code> or a Vercel
+            alias, run setup again or set{" "}
+            <code>FLOOM_API_URL=https://floom.dev</code> for the publish
+            command.
+          </p>
         </Section>
 
         <Section title="v0.1 app contract">
@@ -174,6 +197,18 @@ export default function DocsPage() {
             same app execution path as the browser and API.
           </p>
           <CodeBlock>{mcpExample}</CodeBlock>
+          <p>
+            Raw JSON-RPC clients use <code>tools/list</code> and{" "}
+            <code>tools/call</code>. Publish and private run calls include the
+            agent token as a bearer token.
+          </p>
+          <CodeBlock>{mcpJsonRpcExample}</CodeBlock>
+          <p className="text-sm text-neutral-500">
+            <code>run_app</code> returns an envelope:{" "}
+            <code>{`{ execution_id, status, output, error }`}</code>. Read{" "}
+            <code>output</code> for the object that matches the app output
+            schema.
+          </p>
         </Section>
 
         <Section title="MCP app templates">
@@ -222,6 +257,7 @@ export default function DocsPage() {
             </li>
             <li>Owner-scoped encrypted storage and E2B runtime injection.</li>
           </ul>
+          <CodeBlock>{requirementsExample}</CodeBlock>
           <CodeBlock>{`printf '%s' "$VALUE" | FLOOM_TOKEN=YOUR_FLOOM_AGENT_TOKEN FLOOM_API_URL=https://floom.dev npx @floomhq/cli@latest secrets set YOUR_PRIVATE_SLUG OPENAI_API_KEY --value-stdin
 FLOOM_TOKEN=YOUR_FLOOM_AGENT_TOKEN FLOOM_API_URL=https://floom.dev npx @floomhq/cli@latest secrets list YOUR_PRIVATE_SLUG
 FLOOM_TOKEN=YOUR_FLOOM_AGENT_TOKEN FLOOM_API_URL=https://floom.dev npx @floomhq/cli@latest secrets delete YOUR_PRIVATE_SLUG OPENAI_API_KEY`}</CodeBlock>

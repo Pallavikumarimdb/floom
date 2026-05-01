@@ -104,6 +104,8 @@ npx @floomhq/cli@latest deploy
 For local development, set `FLOOM_API_URL=http://localhost:3000` after `npm run dev`. For one-off scripts, set `FLOOM_TOKEN=YOUR_FLOOM_AGENT_TOKEN`.
 Without Supabase env, visit `/p/demo-app` for the local demo. In the hosted v0.1 launch app, use the homepage CTA to open the retained live app.
 
+`setup` must store `api_url` as `https://floom.dev` for launch testing. If a local config points at `https://preview.floom.dev` or a Vercel alias, run setup again or set `FLOOM_API_URL=https://floom.dev` for the publish command.
+
 ### 6. Manage app secrets
 
 Generate one server-only encryption key and configure it as `FLOOM_SECRET_ENCRYPTION_KEY`:
@@ -130,6 +132,19 @@ FLOOM_TOKEN=<agent-token> FLOOM_API_URL=https://floom.dev npx @floomhq/cli@lates
 ```
 
 The REST surface is `GET`, `PUT`, and `DELETE /api/apps/:slug/secrets`. `PUT` accepts `{ "name": "...", "value": "..." }`; responses return only `name`, `created_at`, and `updated_at` metadata.
+
+For dependencies, every `requirements.txt` line must be an exact pin with a sha256 hash:
+
+```text
+humanize==4.9.0 --hash=sha256:ce284a76d5b1377fd8836733b983bfb0b76f1aa1c090de2566fcf008d7f6ab16
+```
+
+Declare that file from `floom.yaml`:
+
+```yaml
+dependencies:
+  python: ./requirements.txt
+```
 
 ## Launch Claim Contract
 

@@ -30,7 +30,7 @@ Verified backend scope already exists:
    - List existing tokens by name, prefix, scopes, created/expires/last-used/revoked state.
    - Revoke token button.
    - Show the publish command:
-     `FLOOM_TOKEN=YOUR_FLOOM_AGENT_TOKEN FLOOM_API_URL=https://floom-60sec.vercel.app npx @floomhq/cli@latest deploy`
+     `FLOOM_TOKEN=YOUR_FLOOM_AGENT_TOKEN FLOOM_API_URL=https://floom.dev npx @floomhq/cli@latest deploy`
 
 3. Homepage CTA
    - Primary: create token / sign in.

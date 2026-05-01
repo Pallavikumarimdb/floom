@@ -7,8 +7,8 @@ Purpose: remove ambiguity around Floom v0.1 production, OAuth, Supabase, Vercel,
 | Origin | Role |
 | --- | --- |
 | `https://floom.dev` | Public launch origin and user-facing product URL |
-| `https://floom-60sec-mu.vercel.app` | Vercel deployment target behind `floom.dev` |
-| `https://floom-60sec.vercel.app` | Older canonical demo deployment, not the current v0.1 launch target |
+| `https://floom-60sec-mu.vercel.app` | Vercel deployment target currently proxied by `floom.dev` |
+| `https://floom-60sec.vercel.app` | Older demo deployment, not the current v0.1 launch target |
 | `https://preview.floom.dev` | Legacy Floom production stack, separate from v0.1 launch |
 
 The v0.1 launch path uses `https://floom.dev`. CLI, MCP, docs, and app URLs must use that origin unless a local development flow explicitly sets `FLOOM_API_URL=http://localhost:3000`.
@@ -40,6 +40,7 @@ Email provider status:
 
 - App-side redirect handling is fixed.
 - Supabase provider email limits still need SMTP wiring before public self-serve signup can be repeatedly tested at launch volume.
+- Fresh email confirmation must be re-tested after SMTP/rate-limit configuration.
 
 ## Google OAuth
 
@@ -115,11 +116,12 @@ Not part of launch:
 - multi-endpoint web apps
 - teams, org sharing, per-user app ACLs
 
-## Merge Order
+## Merge State
 
-1. Merge `launch/v0.1-deps-secrets` by itself.
-2. Close the superseded PR #3 once main contains v0.1.
-3. Rebase or merge-update PR #11 onto the new main.
-4. Resolve PR #11 conflicts and rerun launch gates.
+Merged into `main`:
 
-Do not batch PR #11 into the v0.1 merge. The combined queue has known conflicts in MCP and UI files.
+- PR #3 / v0.1 dependencies and encrypted secrets.
+- PR #11 / UI launch polish.
+- PR #12 / v0.1 UI punch list and architecture Mermaid fix.
+
+After any auth, proxy, or Vercel routing change, rerun the browser auth/token flow and the live v0.1 publish gate.

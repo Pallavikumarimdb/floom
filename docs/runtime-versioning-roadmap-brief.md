@@ -85,9 +85,9 @@ Federico's call (2026-05-01): the current roadmap collapses too many capabilitie
 
 For "what do we do with the work already done on legacy branches?" → `docs/legacy-migration-strategy.md`. Three-bucket call: don't lift architectural code (re-implement fresh, use legacy as reference), do lift component-level UI / business logic (Forgot Password, AppReviews, email templates) when the corresponding feature becomes priority, archive the rest with the renamed `floom-legacy` repo (read-only, stars preserved). That doc also has the concrete post-launch sequencing — when to fire each Codex agent, in what order, with what constraints (max 3 branches in flight, merge gates).
 
-## What I (Claude) think
+## Current sequencing note
 
-Agree with the parallel-branches structure. Disagree with starting any of these pre-launch — v0.1 still has 3 real blockers (PR #11 unmerged, SMTP not wired, real demo handler not deployed). Drafting now so Codex can fire 2-3 of these in parallel **the day after launch**.
+v0.1 dependencies/secrets, UI polish, and the real `meeting-action-items` demo are merged into `main`. Future runtime branches stay isolated until the v0.1 launch gate is clean: signup/email provider verification, OAuth callback verification, repeated publish-flow QA, and final checklist evidence.
 
 Recommended first wave (parallel):
 - B (multi-action) — Codex agent, 5 days, fastest ship

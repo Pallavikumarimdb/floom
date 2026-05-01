@@ -71,6 +71,12 @@ async function test() {
     assert.ok(toolNames.includes(toolName), `missing MCP tool: ${toolName}`);
   }
   assert.ok(!toolNames.includes('create_agent_token'), 'MCP must not mint agent tokens');
+  const publishTool = floomTools.find((tool) => tool.name === 'publish_app');
+  const runTool = floomTools.find((tool) => tool.name === 'run_app');
+  const candidateTool = floomTools.find((tool) => tool.name === 'find_candidate_apps');
+  assert.match(publishTool.description, /Authorization: Bearer/);
+  assert.match(runTool.description, /execution_id, status, output, error/);
+  assert.match(candidateTool.description, /repository file map/);
   const disabledTokenTool = await callFloomTool(
     'create_agent_token',
     { name: 'blocked' },
@@ -199,6 +205,21 @@ async function test() {
   assert.match(contract.files['floom.yaml'], /secrets:/);
   assert.ok(contract.accepted_manifest_keys.includes('dependencies'));
   assert.ok(contract.accepted_manifest_keys.includes('secrets'));
+  assert.equal(contract.use_this_first.includes('get_app_contract'), true);
+  assert.equal(contract.limits.max_source_bytes, 64 * 1024);
+  assert.equal(contract.limits.max_input_bytes, 16 * 1024);
+  assert.equal(contract.limits.max_output_bytes, 64 * 1024);
+  assert.match(contract.limits.public_run_rate_limit, /20 runs per caller/);
+  assert.deepEqual(Object.keys(contract.response_shapes.run_app), [
+    'execution_id',
+    'status',
+    'output',
+    'error',
+  ]);
+  assert.match(JSON.stringify(contract.requirements_example), /humanize==4\.9\.0 --hash=sha256:/);
+  assert.equal(contract.auth_and_access.header, 'Authorization: Bearer <agent-token>');
+  assert.equal(contract.publish_tool.name, 'publish_app');
+  assert.equal(contract.run_tool.name, 'run_app');
   assert.deepEqual(contract.templates_tool.available_keys, [
     'invoice_calculator',
     'utm_url_builder',
