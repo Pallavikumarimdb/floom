@@ -19,6 +19,7 @@ interface RunSurfaceProps {
   app: AppDetail & { input_schema?: unknown; output_schema?: unknown; handler?: string };
   initialRun?: RunRecord | null;
   initialInputs?: Record<string, unknown>;
+  examplePrefillInputs?: Record<string, unknown>;
   onResetInitialRun?: () => void;
   onResult?: (result: RunSurfaceResult) => void;
   onShare?: () => void;
@@ -58,7 +59,7 @@ function fieldsFromSchema(schema: InputSchema | undefined) {
   }));
 }
 
-export function RunSurface({ app, initialRun, initialInputs, onResult }: RunSurfaceProps) {
+export function RunSurface({ app, initialRun, initialInputs, examplePrefillInputs, onResult }: RunSurfaceProps) {
   const schema = (app.input_schema ?? null) as InputSchema | null;
   const fields = useMemo(() => fieldsFromSchema(schema ?? undefined), [schema]);
 
@@ -90,6 +91,22 @@ export function RunSurface({ app, initialRun, initialInputs, onResult }: RunSurf
   }, [initialRun]);
 
   const canRun = fields.every((f) => !f.required || (values[f.name] && values[f.name].trim() !== ''));
+
+  const allEmpty = fields.length > 0 && fields.every((f) => !values[f.name] || values[f.name].trim() === '');
+  const hasExample = !!examplePrefillInputs && Object.keys(examplePrefillInputs).length > 0;
+  const showExampleHint = hasExample && allEmpty && state.kind === 'idle';
+
+  function applyExample() {
+    if (!examplePrefillInputs) return;
+    setValues((v) => {
+      const next = { ...v };
+      for (const f of fields) {
+        const ex = examplePrefillInputs[f.name];
+        if (ex !== undefined && ex !== null) next[f.name] = String(ex);
+      }
+      return next;
+    });
+  }
 
   async function run() {
     setState({ kind: 'running' });
@@ -234,7 +251,7 @@ export function RunSurface({ app, initialRun, initialInputs, onResult }: RunSurf
             </div>
           )}
 
-          <div style={{ marginTop: 18, display: 'flex', gap: 8 }}>
+          <div style={{ marginTop: 18, display: 'flex', gap: 8, alignItems: 'center' }}>
             <button
               type="button"
               onClick={() => void run()}
@@ -271,6 +288,27 @@ export function RunSurface({ app, initialRun, initialInputs, onResult }: RunSurf
             >
               Reset
             </button>
+            {showExampleHint && (
+              <button
+                type="button"
+                onClick={applyExample}
+                style={{
+                  marginLeft: 'auto',
+                  padding: '6px 0',
+                  background: 'transparent',
+                  color: 'var(--accent)',
+                  border: 'none',
+                  fontSize: 12.5,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                  textDecoration: 'underline',
+                  textUnderlineOffset: 3,
+                }}
+              >
+                Try with example →
+              </button>
+            )}
           </div>
         </div>
 
@@ -282,6 +320,7 @@ export function RunSurface({ app, initialRun, initialInputs, onResult }: RunSurf
               alignItems: 'center',
               justifyContent: 'space-between',
               marginBottom: 12,
+              gap: 12,
             }}
           >
             <span
@@ -297,15 +336,18 @@ export function RunSurface({ app, initialRun, initialInputs, onResult }: RunSurf
               Output
             </span>
             {state.kind === 'ok' && (
-              <span
-                style={{
-                  fontFamily: "'JetBrains Mono', ui-monospace, monospace",
-                  fontSize: 10.5,
-                  color: 'var(--muted)',
-                }}
-              >
-                {state.ms} ms
-              </span>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                <OutputActions output={state.output} slug={app.slug} />
+                <span
+                  style={{
+                    fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+                    fontSize: 10.5,
+                    color: 'var(--muted)',
+                  }}
+                >
+                  {state.ms} ms
+                </span>
+              </div>
             )}
           </div>
 
@@ -359,6 +401,114 @@ export function RunSurface({ app, initialRun, initialInputs, onResult }: RunSurf
       </div>
     </div>
   );
+}
+
+// ── Output actions: copy + download .json + download .csv (when applicable) ──
+
+function OutputActions({ output, slug }: { output: unknown; slug: string }) {
+  const [copied, setCopied] = useState(false);
+  const json = useMemo(
+    () => (typeof output === 'string' ? output : JSON.stringify(output, null, 2)),
+    [output],
+  );
+  // CSV is offered only when output is array-of-objects with string-y keys.
+  // Anything more complex is downgraded to JSON-only.
+  const csv = useMemo(() => toCsv(output), [output]);
+
+  async function copyJson() {
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(json);
+      } else {
+        const ta = document.createElement('textarea');
+        ta.value = json;
+        ta.style.position = 'fixed';
+        ta.style.left = '-9999px';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1500);
+    } catch {
+      /* ignore */
+    }
+  }
+
+  function download(filename: string, mime: string, body: string) {
+    const blob = new Blob([body], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  return (
+    <>
+      <button type="button" onClick={() => void copyJson()} style={iconBtnStyle} aria-label="Copy output as JSON">
+        {copied ? 'Copied' : 'Copy'}
+      </button>
+      <button
+        type="button"
+        onClick={() => download(`${slug}-output.json`, 'application/json', json)}
+        style={iconBtnStyle}
+        aria-label="Download output as JSON"
+      >
+        .json
+      </button>
+      {csv && (
+        <button
+          type="button"
+          onClick={() => download(`${slug}-output.csv`, 'text/csv', csv)}
+          style={iconBtnStyle}
+          aria-label="Download output as CSV"
+        >
+          .csv
+        </button>
+      )}
+    </>
+  );
+}
+
+const iconBtnStyle = {
+  padding: '4px 9px',
+  fontSize: 11,
+  fontWeight: 600,
+  fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+  letterSpacing: '0.04em',
+  background: 'var(--card)',
+  color: 'var(--ink)',
+  border: '1px solid var(--line)',
+  borderRadius: 5,
+  cursor: 'pointer',
+} as const;
+
+// CSV-only when output is Array<{<string,string>:scalar}> with consistent
+// keys across rows. Falls back to null otherwise → button hides.
+function toCsv(output: unknown): string | null {
+  if (!Array.isArray(output) || output.length === 0) return null;
+  const rows = output.filter(
+    (r) => r && typeof r === 'object' && !Array.isArray(r),
+  ) as Array<Record<string, unknown>>;
+  if (rows.length !== output.length) return null;
+  const keys = Object.keys(rows[0] ?? {});
+  if (keys.length === 0) return null;
+  const allConsistent = rows.every(
+    (r) => Object.keys(r).length === keys.length && keys.every((k) => k in r),
+  );
+  if (!allConsistent) return null;
+  const escape = (v: unknown) => {
+    const s = v === null || v === undefined ? '' : typeof v === 'object' ? JSON.stringify(v) : String(v);
+    return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  const head = keys.map(escape).join(',');
+  const body = rows.map((r) => keys.map((k) => escape(r[k])).join(',')).join('\n');
+  return `${head}\n${body}\n`;
 }
 
 const inputStyle = {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { SiteHeader } from "@/components/SiteHeader";
 import { FloomFooter } from "@/components/FloomFooter";
@@ -43,6 +43,12 @@ export default function TokensPage() {
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
   const [confirmRevoke, setConfirmRevoke] = useState<string | null>(null);
+  const nameInputRef = useRef<HTMLInputElement | null>(null);
+
+  function focusCreateForm() {
+    nameInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    window.setTimeout(() => nameInputRef.current?.focus(), 350);
+  }
 
   const origin =
     typeof window === "undefined" ? PRODUCTION_FLOOM_URL : window.location.origin;
@@ -239,6 +245,7 @@ export default function TokensPage() {
             </label>
             <input
               id="token-name"
+              ref={nameInputRef}
               value={name}
               onChange={(event) => setName(event.target.value)}
               className="mt-2 w-full rounded-lg border border-[#cfc7b8] bg-[#fffdf8] px-4 py-3 outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/10"
@@ -322,13 +329,36 @@ export default function TokensPage() {
         <div className="mt-8 rounded-2xl border border-[#ded8cc] bg-white p-6">
           <h2 className="text-xl font-black">Existing tokens</h2>
           {tokens.length === 0 ? (
-            <div className="mt-8 rounded-xl border border-dashed border-[#ded8cc] py-10 text-center">
-              <p className="text-sm font-semibold text-neutral-500">
+            <div className="mt-6 rounded-xl border border-dashed border-[#ded8cc] bg-[#fffdf8] px-6 py-10 text-center">
+              <svg
+                className="mx-auto h-8 w-8 text-emerald-700"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={1.6}
+                aria-hidden="true"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M15 7a3 3 0 1 0-6 0v3H7a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2h-2V7zm-4 7v3"
+                />
+              </svg>
+              <p className="mt-3 text-base font-bold text-neutral-800">
                 No tokens yet
               </p>
-              <p className="mt-1 text-sm text-neutral-400">
-                Create your first token above to start publishing apps.
+              <p className="mx-auto mt-1 max-w-sm text-sm text-neutral-500">
+                You need an agent token to publish apps from the CLI. Mint one
+                in 10 seconds.
               </p>
+              <button
+                type="button"
+                onClick={focusCreateForm}
+                className="mt-5 inline-flex items-center gap-2 rounded-lg bg-emerald-700 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-800"
+              >
+                Create your first token
+                <span aria-hidden="true">→</span>
+              </button>
             </div>
           ) : (
             <div className="mt-4 overflow-x-auto">

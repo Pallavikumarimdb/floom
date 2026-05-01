@@ -1147,7 +1147,8 @@ export default function AppPermalinkPage() {
                 <RunSurface
                   app={app}
                   initialRun={initialRun}
-                  initialInputs={rerunInputs ?? samplePrefillInputs ?? undefined}
+                  initialInputs={rerunInputs ?? undefined}
+                  examplePrefillInputs={samplePrefillInputs ?? undefined}
                   onResetInitialRun={handleResetInitialRun}
                   onResult={handleRunResult}
                   onShare={openShareModal}

@@ -12,6 +12,9 @@ const LAUNCH_DEMO_EXAMPLES: Record<string, Record<string, string>> = {
   'pitch-coach': {
     pitch: 'We make AI tools for developers. Fast, cheap, no lock-in.',
   },
+  'demo-app': {
+    pitch: 'We make AI tools for developers. Fast, cheap, no lock-in.',
+  },
 };
 
 export function getLaunchDemoExampleTextInputs(
