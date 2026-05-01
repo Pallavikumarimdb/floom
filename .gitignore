@@ -40,6 +40,15 @@ yarn-error.log*
 supabase/.branches/
 supabase/.temp/
 
+# launch QA evidence belongs in floom-internal, not the public repo
+docs/qa-runs/
+docs/*session*.md
+docs/*verification*.md
+docs/launch-readiness-20*.md
+docs/launch-readiness-gap-audit-*.md
+docs/*.png
+docs/ui-screenshots-*/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
