@@ -35,10 +35,11 @@ create table if not exists public.app_secrets (
 alter table public.app_secrets enable row level security;
 
 drop policy if exists "app secrets are readable by owner" on public.app_secrets;
-create policy "app secrets are readable by owner"
+drop policy if exists "app secrets are not directly readable" on public.app_secrets;
+create policy "app secrets are not directly readable"
   on public.app_secrets
   for select
-  using (owner_id = auth.uid());
+  using (false);
 
 drop policy if exists "owners can create app secrets" on public.app_secrets;
 create policy "owners can create app secrets"

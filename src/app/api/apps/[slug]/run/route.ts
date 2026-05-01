@@ -11,7 +11,11 @@ import {
 } from "@/lib/floom/rate-limit";
 import { readRuntimeDependencies } from "@/lib/floom/requirements";
 import { resolveRuntimeSecrets } from "@/lib/floom/runtime-secrets";
-import { redactSecretInput, redactSecretOutput } from "@/lib/floom/schema";
+import {
+  redactExactSecretValues,
+  redactSecretInput,
+  redactSecretOutput,
+} from "@/lib/floom/schema";
 import Ajv from "ajv";
 
 const ajv = new Ajv({ strict: false });
@@ -254,7 +258,10 @@ export async function POST(
   const outputValid = validateOutput(result.output);
   const redactedOutput = result.error
     ? null
-    : redactSecretOutput(latestVersion.output_schema ?? {}, result.output);
+    : redactExactSecretValues(
+        redactSecretOutput(latestVersion.output_schema ?? {}, result.output),
+        Object.values(runtimeSecrets.envs)
+      );
 
   // Update execution
   await admin

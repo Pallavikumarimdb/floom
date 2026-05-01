@@ -27,6 +27,7 @@ import {
 } from '../src/lib/floom/runtime-secrets.ts';
 import {
   REDACTED_OUTPUT_VALUE,
+  redactExactSecretValues,
   redactSecretInput,
   redactSecretOutput,
   validateJsonSchemaValue,
@@ -682,11 +683,20 @@ function testSecretRedaction() {
 
   assert.deepEqual(redactSecretOutput(schema, value), expectedRedacted);
   assert.deepEqual(redactSecretInput(schema, value), expectedRedacted);
+  assert.deepEqual(
+    redactExactSecretValues(
+      { result: 'runtime-secret-value', nested: ['ok', 'runtime-secret-value'] },
+      ['runtime-secret-value']
+    ),
+    { result: REDACTED_OUTPUT_VALUE, nested: ['ok', REDACTED_OUTPUT_VALUE] }
+  );
   assert.equal(value.token, 'secret-token');
   assert.equal(value.rows[0].row_secret, 'row-private');
 
   const routeText = readFileSync('src/app/api/apps/[slug]/run/route.ts', 'utf8');
   assert.match(routeText, /redactSecretInput\(latestVersion\.input_schema \?\? \{\}, inputs\)/);
+  assert.match(routeText, /redactExactSecretValues\(/);
+  assert.match(routeText, /Object\.values\(runtimeSecrets\.envs\)/);
   assert.match(routeText, /input: redactedInputs/);
   assert.ok(
     routeText.indexOf('redactSecretInput') < routeText.indexOf('.from("executions")'),
@@ -779,7 +789,7 @@ async function testV01DependencyAndSecretMetadata() {
 
   const cliText = readFileSync('cli/secrets.ts', 'utf8');
   assert.match(cliText, /readStdin/);
-  assert.match(cliText, /FLOOM_SECRET_VALUE/);
+  assert.doesNotMatch(cliText, /FLOOM_SECRET_VALUE/);
   assert.doesNotMatch(cliText, /console\.log\(.*value/);
 
   const migrationText = readFileSync(
@@ -792,7 +802,8 @@ async function testV01DependencyAndSecretMetadata() {
   assertSqlContains(migrationText, 'constraint app_secrets_app_name_key unique (app_id, name)');
   assertSqlContains(migrationText, "constraint app_secrets_name_format check (name ~ '^[A-Z][A-Z0-9_]{1,63}$')");
   assertSqlContains(migrationText, 'alter table public.app_secrets enable row level security');
-  assertSqlContains(migrationText, 'create policy "app secrets are readable by owner"');
+  assertSqlContains(migrationText, 'create policy "app secrets are not directly readable"');
+  assertSqlContains(migrationText, 'using (false)');
   assertSqlContains(migrationText, 'create policy "owners can create app secrets"');
   assertSqlContains(migrationText, 'create policy "owners can update app secrets"');
   assertSqlContains(migrationText, 'create policy "owners can delete app secrets"');

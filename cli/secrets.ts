@@ -51,9 +51,9 @@ async function main(action: string, appSlug: string, secretName?: string) {
   }
 
   if (action === "set" && secretName) {
-    const value = process.env.FLOOM_SECRET_VALUE ?? await readStdin();
+    const value = await readStdin();
     if (!value) {
-      throw new Error("Provide the secret value through stdin or FLOOM_SECRET_VALUE");
+      throw new Error("Provide the secret value through stdin");
     }
 
     const data = await request(`/api/apps/${encodeURIComponent(appSlug)}/secrets`, {
