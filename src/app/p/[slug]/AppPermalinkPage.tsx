@@ -886,9 +886,9 @@ export default function AppPermalinkPage() { // exported as default so the serve
           >
             <div
               style={{
-                width: 44,
-                height: 44,
-                borderRadius: 12,
+                width: 36,
+                height: 36,
+                borderRadius: 9,
                 background: 'var(--bg)',
                 border: '1px solid var(--line)',
                 display: 'flex',
@@ -896,9 +896,10 @@ export default function AppPermalinkPage() { // exported as default so the serve
                 justifyContent: 'center',
                 color: 'var(--accent)',
                 flexShrink: 0,
+                marginTop: 2,
               }}
             >
-              <AppIcon slug={app.slug} size={22} />
+              <AppIcon slug={app.slug} size={18} />
             </div>
             <div className="permalink-hero-title" style={{ flex: 1, minWidth: 0 }}>
               <h1

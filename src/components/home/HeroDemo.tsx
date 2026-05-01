@@ -118,17 +118,17 @@ const STATE_DURATION: Record<DemoState, number> = {
 const HANDLER_CODE = `from floom import App, action
 from google import genai
 
-app = App("pitch-coach")
+app = App("meeting-action-items")
 gem = genai.Client()
 
-@app.action("coach")
-def coach(pitch: str):
-    prompt = f"Coach this pitch: {pitch}"
+@app.action("extract")
+def extract(notes: str):
+    prompt = f"Extract action items: {notes}"
     resp = gem.models.generate_content(
         model="gemini-2.5-flash-lite",
         contents=prompt,
     )
-    return {"score": 8, "tier": "Concise"}
+    return {"actions": [], "summary": "..."}
 `;
 
 /** Slash command typed at Deploy. See header comment re: `/floomit` vs
@@ -506,7 +506,7 @@ function MobileStackedDemo({ reducedMotion: _reducedMotion }: { reducedMotion: b
               <span style={MOBILE_LIVE_DOT_CORE} />
             </span>
             <div style={MOBILE_DEPLOY_URL_TEXT}>
-              <div style={MOBILE_DEPLOY_URL_MAIN}>/p/pitch-coach</div>
+              <div style={MOBILE_DEPLOY_URL_MAIN}>/p/meeting-action-items</div>
               <div style={MOBILE_DEPLOY_URL_META}>Deployed in 1.2s · HTTPS · edge</div>
             </div>
           </div>
@@ -518,30 +518,30 @@ function MobileStackedDemo({ reducedMotion: _reducedMotion }: { reducedMotion: b
         <header style={MOBILE_CARD_HEADER}>
           <span style={MOBILE_STEP_NUM}>03</span>
           <span style={MOBILE_STEP_LABEL} id="hd-mob-run-title">Use</span>
-          <span style={MOBILE_STEP_HINT}>Pitch Coach</span>
+          <span style={MOBILE_STEP_HINT}>Meeting → Action Items</span>
         </header>
         <div style={MOBILE_RUN_BODY}>
           <div style={MOBILE_RUN_INPUT_ROW}>
-            <span style={MOBILE_RUN_INPUT_LABEL}>Your pitch</span>
-            <div style={MOBILE_RUN_INPUT_BOX}>We make AI tools for developers.</div>
+            <span style={MOBILE_RUN_INPUT_LABEL}>Meeting notes</span>
+            <div style={MOBILE_RUN_INPUT_BOX}>Standup: Sarah ships migration docs by EOW. Marcus...</div>
           </div>
           <div style={MOBILE_SCORE_ROW}>
             <span style={MOBILE_SCORE_BIG}>8</span>
-            <span style={MOBILE_SCORE_OF}>/ 10</span>
-            <span style={MOBILE_TIER_PILL}>Concise</span>
+            <span style={MOBILE_SCORE_OF}>items</span>
+            <span style={MOBILE_TIER_PILL}>actions</span>
           </div>
           <ul style={MOBILE_REASONS_LIST}>
             <li style={MOBILE_REASON_ITEM}>
               <span style={MOBILE_REASON_BULLET} aria-hidden="true" />
-              Clear value prop, audience named upfront.
+              Sarah — write migration docs · EOW
             </li>
             <li style={MOBILE_REASON_ITEM}>
               <span style={MOBILE_REASON_BULLET} aria-hidden="true" />
-              Tight: 32 words gets the point across.
+              Marcus — fix /reports 500 · by lunch
             </li>
             <li style={MOBILE_REASON_ITEM}>
               <span style={MOBILE_REASON_BULLET} aria-hidden="true" />
-              Lift: name the user pain you solve, not the offering.
+              Marcus — SOC 2 questionnaire · next week
             </li>
           </ul>
           <div style={MOBILE_RUN_SECONDARY}>
@@ -635,7 +635,7 @@ function EditorSurface({ active, cycle, reducedMotion }: EditorProps) {
     <div style={surfaceStyle} aria-hidden={!active}>
       <div style={EDITOR_GRID} data-hd="editor-grid">
         <aside style={SIDEBAR_STYLE} aria-hidden="true" data-hd="sidebar">
-          <div style={SIDEBAR_SECTION}>my-app</div>
+          <div style={SIDEBAR_SECTION}>meeting-action-items</div>
           <div style={{ ...SIDEBAR_ITEM, ...SIDEBAR_ITEM_ACTIVE }}>handler.py</div>
           <div style={SIDEBAR_ITEM}>floom.yaml</div>
           <div style={SIDEBAR_ITEM}>README.md</div>
@@ -664,7 +664,7 @@ function EditorSurface({ active, cycle, reducedMotion }: EditorProps) {
           <div style={TERMINAL_PANE}>
             <div style={TERMINAL_LINE}>
               <span style={PROMPT_SIGN}>&gt;</span>
-              <span style={{ color: '#8b8680' }}>claude code &middot; pitch-coach</span>
+              <span style={{ color: '#8b8680' }}>claude code &middot; meeting-action-items</span>
             </div>
             {active && !reducedMotion && codeCap >= HANDLER_CODE.length && (
               <div style={{ ...TERMINAL_LINE, color: '#8b8680' }}>
@@ -857,7 +857,7 @@ function DeploySurface({
               <span style={LIVE_DOT_CORE} />
             </span>
             <div style={DEPLOY_URL_TEXT_WRAP}>
-              <div style={DEPLOY_URL_MAIN}>/p/pitch-coach</div>
+              <div style={DEPLOY_URL_MAIN}>/p/meeting-action-items</div>
               <div style={DEPLOY_URL_META_CARD}>Live preview &middot; HTTPS &middot; edge</div>
             </div>
           </div>
@@ -977,10 +977,10 @@ function RunSurfaceDemo({
         <div style={RUN_CONTEXT}>
           <span style={RUN_CONTEXT_DOT} aria-hidden="true" />
           <span>
-            Live preview · <code style={RUN_CONTEXT_CODE}>pitch-coach</code>
+            Live preview · <code style={RUN_CONTEXT_CODE}>meeting-action-items</code>
           </span>
           <span style={RUN_CONTEXT_SEP} aria-hidden="true">·</span>
-          <span style={RUN_CONTEXT_URL}>/p/pitch-coach</span>
+          <span style={RUN_CONTEXT_URL}>/p/meeting-action-items</span>
         </div>
 
         {/* 2026-04-28: Federico feedback "the use page looks empty and
@@ -998,25 +998,25 @@ function RunSurfaceDemo({
           {/* LEFT — input column (2fr) ---------------------------------- */}
           <div style={RUN_INPUT_COL}>
             <div style={RUN_APP_HEADER}>
-              <div style={RUN_APP_BADGE} aria-hidden="true">PC</div>
+              <div style={RUN_APP_BADGE} aria-hidden="true">MA</div>
               <div>
-                <div style={RUN_TITLE}>Pitch Coach</div>
-                <div style={RUN_SUB}>Tighten your elevator pitch</div>
+                <div style={RUN_TITLE}>Meeting → Action Items</div>
+                <div style={RUN_SUB}>Pull owned tasks out of any transcript</div>
               </div>
             </div>
 
             <div style={RUN_FIELDS}>
               <label style={RUN_FIELD}>
-                <span style={RUN_FIELD_LABEL}>Your pitch</span>
+                <span style={RUN_FIELD_LABEL}>Meeting notes</span>
                 <div style={RUN_FIELD_INPUT}>
-                  <span style={RUN_FIELD_INPUT_TEXT}>We make AI tools for developers.</span>
+                  <span style={RUN_FIELD_INPUT_TEXT}>Standup: Sarah ships migration docs by EOW. Marcus...</span>
                 </div>
               </label>
             </div>
 
             <button
               type="button"
-              aria-label="Run Pitch Coach"
+              aria-label="Run Meeting Action Items"
               style={{
                 ...RUN_BUTTON,
                 transform: pressed ? 'scale(0.98)' : 'scale(1)',
@@ -1054,14 +1054,14 @@ function RunSurfaceDemo({
                     <span style={{ ...DOT, animationDelay: '.15s' }} />
                     <span style={{ ...DOT, animationDelay: '.3s' }} />
                   </div>
-                  <div style={RUN_THINKING_LABEL}>Coaching your pitch&hellip;</div>
+                  <div style={RUN_THINKING_LABEL}>Pulling action items&hellip;</div>
                 </div>
               )}
               {resultReady && (
                 <div style={RUN_RESULT}>
                   <div style={SCORE_ROW}>
                     <span style={SCORE_BIG}>{score}</span>
-                    <span style={SCORE_OF}>/ 10</span>
+                    <span style={SCORE_OF}>items</span>
                     <span
                       style={{
                         ...TIER_PILL,
@@ -1072,7 +1072,7 @@ function RunSurfaceDemo({
                           : 'opacity .25s ease, transform .25s ease',
                       }}
                     >
-                      Concise
+                      actions
                     </span>
                   </div>
 
@@ -1088,19 +1088,19 @@ function RunSurfaceDemo({
                         : 'opacity .3s ease .1s, transform .3s ease .1s',
                     }}
                   >
-                    <div style={RUN_REASONS_TITLE}>Pitch feedback</div>
+                    <div style={RUN_REASONS_TITLE}>Action items</div>
                     <ul style={RUN_REASONS_LIST}>
                       <li style={RUN_REASON_ITEM}>
                         <span style={RUN_REASON_BULLET} aria-hidden="true" />
-                        Clear value prop, audience named upfront.
+                        Sarah — write migration docs · EOW
                       </li>
                       <li style={RUN_REASON_ITEM}>
                         <span style={RUN_REASON_BULLET} aria-hidden="true" />
-                        Tight: 32 words gets the point across.
+                        Marcus — fix /reports 500 · by lunch
                       </li>
                       <li style={RUN_REASON_ITEM}>
                         <span style={RUN_REASON_BULLET} aria-hidden="true" />
-                        Lift: name the user pain you solve, not the offering.
+                        Marcus — SOC 2 questionnaire · next week
                       </li>
                     </ul>
                   </div>
