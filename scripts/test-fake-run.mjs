@@ -775,6 +775,7 @@ function testOAuthCallbackErrorHandling() {
   );
   assert.doesNotMatch(routeText, /searchParams\.set\("message",\s*error\.message/);
   assert.doesNotMatch(routeText, /new URL\(safeNext,[\s\S]*if \(error\)/);
+  assert.match(routeText, /process\.env\.FLOOM_ORIGIN/);
   assert.match(routeText, /x-forwarded-host/);
   assert.match(routeText, /x-forwarded-proto/);
 }

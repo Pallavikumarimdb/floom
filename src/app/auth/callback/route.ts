@@ -32,6 +32,11 @@ function redirectToLoginWithAuthError(req: NextRequest) {
 }
 
 function resolvePublicOrigin(req: NextRequest) {
+  const configuredOrigin = configuredPublicOrigin();
+  if (configuredOrigin) {
+    return configuredOrigin;
+  }
+
   const forwardedProto = req.headers.get("x-forwarded-proto")?.split(",")[0]?.trim();
   const forwardedHost = req.headers.get("x-forwarded-host")?.split(",")[0]?.trim();
 
@@ -40,4 +45,21 @@ function resolvePublicOrigin(req: NextRequest) {
   }
 
   return new URL(req.url).origin;
+}
+
+function configuredPublicOrigin() {
+  const rawOrigin =
+    process.env.FLOOM_ORIGIN ||
+    process.env.NEXT_PUBLIC_FLOOM_ORIGIN ||
+    process.env.NEXT_PUBLIC_APP_URL;
+
+  if (!rawOrigin) {
+    return null;
+  }
+
+  try {
+    return new URL(rawOrigin).origin;
+  } catch {
+    return null;
+  }
 }
