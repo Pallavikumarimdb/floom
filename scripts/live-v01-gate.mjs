@@ -59,17 +59,20 @@ async function main() {
   await runDependencyAppThroughRest();
   await runDependencyAppThroughMcp();
 
-  await assertPublicSecretAppRejected();
   await publishSecretAppViaMcp();
+  await publishPublicSecretAppViaMcp();
   await assertMetadataAndPageAccess();
   await assertSecretRouteAuthNegatives();
   await assertMissingSecretFailsBeforeRun();
   await setSecretValueViaCli();
+  await setPublicSecretValueViaCli();
   await assertSecretMetadataOnlyViaCli();
   await assertSecretDeleteViaCli();
   await assertScopedAndNonOwnerAccessControls();
   await runSecretAppThroughRest();
   await runSecretAppThroughMcp();
+  await runPublicSecretAppAnonymouslyThroughRest();
+  await runPublicSecretAppAnonymouslyThroughMcp();
   await verifySupabaseEvidence();
 
   console.log(JSON.stringify({ ok: true, checks: results }, null, 2));
@@ -124,20 +127,6 @@ async function runDependencyAppThroughMcp() {
   pass('mcp_run_dependency_app');
 }
 
-async function assertPublicSecretAppRejected() {
-  const fixture = readFixture('python-secret');
-  const result = await mcpToolRaw('publish_app', {
-    manifest: withSlug(fixture.manifest.replace('public: false', 'public: true'), publicSecretSlug),
-    source: fixture.source,
-    input_schema: fixture.inputSchema,
-    output_schema: fixture.outputSchema,
-  });
-  check(result.isError === true, 'public secret-backed app publish unexpectedly succeeded');
-  const text = JSON.parse(result.content[0].text);
-  check(/Secret-backed apps must be private/.test(text.error), 'public secret-backed app error was unexpected');
-  pass('public_secret_app_rejected');
-}
-
 async function publishSecretAppViaMcp() {
   const fixture = readFixture('python-secret');
   const result = await mcpTool('publish_app', {
@@ -148,6 +137,18 @@ async function publishSecretAppViaMcp() {
   });
   check(result.app?.slug === secretSlug, 'MCP secret app publish returned unexpected slug');
   pass('mcp_publish_secret_app');
+}
+
+async function publishPublicSecretAppViaMcp() {
+  const fixture = readFixture('python-secret');
+  const result = await mcpTool('publish_app', {
+    manifest: withSlug(fixture.manifest.replace('public: false', 'public: true'), publicSecretSlug),
+    source: fixture.source,
+    input_schema: fixture.inputSchema,
+    output_schema: fixture.outputSchema,
+  });
+  check(result.app?.slug === publicSecretSlug, 'MCP public secret app publish returned unexpected slug');
+  pass('mcp_publish_public_secret_app');
 }
 
 async function assertMetadataAndPageAccess() {
@@ -179,10 +180,17 @@ async function assertMetadataAndPageAccess() {
 
   await assertPageLoad(secretSlug, {
     authToken: null,
-    expectedStatus: 200,
+    expectedStatus: 404,
     expectedText: ['App not found', 'No app found', 'Page not found', '404'],
-    label: 'private anonymous app page shell',
+    label: 'private anonymous app page',
   });
+
+  const publicSecretMetadata = await apiJson(`/api/apps/${publicSecretSlug}`, {
+    method: 'GET',
+    authToken: null,
+  });
+  check(publicSecretMetadata.slug === publicSecretSlug, 'public secret metadata returned unexpected slug');
+  check(publicSecretMetadata.public === true, 'public secret metadata did not mark app public');
   pass('metadata_and_page_access');
 }
 
@@ -264,6 +272,13 @@ async function setSecretValueViaCli() {
   assertNoSecret(tempData, 'set temp secret CLI response');
   check(tempData.secret?.name === tempSecretName, 'set temp secret CLI response missing metadata');
   pass('secret_set_metadata_only_cli');
+}
+
+async function setPublicSecretValueViaCli() {
+  const data = runSecretsCliJson(['set', publicSecretSlug, 'FLOOM_TEST_SECRET'], secretValue);
+  assertNoSecret(data, 'set public-secret CLI response');
+  check(data.secret?.name === 'FLOOM_TEST_SECRET', 'set public-secret CLI response missing metadata');
+  pass('public_secret_set_metadata_only_cli');
 }
 
 async function assertSecretMetadataOnlyViaCli() {
@@ -371,6 +386,25 @@ async function runSecretAppThroughMcp() {
   pass('mcp_run_secret_app_redacted');
 }
 
+async function runPublicSecretAppAnonymouslyThroughRest() {
+  const data = await apiJson(`/api/apps/${publicSecretSlug}/run`, {
+    method: 'POST',
+    authToken: null,
+    body: { inputs: { message: 'anonymous rest public secret check' } },
+  });
+  assertSecretRunResult(data, 'anonymous rest public secret run');
+  pass('anonymous_rest_run_public_secret_app_redacted');
+}
+
+async function runPublicSecretAppAnonymouslyThroughMcp() {
+  const data = await mcpTool('run_app', {
+    slug: publicSecretSlug,
+    inputs: { message: 'anonymous mcp public secret check' },
+  }, null);
+  assertSecretRunResult(data, 'anonymous mcp public secret run');
+  pass('anonymous_mcp_run_public_secret_app_redacted');
+}
+
 async function verifySupabaseEvidence() {
   const app = await fetchAppForCleanup(secretSlug);
   check(app.public === false, 'secret app is not private in DB');
@@ -396,6 +430,12 @@ async function verifySupabaseEvidence() {
   if (execError) throw new Error('Failed to load execution evidence');
   check(executions.some((execution) => execution.status === 'success'), 'no successful execution evidence found');
   assertNoSecret(executions, 'executions evidence');
+
+  const publicApp = await fetchAppForCleanup(publicSecretSlug);
+  check(publicApp.public === true, 'public secret app is not public in DB');
+  check(arrayEquals(publicApp.app_versions[0].secrets, ['FLOOM_TEST_SECRET']), 'public app_versions secret names unexpected');
+  assertNoSecret(publicApp, 'public apps/app_versions evidence');
+
   pass('supabase_evidence_secret_not_persisted');
 }
 
