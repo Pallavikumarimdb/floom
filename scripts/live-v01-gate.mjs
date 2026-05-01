@@ -507,7 +507,7 @@ function runCli(command, args, { input } = {}) {
 
 function runSecretsCliJson(args, input) {
   const output = runCli('npx', ['tsx', 'cli/secrets.ts', ...args], { input });
-  return parseJson(output, `cli/secrets.ts ${args[0]} returned invalid JSON`);
+  return parseJson(extractJsonObject(output), `cli/secrets.ts ${args[0]} returned invalid JSON`);
 }
 
 function makeTempFixture(name, slug, { publicApp = false } = {}) {
@@ -740,6 +740,15 @@ function parseJson(text, message) {
   } catch {
     throw new Error(message);
   }
+}
+
+function extractJsonObject(text) {
+  const start = text.indexOf('{');
+  const end = text.lastIndexOf('}');
+  if (start === -1 || end === -1 || end < start) {
+    return text;
+  }
+  return text.slice(start, end + 1);
 }
 
 function safeErrorMessage(error) {
