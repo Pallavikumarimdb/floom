@@ -33,7 +33,16 @@ try {
   console.error(JSON.stringify({ ok: false, error: safeErrorMessage(error) }, null, 2));
   process.exitCode = 1;
 } finally {
-  await cleanupLiveArtifacts();
+  try {
+    await cleanupLiveArtifacts();
+  } catch (error) {
+    console.error(JSON.stringify({
+      ok: false,
+      cleanup_failed: true,
+      error: safeErrorMessage(error),
+    }, null, 2));
+    process.exitCode = 1;
+  }
 }
 
 async function main() {
@@ -45,11 +54,13 @@ async function main() {
   }, null, 2));
 
   await publishDependencyAppViaCli();
+  await publishDependencyAppViaMcp();
   await runDependencyAppThroughRest();
   await runDependencyAppThroughMcp();
 
   await assertPublicSecretAppRejected();
   await publishSecretAppViaMcp();
+  await assertMetadataAndPageAccess();
   await assertSecretRouteAuthNegatives();
   await assertMissingSecretFailsBeforeRun();
   await setSecretValueViaCli();
@@ -68,6 +79,27 @@ async function publishDependencyAppViaCli() {
   const output = runCli('npx', ['tsx', 'cli/deploy.ts', appDir]);
   check(output.includes(`/p/${dependencySlug}`), 'CLI dependency publish did not return expected app URL');
   pass('cli_publish_dependency_app');
+}
+
+async function publishDependencyAppViaMcp() {
+  const mcpDependencySlug = `${dependencySlug}-mcp`;
+  cleanupState.slugs.push(mcpDependencySlug);
+  const fixture = readFixture('python-requirements');
+  const result = await mcpTool('publish_app', {
+    manifest: withSlug(fixture.manifest, mcpDependencySlug),
+    source: fixture.source,
+    input_schema: fixture.inputSchema,
+    output_schema: fixture.outputSchema,
+    requirements: fixture.requirements,
+  });
+  check(result.app?.slug === mcpDependencySlug, 'MCP dependency app publish returned unexpected slug');
+  const run = await mcpTool('run_app', {
+    slug: mcpDependencySlug,
+    inputs: { count: 654321 },
+  });
+  check(run.status === 'success', 'MCP-published dependency run did not succeed');
+  check(run.output?.formatted === '654,321', 'MCP-published dependency run returned unexpected formatted output');
+  pass('mcp_publish_dependency_app');
 }
 
 async function runDependencyAppThroughRest() {
@@ -117,7 +149,70 @@ async function publishSecretAppViaMcp() {
   pass('mcp_publish_secret_app');
 }
 
+async function assertMetadataAndPageAccess() {
+  const publicMetadata = await apiJson(`/api/apps/${dependencySlug}`, {
+    method: 'GET',
+    authToken: null,
+  });
+  check(publicMetadata.slug === dependencySlug, 'public app metadata returned unexpected slug');
+  check(publicMetadata.public === true, 'public app metadata did not mark app public');
+
+  await assertPageLoad(dependencySlug, {
+    authToken: null,
+    expectedStatus: 200,
+    expectedText: '__next',
+    label: 'public app page',
+  });
+
+  const privateMetadata = await apiJson(`/api/apps/${secretSlug}`, {
+    method: 'GET',
+  });
+  check(privateMetadata.slug === secretSlug, 'private owner metadata returned unexpected slug');
+  check(privateMetadata.public === false, 'private owner metadata did not mark app private');
+
+  await apiJson(`/api/apps/${secretSlug}`, {
+    method: 'GET',
+    authToken: null,
+    expectedStatus: 404,
+  });
+
+  await assertPageLoad(secretSlug, {
+    authToken: null,
+    expectedStatus: 200,
+    expectedText: '__next',
+    label: 'private anonymous app page shell',
+  });
+  pass('metadata_and_page_access');
+}
+
 async function assertSecretRouteAuthNegatives() {
+  await assertMcpError('get_app', { slug: secretSlug }, {
+    authToken: null,
+    expectedError: /App not found/,
+    label: 'unauthenticated private get_app',
+  });
+  await assertMcpError('run_app', {
+    slug: secretSlug,
+    inputs: { message: 'anonymous mcp secret run' },
+  }, {
+    authToken: null,
+    expectedError: /Forbidden/,
+    label: 'unauthenticated private run_app',
+  });
+  await assertMcpError('get_app', { slug: secretSlug }, {
+    authToken: 'not-a-valid-token',
+    expectedError: /App not found/,
+    label: 'invalid-token private get_app',
+  });
+  await assertMcpError('run_app', {
+    slug: secretSlug,
+    inputs: { message: 'invalid token mcp secret run' },
+  }, {
+    authToken: 'not-a-valid-token',
+    expectedError: /Unauthorized/,
+    label: 'invalid-token private run_app',
+  });
+
   await apiJson(`/api/apps/${secretSlug}/secrets`, {
     method: 'GET',
     authToken: null,
@@ -181,6 +276,30 @@ async function assertScopedAndNonOwnerAccessControls() {
   const readOnlyToken = await createScopedAgentToken(app.owner_id, ['read']);
   const otherUser = await createTemporaryUser();
   const otherToken = await createScopedAgentToken(otherUser.id, ['read', 'run', 'publish']);
+
+  const readOnlyMetadata = await mcpTool('get_app', { slug: secretSlug }, readOnlyToken.token);
+  check(readOnlyMetadata.slug === secretSlug, 'read-only MCP get_app returned unexpected slug');
+  await assertMcpError('run_app', {
+    slug: secretSlug,
+    inputs: { message: 'read-only mcp secret run' },
+  }, {
+    authToken: readOnlyToken.token,
+    expectedError: /Missing run scope/,
+    label: 'read-only private run_app',
+  });
+  await assertMcpError('get_app', { slug: secretSlug }, {
+    authToken: otherToken.token,
+    expectedError: /App not found/,
+    label: 'non-owner private get_app',
+  });
+  await assertMcpError('run_app', {
+    slug: secretSlug,
+    inputs: { message: 'non-owner mcp secret run' },
+  }, {
+    authToken: otherToken.token,
+    expectedError: /Forbidden/,
+    label: 'non-owner private run_app',
+  });
 
   await apiJson(`/api/apps/${secretSlug}/secrets`, {
     method: 'PUT',
@@ -262,8 +381,8 @@ function assertSecretRunResult(data, label) {
   check(data.output?.secret_length === secretValue.length, `${label} returned wrong secret length`);
 }
 
-async function mcpTool(name, args) {
-  const result = await mcpToolRaw(name, args);
+async function mcpTool(name, args, authToken = token) {
+  const result = await mcpToolRaw(name, args, authToken);
   if (result.isError === true) {
     throw new Error(`${name} returned an error result`);
   }
@@ -273,12 +392,11 @@ async function mcpTool(name, args) {
 }
 
 async function mcpToolRaw(name, args, authToken = token) {
+  const headers = { 'content-type': 'application/json' };
+  if (authToken) headers.authorization = `Bearer ${authToken}`;
   const response = await fetch(`${apiUrl}/mcp`, {
     method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      authorization: `Bearer ${authToken}`,
-    },
+    headers,
     body: JSON.stringify({
       jsonrpc: '2.0',
       id: `${name}-${Date.now()}`,
@@ -293,6 +411,14 @@ async function mcpToolRaw(name, args, authToken = token) {
   }
   assertNoSecret(payload, 'MCP raw response');
   return payload.result;
+}
+
+async function assertMcpError(name, args, { authToken, expectedError, label }) {
+  const result = await mcpToolRaw(name, args, authToken);
+  check(result.isError === true, `${label} unexpectedly succeeded`);
+  const data = JSON.parse(result.content[0].text);
+  assertNoSecret(data, `${label} MCP error`);
+  check(expectedError.test(data.error || ''), `${label} returned unexpected error`);
 }
 
 async function apiJson(path, { method, body, expectedStatus = 200, authToken = token } = {}) {
@@ -314,10 +440,23 @@ async function apiJson(path, { method, body, expectedStatus = 200, authToken = t
   return data;
 }
 
+async function assertPageLoad(slug, { authToken, expectedStatus, expectedText, label }) {
+  const headers = {};
+  if (authToken) headers.authorization = `Bearer ${authToken}`;
+  const response = await fetch(`${apiUrl}/p/${slug}`, { method: 'GET', headers });
+  const text = await response.text();
+  assertNoSecret(text, `${label} HTML`);
+  if (response.status !== expectedStatus) {
+    throw new Error(`${label} returned ${response.status}: ${redactString(text.slice(0, 500))}`);
+  }
+  check(text.includes(expectedText), `${label} did not contain expected page marker`);
+}
+
 function runCli(command, args, { input } = {}) {
+  const env = cliEnv();
   const result = input === undefined
-    ? execFileSync(command, args, { cwd: process.cwd(), env: cliEnv(), encoding: 'utf8', stdio: 'pipe' })
-    : spawnSync(command, args, { cwd: process.cwd(), env: cliEnv(), input, encoding: 'utf8' });
+    ? execFileSync(command, args, { cwd: process.cwd(), env, encoding: 'utf8', stdio: 'pipe' })
+    : spawnSync(command, args, { cwd: process.cwd(), env, input, encoding: 'utf8' });
 
   if (typeof result === 'string') {
     assertNoSecret(result, `${command} output`);
@@ -388,35 +527,50 @@ async function createTemporaryUser() {
 }
 
 async function cleanupLiveArtifacts() {
+  const failures = [];
   for (const slug of cleanupState.slugs) {
-    await cleanupApp(slug).catch(() => undefined);
+    await cleanupStep(`app ${slug}`, () => cleanupApp(slug), failures);
   }
   if (cleanupState.tokenIds.length > 0) {
-    await admin.from('agent_tokens').delete().in('id', cleanupState.tokenIds).catch(() => undefined);
+    await cleanupStep('agent tokens', async () => {
+      const { error } = await admin.from('agent_tokens').delete().in('id', cleanupState.tokenIds);
+      if (error) throw new Error(error.message);
+    }, failures);
   }
   for (const userId of cleanupState.userIds) {
-    await admin.auth.admin.deleteUser(userId).catch(() => undefined);
+    await cleanupStep(`auth user ${userId}`, async () => {
+      const { error } = await admin.auth.admin.deleteUser(userId);
+      if (error) throw new Error(error.message);
+    }, failures);
   }
   for (const dir of cleanupState.tempDirs) {
-    rmSync(dir, { recursive: true, force: true });
+    await cleanupStep(`temp dir ${dir}`, async () => {
+      rmSync(dir, { recursive: true, force: true });
+    }, failures);
+  }
+  if (failures.length > 0) {
+    throw new Error(`Live gate cleanup failed: ${failures.join('; ')}`);
   }
 }
 
 async function cleanupApp(slug) {
-  const { data } = await admin
+  const { data, error: loadError } = await admin
     .from('apps')
     .select('id, app_versions(bundle_path)')
     .eq('slug', slug)
     .maybeSingle();
+  if (loadError) throw new Error(`load failed: ${loadError.message}`);
   if (!data) return;
 
   const bundlePaths = (data.app_versions || [])
     .map((version) => version.bundle_path)
     .filter(Boolean);
   if (bundlePaths.length > 0) {
-    await admin.storage.from('app-bundles').remove(bundlePaths);
+    const { error: storageError } = await admin.storage.from('app-bundles').remove(bundlePaths);
+    if (storageError) throw new Error(`storage remove failed: ${storageError.message}`);
   }
-  await admin.from('apps').delete().eq('id', data.id);
+  const { error: deleteError } = await admin.from('apps').delete().eq('id', data.id);
+  if (deleteError) throw new Error(`app delete failed: ${deleteError.message}`);
 }
 
 function readFixture(name) {
@@ -443,16 +597,52 @@ function withSlug(manifest, slug) {
 }
 
 function cliEnv() {
-  return {
-    ...process.env,
+  const env = {
+    PATH: process.env.PATH || '',
+    HOME: process.env.HOME || '',
+    TMPDIR: process.env.TMPDIR || tmpdir(),
+    TEMP: process.env.TEMP || tmpdir(),
+    TMP: process.env.TMP || tmpdir(),
+    CI: process.env.CI || '',
+    NO_COLOR: process.env.NO_COLOR || '',
+    FORCE_COLOR: process.env.FORCE_COLOR || '',
     FLOOM_API_URL: apiUrl,
     FLOOM_TOKEN: token,
   };
+  assertChildEnvSafe(env);
+  return env;
+}
+
+function assertChildEnvSafe(env) {
+  const forbiddenNames = [
+    'SUPABASE_SERVICE_ROLE_KEY',
+    'AGENT_TOKEN_PEPPER',
+    'FLOOM_V01_TEST_SECRET',
+    'NEXT_PUBLIC_SUPABASE_URL',
+  ];
+  for (const name of forbiddenNames) {
+    if (Object.prototype.hasOwnProperty.call(env, name)) {
+      throw new Error(`child CLI env includes forbidden variable ${name}`);
+    }
+  }
+  const serialized = JSON.stringify(env);
+  if (serialized.includes(serviceRoleKey) || serialized.includes(agentTokenPepper) || serialized.includes(secretValue)) {
+    throw new Error('child CLI env includes a forbidden secret value');
+  }
+}
+
+async function cleanupStep(label, fn, failures) {
+  try {
+    await fn();
+  } catch (error) {
+    failures.push(`${label}: ${safeErrorMessage(error)}`);
+  }
 }
 
 function assertNoSecret(value, label) {
-  if (JSON.stringify(value).includes(secretValue)) {
-    throw new Error(`${label} leaked the raw secret value`);
+  const serialized = JSON.stringify(value);
+  if (sensitiveValues().some((secret) => serialized.includes(secret))) {
+    throw new Error(`${label} leaked a sensitive value`);
   }
 }
 
@@ -479,7 +669,11 @@ function safeErrorMessage(error) {
 }
 
 function redactString(text) {
-  return text.split(secretValue).join('[REDACTED]');
+  return sensitiveValues().reduce((redacted, secret) => redacted.split(secret).join('[REDACTED]'), text);
+}
+
+function sensitiveValues() {
+  return [secretValue, serviceRoleKey, agentTokenPepper, token].filter(Boolean);
 }
 
 function normalizeApiUrl(value) {
