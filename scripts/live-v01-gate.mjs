@@ -248,7 +248,7 @@ async function assertSecretRouteAuthNegatives() {
     method: 'POST',
     authToken: null,
     body: { inputs: { message: 'anonymous secret run' } },
-    expectedStatus: 403,
+    expectedStatus: 404,
   });
   pass('secret_route_auth_negatives');
 }
@@ -363,7 +363,7 @@ async function assertScopedAndNonOwnerAccessControls() {
     method: 'POST',
     authToken: otherToken.token,
     body: { inputs: { message: 'non owner run' } },
-    expectedStatus: 403,
+    expectedStatus: 404,
   });
   pass('scoped_and_non_owner_access_controls');
 }
