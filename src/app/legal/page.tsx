@@ -1,5 +1,28 @@
+import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { SiteHeader } from "@/components/SiteHeader";
+
+const SITE_URL = "https://floom-60sec.vercel.app";
+
+export const metadata: Metadata = {
+  title: "Legal & privacy",
+  description:
+    "Floom alpha service notice: data handled, private/public apps, abuse policy, contact. Honest scope, no enterprise theatre.",
+  alternates: { canonical: `${SITE_URL}/legal` },
+  openGraph: {
+    type: "article",
+    title: "Floom — Legal & privacy",
+    description: "Alpha service notice. Honest scope.",
+    url: `${SITE_URL}/legal`,
+    images: [{ url: `${SITE_URL}/opengraph-image`, width: 1200, height: 630 }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Floom — Legal & privacy",
+    description: "Alpha service notice. Honest scope.",
+    images: [`${SITE_URL}/opengraph-image`],
+  },
+};
 
 function Section({
   title,

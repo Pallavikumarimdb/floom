@@ -1,6 +1,30 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { SiteHeader } from "@/components/SiteHeader";
+
+const SITE_URL = "https://floom-60sec.vercel.app";
+
+export const metadata: Metadata = {
+  title: "Docs",
+  description:
+    "Floom v0 docs: ship a Python function as a hosted UI, REST endpoint, and MCP tool in 60 seconds. The v0 contract, manifest, MCP templates, and v0.1 scope.",
+  alternates: { canonical: `${SITE_URL}/docs` },
+  openGraph: {
+    type: "article",
+    title: "Floom Docs — Local Python function to live app",
+    description:
+      "The v0 contract: one Python function, JSON Schema inputs, browser page + REST + MCP. Plus v0.1 scope (deps, secrets) and limits.",
+    url: `${SITE_URL}/docs`,
+    images: [{ url: `${SITE_URL}/opengraph-image`, width: 1200, height: 630 }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Floom Docs",
+    description: "Ship a Python function as a hosted UI, REST endpoint, and MCP tool.",
+    images: [`${SITE_URL}/opengraph-image`],
+  },
+};
 
 const manifestExample = `name: pitch-coach
 slug: pitch-coach
@@ -45,8 +69,13 @@ function Section({
 }
 
 function CodeBlock({ children }: { children: string }) {
+  // overflow-x-auto + whitespace-pre keeps long URLs and command lines
+  // readable as a single line on desktop, and lets users horizontally
+  // scroll on mobile instead of break-words mid-URL or pushing the page
+  // off-screen. text-xs on mobile, sm on sm+ keeps it dense without
+  // breaking layout at 375px.
   return (
-    <pre className="max-w-full whitespace-pre-wrap break-words rounded-xl border border-[#ded8cc] bg-[#11110f] p-4 text-sm leading-7 text-[#f6f1e7]">
+    <pre className="max-w-full overflow-x-auto whitespace-pre rounded-xl border border-[#ded8cc] bg-[#11110f] p-4 text-xs leading-6 text-[#f6f1e7] sm:text-sm sm:leading-7">
       <code>{children}</code>
     </pre>
   );
