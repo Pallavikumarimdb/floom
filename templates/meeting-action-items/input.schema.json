@@ -1,0 +1,17 @@
+{
+  "type": "object",
+  "required": ["transcript"],
+  "properties": {
+    "transcript": {
+      "type": "string",
+      "title": "Meeting notes",
+      "default": "Action: Sarah sends launch notes by Friday\nMike owns beta checklist tomorrow\nPriya will run demo QA before launch"
+    },
+    "default_owner": {
+      "type": "string",
+      "title": "Default owner",
+      "default": ""
+    }
+  },
+  "additionalProperties": false
+}

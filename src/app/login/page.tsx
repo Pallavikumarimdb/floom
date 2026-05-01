@@ -269,7 +269,7 @@ function LoginContent() {
         <p style={{ marginTop: 24, fontSize: 13, color: 'var(--muted)', textAlign: 'center' }}>
           Want to see Floom first?{" "}
           <Link
-            href="/p/pitch-coach"
+            href="/p/meeting-action-items"
             style={{ fontWeight: 600, color: 'var(--accent)', textDecoration: 'none' }}
           >
             Try the live app

@@ -2,20 +2,20 @@
 
 Use this file for repeated "virgin agent" tests. Each run starts from no prior Floom context except the public URL, the repo path, and a fresh Floom agent token supplied through the environment. Testers must not print tokens, JWTs, Supabase keys, or E2B keys.
 
-Current v0 claim:
+Current launch claim:
 
-> Local single-file Python function to secure live Floom app in about 60 seconds after Floom account and agent-token setup.
+> Local Python function to secure live Floom app in about 60 seconds after Floom account and agent-token setup.
 
-Current v0 host:
+Current v0.1 host:
 
 ```bash
-export FLOOM_API_URL="https://floom-60sec.vercel.app"
+export FLOOM_API_URL="https://floom.dev"
 export FLOOM_TOKEN="<agent-token>"
 ```
 
 ## Supported App Contract
 
-Agents can ask the Floom MCP tool `get_app_contract` for the current v0 contract
+Agents can ask the Floom MCP tool `get_app_contract` for the current v0.1 contract
 and `list_app_templates` / `get_app_template` for useful copy-paste app bundles
 before generating an app.
 
@@ -24,27 +24,39 @@ MCP cannot create or return raw agent tokens. Create tokens only from the signed
 Accept:
 
 - Single-file Python.
-- Standard library only.
+- Python standard library.
+- Exact-pinned, hash-locked `requirements.txt` when `floom.yaml` declares `dependencies.python: ./requirements.txt`.
 - One handler function, usually `run(inputs: dict) -> dict`.
 - `floom.yaml`, `input.schema.json`, and `output.schema.json`.
 - `public: true` for public apps; omitted or `false` for private apps.
+- Secret names only, never raw secret values, via `secrets: ["OPENAI_API_KEY"]`.
 
 Reject:
 
-- `requirements.txt`, `pyproject.toml`, `package.json`, or `openapi.json`.
-- FastAPI, OpenAPI, TypeScript, Node, multi-file Python, secrets, dependencies, long-running servers, CLIs, workers, queues, cron, browser automation, OAuth callbacks, and local databases.
-- `floom.yaml` fields named `actions`, `dependencies`, or `secrets`.
+- Undeclared `requirements.txt`, `pyproject.toml`, `package.json`, or `openapi.json`.
+- FastAPI, OpenAPI, TypeScript, Node, multi-file Python, raw secret values, long-running servers, CLIs, workers, queues, cron, browser automation, OAuth callbacks, and local databases.
+- `floom.yaml` field named `actions`.
 
 ## v0.1 Boundary
 
-v0.1 is dependencies plus secret names with secure runtime injection. It is not
-generic web hosting.
+v0.1 is exact-pinned, hash-locked dependencies plus owner-managed encrypted app secrets with
+runtime environment injection. It is not generic web hosting, and it is not part
+of the public launch claim until the complete flow is verified end to end.
 
 Add in v0.1:
 
-- A constrained `requirements.txt` install path for Python packages.
+- An exact-pinned, hash-locked `requirements.txt` install path for Python packages.
 - `floom.yaml` secret names only, never raw secret values.
-- Secure storage for secret values and E2B runtime injection.
+- Owner-scoped encrypted secret storage and E2B runtime injection.
+
+Self-serve secret values are set through `GET`/`PUT`/`DELETE /api/apps/:slug/secrets`
+or the public CLI. Responses contain metadata only.
+
+```bash
+printf '%s' "$VALUE" | FLOOM_TOKEN="$FLOOM_TOKEN" FLOOM_API_URL="$FLOOM_API_URL" npx @floomhq/cli@latest secrets set <app-slug> OPENAI_API_KEY --value-stdin
+FLOOM_TOKEN="$FLOOM_TOKEN" FLOOM_API_URL="$FLOOM_API_URL" npx @floomhq/cli@latest secrets list <app-slug>
+FLOOM_TOKEN="$FLOOM_TOKEN" FLOOM_API_URL="$FLOOM_API_URL" npx @floomhq/cli@latest secrets delete <app-slug> OPENAI_API_KEY
+```
 
 Still reject until later: FastAPI/OpenAPI apps, arbitrary HTTP servers,
 TypeScript/Node apps, background workers, multi-service repos, and long-running
@@ -75,7 +87,8 @@ Run every item from a fresh shell/session.
    - Publish with:
 
 ```bash
-npx tsx /Users/federicodeponte/floom-60sec/cli/deploy.ts <app-dir>
+cd <app-dir>
+FLOOM_API_URL="https://floom.dev" npx @floomhq/cli@latest deploy
 ```
 
    - Record elapsed time from command start to printed `/p/:slug`.
@@ -112,9 +125,10 @@ npx tsx /Users/federicodeponte/floom-60sec/cli/deploy.ts <app-dir>
    - Confirm app ownership and `public` values match the manifest.
 
 8. Unsupported app proof
-   - Try one app with `requirements.txt`; expect CLI rejection.
+   - Try one app with undeclared `requirements.txt`; expect CLI rejection.
+   - Try one v0.1 app with `dependencies.python: ./requirements.txt` and exact `package==version` pins; expect candidate validation to pass.
    - Try one app with two top-level `.py` files; expect CLI rejection.
-   - Try one manifest with `dependencies`, `secrets`, or `actions`; expect CLI rejection.
+   - Try one manifest with `actions`, malformed `dependencies`, or raw/malformed `secrets`; expect CLI rejection.
 
 ## Result Log Template
 

@@ -8,6 +8,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import type { AppDetail, RunRecord } from '@/lib/types';
+import { createClient } from '@/lib/supabase/client';
 
 export interface RunSurfaceResult {
   runId?: string;
@@ -132,9 +133,19 @@ export function RunSurface({ app, initialRun, initialInputs, examplePrefillInput
           payload[f.name] = raw;
         }
       }
+      const headers: Record<string, string> = { 'content-type': 'application/json' };
+      try {
+        const { data } = await createClient().auth.getSession();
+        if (data.session?.access_token) {
+          headers.Authorization = `Bearer ${data.session.access_token}`;
+        }
+      } catch {
+        // Public app runs still work without a browser session.
+      }
+
       const res = await fetch(`/api/apps/${app.slug}/run`, {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
+        headers,
         body: JSON.stringify({ inputs: payload }),
       });
       const data = (await res.json().catch(() => null)) as

@@ -89,7 +89,7 @@ function MvpHeroInstall({ appsCount, runs7dSum }: MvpHeroInstallProps) {
       */}
       <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 22 }}>
         <Link
-          href="/p/pitch-coach"
+          href="/p/meeting-action-items"
           data-testid="hero-try-live-app"
           style={{
             display: 'inline-flex',
@@ -358,7 +358,7 @@ export default function LandingV17PageMvp() {
                 margin: '-4px 0 20px',
               }}
             >
-              Localhost to live in 60 seconds.
+              Localhost to live and secure in 60 seconds.
             </p>
 
             {/* CTA — MVP variant: inline MCP setup snippet. */}

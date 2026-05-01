@@ -64,7 +64,7 @@ export default function OpengraphImage() {
             <span>.</span>
           </div>
           <div style={{ fontSize: 32, color: "#5a564f", fontWeight: 500 }}>
-            Localhost to live in 60 seconds.
+            Localhost to live and secure in 60 seconds.
           </div>
         </div>
 
@@ -78,7 +78,7 @@ export default function OpengraphImage() {
             fontFamily: "ui-monospace, monospace",
           }}
         >
-          <div>floom-60sec.vercel.app</div>
+          <div>floom.dev</div>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <span style={{ display: "flex", width: 8, height: 8, borderRadius: 4, background: "#047857" }} />
             <span>Open source · MCP · REST · UI</span>

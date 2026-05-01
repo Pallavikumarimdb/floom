@@ -1,0 +1,10 @@
+name: Requirements Formatter
+slug: requirements-formatter
+runtime: python
+entrypoint: app.py
+handler: run
+public: false
+dependencies:
+  python: ./requirements.txt
+input_schema: input.schema.json
+output_schema: output.schema.json

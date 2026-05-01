@@ -42,6 +42,7 @@ import {
   samplePrefill,
 } from '@/lib/onboarding';
 import { getLaunchDemoExampleTextInputs } from '@/lib/app-examples';
+import { createClient } from '@/lib/supabase/client';
 
 // Map of known app slugs to GitHub repo URLs.
 const GITHUB_REPOS: Record<string, string> = {
@@ -64,6 +65,8 @@ const HERO_SUBHEAD: Record<string, string> = {
     'Paste a company URL. Get a readiness score, 3 risks, 3 opportunities, and one concrete next step.',
   'pitch-coach':
     'Paste a 20-500 char startup pitch. Get 3 direct critiques, 3 rewrites by angle, and a one-line TL;DR.',
+  'meeting-action-items':
+    'Paste meeting notes. Get action items with owners and due dates.',
 };
 
 export default function AppPermalinkPage() { // exported as default so the server page can dynamic-import without renaming
@@ -156,22 +159,39 @@ export default function AppPermalinkPage() { // exported as default so the serve
     setLoading(true);
     setNotFound(false);
     setLoadFailure(null);
-    // Data seam: getApp(slug) → fetch('/api/apps/' + slug)
-    fetch(`/api/apps/${slug}`)
-      .then(async (res) => {
-        if (!res.ok) {
-          const err = new ApiError('App not found', res.status);
-          const outcome = classifyPermalinkLoadError(err);
-          setNotFound(outcome === 'not_found');
-          setLoadFailure(outcome === 'retryable' ? outcome : null);
-          setLoading(false);
-          return;
+    const loadApp = async () => {
+      const headers: Record<string, string> = {};
+      try {
+        const { data } = await createClient().auth.getSession();
+        if (data.session?.access_token) {
+          headers.Authorization = `Bearer ${data.session.access_token}`;
         }
-        const a = await res.json() as AppDetail & {
-          handler?: string;
-          input_schema?: unknown;
-          output_schema?: unknown;
-        };
+      } catch {
+        // Public app metadata still loads without a browser session.
+      }
+
+      // Data seam: getApp(slug) → fetch('/api/apps/' + slug)
+      const res = await fetch(`/api/apps/${slug}`, { headers });
+      if (!res.ok) {
+        const err = new ApiError('App not found', res.status);
+        const outcome = classifyPermalinkLoadError(err);
+        setNotFound(outcome === 'not_found');
+        setLoadFailure(outcome === 'retryable' ? outcome : null);
+        setLoading(false);
+        return;
+      }
+      const a = await res.json() as AppDetail & {
+        handler?: string;
+        input_schema?: unknown;
+        output_schema?: unknown;
+      };
+      return a;
+    };
+
+    loadApp()
+      .then(async (res) => {
+        if (!res) return;
+        const a = res;
         // Synthesize manifest from the floom-minimal API shape:
         // /api/apps/[slug] returns { id, slug, name, runtime, entrypoint,
         // handler, input_schema, output_schema, public }. The v5-ported
@@ -1185,7 +1205,7 @@ export default function AppPermalinkPage() { // exported as default so the serve
                   >
                     Floom
                   </Link>
-                  {' '}— localhost to live in 60 seconds.
+                  {' '}— localhost to live and secure in 60 seconds.
                 </div>
                 {celebrate && (
                   <CelebrationCard

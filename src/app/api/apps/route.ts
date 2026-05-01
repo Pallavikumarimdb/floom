@@ -9,8 +9,15 @@ import {
   validatePythonSourceForManifest,
   type FloomManifest,
 } from "@/lib/floom/manifest";
-import { MAX_REQUEST_BYTES, MAX_SCHEMA_BYTES, MAX_SOURCE_BYTES } from "@/lib/floom/limits";
+import {
+  MAX_REQUEST_BYTES,
+  MAX_REQUIREMENTS_BYTES,
+  MAX_SCHEMA_BYTES,
+  MAX_SOURCE_BYTES,
+} from "@/lib/floom/limits";
+import { validatePythonRequirementsText } from "@/lib/floom/requirements";
 import { parseAndValidateJsonSchemaText } from "@/lib/floom/schema";
+import { resolveMcpForwardOrigin } from "@/lib/mcp/origin";
 
 export async function POST(req: NextRequest) {
   if (!hasSupabaseConfig()) {
@@ -30,6 +37,7 @@ export async function POST(req: NextRequest) {
   const bundleFile = form.get("bundle") as File | null;
   const inputSchemaFile = form.get("input_schema") as File | null;
   const outputSchemaFile = form.get("output_schema") as File | null;
+  const requirementsFile = form.get("requirements") as File | null;
 
   if (!manifestFile || !bundleFile) {
     return NextResponse.json({ error: "Missing manifest or bundle" }, { status: 400 });
@@ -45,9 +53,10 @@ export async function POST(req: NextRequest) {
 
   if (
     (inputSchemaFile && inputSchemaFile.size > MAX_SCHEMA_BYTES) ||
-    (outputSchemaFile && outputSchemaFile.size > MAX_SCHEMA_BYTES)
+    (outputSchemaFile && outputSchemaFile.size > MAX_SCHEMA_BYTES) ||
+    (requirementsFile && requirementsFile.size > MAX_REQUIREMENTS_BYTES)
   ) {
-    return NextResponse.json({ error: "Schema is too large" }, { status: 413 });
+    return NextResponse.json({ error: "Upload metadata is too large" }, { status: 413 });
   }
 
   const manifestText = await manifestFile.text();
@@ -73,6 +82,12 @@ export async function POST(req: NextRequest) {
   }
 
   const ownerId = caller.userId;
+  if (manifest.public && (manifest.secrets?.length ?? 0) > 0) {
+    return NextResponse.json(
+      { error: "Secret-backed apps must be private in v0.1" },
+      { status: 400 }
+    );
+  }
 
   // Fetch existing app so owners can publish updates to their slug.
   const { data: existing } = await admin
@@ -108,6 +123,31 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: outputResult.error }, { status: 400 });
     }
     outputSchema = outputResult.schema;
+  }
+
+  let pythonRequirements: string | undefined;
+  if (manifest.dependencies?.python) {
+    if (!requirementsFile) {
+      return NextResponse.json({ error: "requirements.txt is required by floom.yaml" }, { status: 400 });
+    }
+
+    try {
+      pythonRequirements = validatePythonRequirementsText(await requirementsFile.text());
+    } catch (requirementsError) {
+      return NextResponse.json(
+        {
+          error: requirementsError instanceof Error
+            ? requirementsError.message
+            : "Invalid requirements.txt",
+        },
+        { status: 400 }
+      );
+    }
+  } else if (requirementsFile) {
+    return NextResponse.json(
+      { error: "requirements.txt requires dependencies.python in floom.yaml" },
+      { status: 400 }
+    );
   }
 
   const bundleBuffer = Buffer.from(await bundleFile.arrayBuffer());
@@ -181,8 +221,8 @@ export async function POST(req: NextRequest) {
     bundle_path: bundlePath,
     input_schema: inputSchema,
     output_schema: outputSchema,
-    dependencies: {},
-    secrets: [],
+    dependencies: pythonRequirements ? { python_requirements: pythonRequirements } : {},
+    secrets: manifest.secrets ?? [],
   });
 
   if (versionError) {
@@ -195,7 +235,7 @@ export async function POST(req: NextRequest) {
       id: app.id,
       slug: app.slug,
       name: app.name,
-      url: new URL(`/p/${app.slug}`, req.url).toString(),
+      url: new URL(`/p/${app.slug}`, resolveMcpForwardOrigin(req.url) || req.url).toString(),
     },
   });
 }

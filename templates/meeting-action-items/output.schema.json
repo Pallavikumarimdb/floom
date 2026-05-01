@@ -1,0 +1,25 @@
+{
+  "type": "object",
+  "required": ["count", "items"],
+  "properties": {
+    "count": {
+      "type": "integer",
+      "title": "Action item count"
+    },
+    "items": {
+      "type": "array",
+      "title": "Action items",
+      "items": {
+        "type": "object",
+        "required": ["task", "owner", "due"],
+        "properties": {
+          "task": { "type": "string" },
+          "owner": { "type": "string" },
+          "due": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

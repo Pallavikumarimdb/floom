@@ -1,12 +1,12 @@
-# Floom v0
+# Floom v0.1
 
 from localhost to live and secure in 60sec.
 
 ## What is this?
 
-Floom v0 is a minimal vertical slice for packaging a local, single-file, stdlib-only Python function app and running it through a generated JSON Schema UI. The verified launch claim is: from localhost to live and secure in 60sec. This claim starts after account and agent-token setup, and covers CLI publish plus browser/API run for the verified v0 contract.
+Floom v0.1 is the launch slice for packaging a local single-file Python function app, optionally installing exact-pinned hash-locked Python dependencies, storing owner-managed encrypted app secrets, and running it through a generated JSON Schema UI. The launch claim is: from localhost to live and secure in 60sec. This claim starts after account and agent-token setup, and covers CLI publish plus browser/API/MCP run for the verified v0.1 contract.
 
-Secure in the v0 claim means the verified controls are in place: E2B sandboxed execution, scoped agent tokens created through `/tokens`, schema-marked input/output redaction before persistence, caller-derived plus per-app run rate limits, and public/private access control. The local demo works without Supabase. Supabase-backed API routes require Supabase env and return 503 JSON when that env is missing.
+Secure in the v0.1 claim means the verified controls are in place: E2B sandboxed execution, scoped agent tokens created through `/tokens`, schema-marked input/output redaction before persistence, encrypted secret storage at rest, runtime-only secret injection, caller-derived plus per-app run rate limits, and public/private access control. The local demo works without Supabase. Supabase-backed API routes require Supabase env and return 503 JSON when that env is missing.
 
 ## Stack
 
@@ -62,6 +62,10 @@ NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 AGENT_TOKEN_PEPPER=your-random-server-only-pepper
+FLOOM_SECRET_ENCRYPTION_KEY=base64-encoded-32-byte-key
+FLOOM_ORIGIN=https://floom.dev
+NEXT_PUBLIC_FLOOM_ORIGIN=https://floom.dev
+NEXT_PUBLIC_APP_URL=https://floom.dev
 
 # E2B (required for production runs; local tests can use explicit fake mode)
 E2B_API_KEY=your-e2b-api-key
@@ -98,28 +102,55 @@ npx @floomhq/cli@latest deploy
 ```
 
 For local development, set `FLOOM_API_URL=http://localhost:3000` after `npm run dev`. For one-off scripts, set `FLOOM_TOKEN=YOUR_FLOOM_AGENT_TOKEN`.
-Without Supabase env, visit `/p/demo-app` for the local demo. In the hosted v0, use the homepage CTA to open the retained live app.
+Without Supabase env, visit `/p/demo-app` for the local demo. In the hosted v0.1 launch app, use the homepage CTA to open the retained live app.
+
+### 6. Manage app secrets
+
+Generate one server-only encryption key and configure it as `FLOOM_SECRET_ENCRYPTION_KEY`:
+
+```bash
+openssl rand -base64 32
+```
+
+The key is a base64-encoded 32-byte value. `base64:<value>` is also accepted. Keep it only in server env.
+
+Apps declare required secret names in `floom.yaml`:
+
+```yaml
+secrets:
+  - OPENAI_API_KEY
+```
+
+Set, list, and delete values with the owner token:
+
+```bash
+printf '%s' "$VALUE" | FLOOM_TOKEN=<agent-token> FLOOM_API_URL=https://floom.dev npx @floomhq/cli@latest secrets set <app-slug> OPENAI_API_KEY --value-stdin
+FLOOM_TOKEN=<agent-token> FLOOM_API_URL=https://floom.dev npx @floomhq/cli@latest secrets list <app-slug>
+FLOOM_TOKEN=<agent-token> FLOOM_API_URL=https://floom.dev npx @floomhq/cli@latest secrets delete <app-slug> OPENAI_API_KEY
+```
+
+The REST surface is `GET`, `PUT`, and `DELETE /api/apps/:slug/secrets`. `PUT` accepts `{ "name": "...", "value": "..." }`; responses return only `name`, `created_at`, and `updated_at` metadata.
 
 ## Launch Claim Contract
 
-The mainline v0 path is intentionally narrow:
+The mainline v0.1 path is intentionally narrow:
 
 - Account setup and agent-token creation happen before the 60sec timer.
-- Apps use one `app.py` file with Python stdlib only.
+- Apps use one `app.py` file with Python stdlib, plus exact-pinned and hash-locked dependencies when declared with `dependencies.python`.
 - Inputs and outputs are declared with JSON Schema.
 - Publish uses `FLOOM_TOKEN` and the CLI.
 - Public apps can be read and run anonymously.
 - Private apps require a valid owner token for metadata and runs.
 
-Not mainline unless re-verified end to end: TypeScript apps, Java apps, dependency installation, user-provided secrets, OpenAPI/FastAPI apps, multi-file bundles, background workers, and arbitrary web servers.
+Not part of the v0.1 launch claim: TypeScript apps, Java apps, OpenAPI/FastAPI apps, multi-file bundles, background workers, and arbitrary web servers.
 
 ## App Contract
 
 `floom.yaml`:
 
 ```yaml
-name: Pitch Coach
-slug: pitch-coach
+name: Meeting Action Items
+slug: meeting-action-items
 runtime: python
 entrypoint: app.py
 handler: run
@@ -127,7 +158,7 @@ input_schema: ./input.schema.json
 output_schema: ./output.schema.json
 ```
 
-Python v0:
+Python v0.1:
 
 ```python
 def run(inputs: dict) -> dict:
@@ -140,14 +171,15 @@ def run(inputs: dict) -> dict:
 2. CLI validates `floom.yaml`, input JSON Schema, output JSON Schema, and the Python handler.
 3. CLI sends the Python entrypoint to Floom API (`POST /api/apps`).
 4. With Supabase env configured, Floom API creates app/version records in Supabase.
-5. Floom runs through E2B when `E2B_API_KEY` is configured.
-6. In fake mode, the runner returns mock output for local development and tests only.
-7. With `E2B_API_KEY`, the runner uploads the entrypoint to E2B and invokes the handler.
-8. Floom validates inputs and outputs, stores execution records when Supabase is configured, and renders results.
+5. App owners store declared secret values through `/api/apps/:slug/secrets`; values are encrypted in `app_secrets`.
+6. Floom runs through E2B when `E2B_API_KEY` is configured.
+7. In fake mode, the runner returns mock output for local development and tests only.
+8. With `E2B_API_KEY`, the runner uploads the entrypoint to E2B, decrypts declared secrets server-side, injects them as E2B environment variables, and invokes the handler.
+9. Floom validates inputs and outputs, stores execution records when Supabase is configured, and renders results.
 
 ## MCP
 
-The v0 MCP endpoint is `/mcp`.
+The v0.1 MCP endpoint is `/mcp`.
 
 Use an Authorization bearer token:
 
@@ -169,9 +201,11 @@ Launch tools:
 
 MCP cannot create or return raw agent tokens. Create agent tokens from the signed-in `/tokens` page, where the raw token is shown once. The publish/run tools accept a Floom agent token when the token has the required scope.
 
-`get_app_contract` returns the current v0 manifest, `app.py`, input/output schema examples, and explicit unsupported cases. Agents use it before generating app files so they do not create FastAPI/OpenAPI, dependency, TypeScript, multi-file, secrets, or multi-action apps for the v0 runtime.
+MCP does not return raw app secret values. App secret values are managed through the REST route or `npx @floomhq/cli@latest secrets`; list responses contain metadata only.
 
-`list_app_templates` and `get_app_template` return useful copy-paste v0 app bundles. Current templates:
+`get_app_contract` returns the current v0.1 manifest, `app.py`, input/output schema examples, dependency/secret fields, and explicit unsupported cases. Agents use it before generating app files so they do not create FastAPI/OpenAPI, TypeScript, multi-file, server, or multi-action apps for this function runtime.
+
+`list_app_templates` and `get_app_template` return useful copy-paste v0.1-safe app bundles. Current templates:
 
 - `invoice_calculator`
 - `utm_url_builder`
@@ -180,14 +214,18 @@ MCP cannot create or return raw agent tokens. Create agent tokens from the signe
 
 Each template includes `floom.yaml`, `app.py`, `input.schema.json`, and `output.schema.json`. They use one stdlib-only Python file and no secrets.
 
+The deployable filesystem template in this repository is `templates/meeting-action-items`. Post-v0 references that need file upload, Gemini, or broader app hosting live under `docs/post-v0-templates`.
+
 ## v0.1 Scope
 
-v0.1 adds the two capabilities that unlock many real apps without turning Floom into broad web hosting:
+v0.1 includes these capabilities without turning Floom into broad web hosting:
 
-- Python dependency installation from a constrained `requirements.txt`.
-- Secret names in `floom.yaml`, with secret values stored securely by Floom and injected only into the E2B runtime.
+- Python dependency installation from an exact-pinned, hash-locked `requirements.txt` declared as `dependencies.python`.
+- Secret names in `floom.yaml`, with owner-scoped encrypted values injected only into the E2B runtime.
 
 v0.1 does not claim arbitrary HTTP servers, FastAPI/OpenAPI apps, TypeScript apps, background workers, or full repo hosting. Those stay post-v0.1 until the runtime, auth, limits, and UI contracts are verified end to end.
+
+Secret values are encrypted at rest in `app_secrets` with `FLOOM_SECRET_ENCRYPTION_KEY`. API, CLI, MCP, execution rows, app versions, docs, and bundle storage expose only secret names or metadata.
 
 ## Fake Mode
 
@@ -203,7 +241,7 @@ If `E2B_API_KEY` is not set, fake mode is available only outside production when
 - [x] Build passes
 - [x] Live E2B verification
 
-## v0 Exclusions
+## v0.1 Exclusions
 
 - Studio
 - Marketplace

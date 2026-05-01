@@ -7,15 +7,17 @@ export type FloomManifest = {
   public?: boolean;
   input_schema?: string;
   output_schema?: string;
+  dependencies?: {
+    python?: "requirements.txt";
+  };
+  secrets?: string[];
 };
 
 const SLUG_RE = /^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$/;
 const PYTHON_FILE_RE = /^[A-Za-z_][A-Za-z0-9_]*\.py$/;
 const IDENTIFIER_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
-const POST_V0_FIELDS = [
+const POST_V01_FIELDS = [
   "actions",
-  "dependencies",
-  "secrets",
   "description",
   "type",
   "visibility",
@@ -25,6 +27,7 @@ const POST_V0_FIELDS = [
   "secrets_needed",
   "openapi_spec_url",
 ];
+const SECRET_NAME_RE = /^[A-Z][A-Z0-9_]{1,63}$/;
 
 function requiredString(value: unknown, field: string): string {
   if (typeof value !== "string" || value.trim() === "") {
@@ -39,19 +42,19 @@ export function parseManifest(value: unknown): FloomManifest {
   }
 
   const data = value as Record<string, unknown>;
-  for (const field of POST_V0_FIELDS) {
+  for (const field of POST_V01_FIELDS) {
     if (data[field] !== undefined) {
-      throw new Error(`v0 does not support floom.yaml field: ${field}`);
+      throw new Error(`v0.1 does not support floom.yaml field: ${field}`);
     }
   }
   if (data.input_schema !== undefined && typeof data.input_schema !== "string") {
-    throw new Error("input_schema must be a file path string in v0");
+    throw new Error("input_schema must be a file path string in v0.1");
   }
   if (data.output_schema !== undefined && typeof data.output_schema !== "string") {
-    throw new Error("output_schema must be a file path string in v0");
+    throw new Error("output_schema must be a file path string in v0.1");
   }
   if (data.public !== undefined && typeof data.public !== "boolean") {
-    throw new Error("public must be true or false in v0");
+    throw new Error("public must be true or false in v0.1");
   }
 
   const manifest: FloomManifest = {
@@ -63,6 +66,8 @@ export function parseManifest(value: unknown): FloomManifest {
     public: data.public === true,
     input_schema: typeof data.input_schema === "string" ? data.input_schema : undefined,
     output_schema: typeof data.output_schema === "string" ? data.output_schema : undefined,
+    dependencies: parseDependencies(data.dependencies),
+    secrets: parseSecretNames(data.secrets),
   };
 
   if (manifest.runtime !== "python") {
@@ -82,6 +87,55 @@ export function parseManifest(value: unknown): FloomManifest {
   }
 
   return manifest;
+}
+
+function parseDependencies(value: unknown): FloomManifest["dependencies"] {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("dependencies must be an object");
+  }
+
+  const data = value as Record<string, unknown>;
+  const keys = Object.keys(data);
+  if (keys.some((key) => key !== "python")) {
+    throw new Error("dependencies only supports python: ./requirements.txt");
+  }
+
+  if (data.python !== "requirements.txt" && data.python !== "./requirements.txt") {
+    throw new Error("dependencies.python must be ./requirements.txt");
+  }
+
+  return { python: "requirements.txt" };
+}
+
+function parseSecretNames(value: unknown): string[] | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (!Array.isArray(value)) {
+    throw new Error("secrets must be an array of environment variable names");
+  }
+
+  if (value.length > 10) {
+    throw new Error("secrets supports at most 10 names");
+  }
+
+  const names = value.map((item) => {
+    if (typeof item !== "string" || !SECRET_NAME_RE.test(item)) {
+      throw new Error("secrets must contain only uppercase environment variable names");
+    }
+    return item;
+  });
+
+  if (new Set(names).size !== names.length) {
+    throw new Error("secrets must not contain duplicate names");
+  }
+
+  return names;
 }
 
 export function isSafePythonEntrypoint(value: string) {

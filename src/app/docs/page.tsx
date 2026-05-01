@@ -18,26 +18,26 @@ npx @floomhq/cli@latest deploy --dry-run
 npx @floomhq/cli@latest deploy
 npx @floomhq/cli@latest run meeting-notes-demo '{"text":"Action: Sarah sends launch notes by Friday"}' --json`;
 
-const apiExample = `curl -X POST https://floom-60sec.vercel.app/api/apps/meeting-action-items/run \\
+const apiExample = `curl -X POST https://floom.dev/api/apps/meeting-action-items/run \\
   -H 'Content-Type: application/json' \\
   -d '{"inputs":{"transcript":"Action: Sarah sends launch notes by Friday"}}'`;
 
-const privateApiExample = `curl -X POST https://floom-60sec.vercel.app/api/apps/YOUR_PRIVATE_SLUG/run \\
+const privateApiExample = `curl -X POST https://floom.dev/api/apps/YOUR_PRIVATE_SLUG/run \\
   -H 'Authorization: Bearer YOUR_FLOOM_AGENT_TOKEN' \\
   -H 'Content-Type: application/json' \\
   -d '{"inputs":{"text":"Send this from n8n or any HTTP client"}}'`;
 
-const mcpExample = `POST https://floom-60sec.vercel.app/mcp
+const mcpExample = `POST https://floom.dev/mcp
 tool: get_app_contract
 
-POST https://floom-60sec.vercel.app/mcp
+POST https://floom.dev/mcp
 tool: list_app_templates
 
-POST https://floom-60sec.vercel.app/mcp
+POST https://floom.dev/mcp
 tool: get_app_template
 arguments: { "key": "invoice_calculator" }
 
-POST https://floom-60sec.vercel.app/mcp
+POST https://floom.dev/mcp
 tool: run_app
 arguments: { "slug": "meeting-action-items", "inputs": { ... } }`;
 
@@ -71,14 +71,13 @@ export default function DocsPage() {
 
       <article className="mx-auto max-w-4xl px-5 py-14">
         <p className="mb-3 text-sm font-semibold text-emerald-700">
-          Floom v0 docs
+          Floom v0.1 docs
         </p>
         <h1 className="text-4xl font-black tracking-tight sm:text-5xl">
           Local Python function to live app.
         </h1>
         <p className="mt-4 max-w-2xl text-lg text-neutral-600">
-          Floom v0 publishes a narrow app shape: one stdlib Python function,
-          JSON Schema inputs, a browser page, API run, and MCP run.
+          Floom v0.1 publishes a narrow app shape: one Python function, optional exact-pinned hash-locked dependencies, encrypted owner-managed secrets, JSON Schema inputs, a browser page, API run, and MCP run.
         </p>
 
         <div className="mt-8 flex flex-wrap gap-3">
@@ -89,7 +88,7 @@ export default function DocsPage() {
             Create token
           </Link>
           <Link
-            href="/p/smoke-1777538613152"
+            href="/p/meeting-action-items"
             className="rounded-md border border-[#ded8cc] bg-white px-4 py-2 text-sm font-semibold text-neutral-800"
           >
             Run live demo
@@ -112,22 +111,19 @@ export default function DocsPage() {
           <CodeBlock>{launchCommand}</CodeBlock>
         </Section>
 
-        <Section title="v0 app contract">
+        <Section title="v0.1 app contract">
           <ul className="list-disc space-y-3 pl-5">
             <li>Runtime: Python.</li>
             <li>Entrypoint: one top-level `.py` file.</li>
             <li>Handler: one function that receives a JSON object and returns JSON.</li>
             <li>Inputs: JSON Schema rendered into a browser form.</li>
             <li>Outputs: JSON object displayed in the app page.</li>
-            <li>Dependencies: Python standard library only in v0.</li>
-            <li>Config: only the keys shown in the manifest example are active in v0.</li>
+            <li>Dependencies: Python standard library plus exact-pinned, hash-locked <code>requirements.txt</code> when declared.</li>
+            <li>Config: only the keys shown in the manifest example are active in v0.1.</li>
           </ul>
           <p className="text-sm text-neutral-500">
             TypeScript, FastAPI/OpenAPI, multiple Python files, custom packages,
-            secrets, inline schemas in <code>floom.yaml</code>,{" "}
-            <code>visibility</code>, <code>actions</code>,{" "}
-            <code>dependencies</code>, and <code>manifest_version</code> are
-            outside the v0 contract.
+            inline schemas in <code>floom.yaml</code>, <code>visibility</code>, <code>actions</code>, and <code>manifest_version</code> are outside the v0.1 contract. Secret names and declared dependencies are supported; raw secret values never belong in source or manifest files.
           </p>
         </Section>
 
@@ -167,7 +163,7 @@ export default function DocsPage() {
 
         <Section title="MCP app templates">
           <p>
-            Floom serves copy-paste v0-safe bundles for agents that need a fast,
+            Floom serves copy-paste v0.1-safe bundles for agents that need a fast,
             useful starting point instead of a blank function.
           </p>
           <ul className="list-disc space-y-3 pl-5">
@@ -189,7 +185,7 @@ export default function DocsPage() {
             </li>
           </ul>
           <p className="text-sm text-neutral-500">
-            Every template uses one stdlib-only Python file and includes
+            Every template uses one Python file and includes
             <code> floom.yaml</code>, <code>app.py</code>,{" "}
             <code>input.schema.json</code>, and{" "}
             <code>output.schema.json</code>. Before publishing a template, change
@@ -197,21 +193,23 @@ export default function DocsPage() {
           </p>
         </Section>
 
-        <Section title="v0.1 scope">
+        <Section title="Dependencies and secrets">
           <p>
-            v0.1 adds dependencies and secrets without changing Floom into broad
-            app hosting.
+            v0.1 includes exact-pinned, hash-locked dependencies and owner-managed encrypted app secrets without changing Floom into broad app hosting.
           </p>
           <ul className="list-disc space-y-3 pl-5">
             <li>
-              Constrained Python dependency installation from{" "}
+              Exact-pinned, hash-locked Python dependency installation from{" "}
               <code>requirements.txt</code>.
             </li>
             <li>
               Secret names in <code>floom.yaml</code>, never raw secret values.
             </li>
-            <li>Secure secret storage and E2B runtime injection.</li>
+            <li>Owner-scoped encrypted storage and E2B runtime injection.</li>
           </ul>
+          <CodeBlock>{`printf '%s' "$VALUE" | FLOOM_TOKEN=YOUR_FLOOM_AGENT_TOKEN FLOOM_API_URL=https://floom.dev npx @floomhq/cli@latest secrets set YOUR_PRIVATE_SLUG OPENAI_API_KEY --value-stdin
+FLOOM_TOKEN=YOUR_FLOOM_AGENT_TOKEN FLOOM_API_URL=https://floom.dev npx @floomhq/cli@latest secrets list YOUR_PRIVATE_SLUG
+FLOOM_TOKEN=YOUR_FLOOM_AGENT_TOKEN FLOOM_API_URL=https://floom.dev npx @floomhq/cli@latest secrets delete YOUR_PRIVATE_SLUG OPENAI_API_KEY`}</CodeBlock>
           <p className="text-sm text-neutral-500">
             FastAPI/OpenAPI, arbitrary HTTP servers, TypeScript apps,
             background workers, and full repo hosting remain later milestones.
@@ -220,23 +218,22 @@ export default function DocsPage() {
 
         <Section title="Limits and exclusions">
           <ul className="list-disc space-y-3 pl-5">
-            <li>v0 is optimized for short function-style apps.</li>
+            <li>v0.1 is optimized for short function-style apps.</li>
             <li>Public runs are rate-limited.</li>
             <li>Output fields marked as secret in output schema are redacted.</li>
             <li>Raw agent tokens are shown once and are stored only as hashes.</li>
-            <li>No teams, orgs, per-user share links, OAuth providers, or billing in v0.</li>
+            <li>No teams, orgs, per-user share links, app-owned OAuth providers, or billing in v0.1.</li>
           </ul>
         </Section>
 
         <Section title="Auth and email redirect">
           <p>
             Signup emails are sent by Supabase Auth. The confirmation link must
-            return to `https://floom-60sec.vercel.app/auth/callback?next=/tokens`.
+            return to `https://floom.dev/auth/callback?next=/tokens`.
           </p>
           <p>
             If an email sends you to localhost, update the Supabase Auth Site URL
-            to `https://floom-60sec.vercel.app` and add
-            `https://floom-60sec.vercel.app/auth/callback` to redirect URLs.
+            to `https://floom.dev` and add `https://floom.dev/auth/callback` to redirect URLs.
           </p>
         </Section>
       </article>

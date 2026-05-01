@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next";
 
-const SITE = "https://floom-60sec.vercel.app";
+const SITE = "https://floom.dev";
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const now = new Date();
@@ -24,7 +24,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 0.4,
     },
     {
-      url: `${SITE}/p/pitch-coach`,
+      url: `${SITE}/p/meeting-action-items`,
       lastModified: now,
       changeFrequency: "weekly",
       priority: 0.7,
