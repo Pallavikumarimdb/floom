@@ -358,7 +358,7 @@ export default function LandingV17PageMvp() {
                 margin: '-4px 0 20px',
               }}
             >
-              Localhost to live in 60 seconds.
+              Localhost to live and secure in 60 seconds.
             </p>
 
             {/* CTA — MVP variant: inline MCP setup snippet. */}

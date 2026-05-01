@@ -64,7 +64,7 @@ export default function OpengraphImage() {
             <span>.</span>
           </div>
           <div style={{ fontSize: 32, color: "#5a564f", fontWeight: 500 }}>
-            Localhost to live in 60 seconds.
+            Localhost to live and secure in 60 seconds.
           </div>
         </div>
 

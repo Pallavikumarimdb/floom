@@ -1205,7 +1205,7 @@ export default function AppPermalinkPage() { // exported as default so the serve
                   >
                     Floom
                   </Link>
-                  {' '}— localhost to live in 60 seconds.
+                  {' '}— localhost to live and secure in 60 seconds.
                 </div>
                 {celebrate && (
                   <CelebrationCard

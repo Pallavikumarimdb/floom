@@ -46,23 +46,48 @@ export async function runInSandbox(
     return { output: {}, error: "App source is too large" };
   }
 
-  let sbx: Awaited<ReturnType<typeof Sandbox.create>> | null = null;
   const hasPythonRequirements = Boolean(dependencies.python_requirements?.trim());
+  const hasRuntimeSecrets = Object.keys(secrets).length > 0;
+  let installSbx: Awaited<ReturnType<typeof Sandbox.create>> | null = null;
+  let runSbx: Awaited<ReturnType<typeof Sandbox.create>> | null = null;
 
   try {
-    sbx = await Sandbox.create("base", {
-      apiKey: process.env.E2B_API_KEY,
-      allowInternetAccess: hasPythonRequirements,
-      secure: true,
-      timeoutMs: SANDBOX_TIMEOUT_MS,
-      requestTimeoutMs: REQUEST_TIMEOUT_MS,
-      lifecycle: { onTimeout: "kill" },
-    });
+    let dependencyArchive: Uint8Array | null = null;
+    if (hasPythonRequirements && hasRuntimeSecrets && dependencies.python_requirements) {
+      installSbx = await Sandbox.create("base", sandboxOptions({ allowInternetAccess: true }));
+      await installSbx.files.write("/home/user/requirements.txt", dependencies.python_requirements);
+      await installSbx.commands.run(
+        "python3 -m pip install --disable-pip-version-check --no-input --require-hashes --target /home/user/.deps -r /home/user/requirements.txt",
+        {
+          timeoutMs: COMMAND_TIMEOUT_MS,
+          requestTimeoutMs: REQUEST_TIMEOUT_MS,
+        }
+      );
+      await installSbx.commands.run("tar -C /home/user -czf /home/user/deps.tgz .deps", {
+        timeoutMs: COMMAND_TIMEOUT_MS,
+        requestTimeoutMs: REQUEST_TIMEOUT_MS,
+      });
+      dependencyArchive = await installSbx.files.read("/home/user/deps.tgz", {
+        format: "bytes",
+        requestTimeoutMs: REQUEST_TIMEOUT_MS,
+      });
+    }
 
-    await sbx.files.write(`/home/user/${entrypoint}`, source);
-    if (hasPythonRequirements && dependencies.python_requirements) {
-      await sbx.files.write("/home/user/requirements.txt", dependencies.python_requirements);
-      await sbx.commands.run(
+    runSbx = await Sandbox.create(
+      "base",
+      sandboxOptions({ allowInternetAccess: hasPythonRequirements && !hasRuntimeSecrets })
+    );
+
+    await runSbx.files.write(`/home/user/${entrypoint}`, source);
+    if (dependencyArchive) {
+      await runSbx.files.write("/home/user/deps.tgz", toArrayBuffer(dependencyArchive));
+      await runSbx.commands.run("tar -C /home/user -xzf /home/user/deps.tgz", {
+        timeoutMs: COMMAND_TIMEOUT_MS,
+        requestTimeoutMs: REQUEST_TIMEOUT_MS,
+      });
+    } else if (hasPythonRequirements && dependencies.python_requirements) {
+      await runSbx.files.write("/home/user/requirements.txt", dependencies.python_requirements);
+      await runSbx.commands.run(
         "python3 -m pip install --disable-pip-version-check --no-input --require-hashes --target /home/user/.deps -r /home/user/requirements.txt",
         {
           timeoutMs: COMMAND_TIMEOUT_MS,
@@ -85,15 +110,15 @@ with open("/home/user/output.json", "w") as handle:
     json.dump(result, handle)
 `;
 
-    await sbx.files.write("/home/user/runner.py", wrapper);
-    await sbx.files.write("/home/user/inputs.json", JSON.stringify(inputs));
+    await runSbx.files.write("/home/user/runner.py", wrapper);
+    await runSbx.files.write("/home/user/inputs.json", JSON.stringify(inputs));
 
-    await sbx.commands.run("python3 /home/user/runner.py", {
+    await runSbx.commands.run("python3 /home/user/runner.py", {
       timeoutMs: COMMAND_TIMEOUT_MS,
       requestTimeoutMs: REQUEST_TIMEOUT_MS,
       envs: secrets,
     });
-    const outputText = await sbx.files.read("/home/user/output.json", {
+    const outputText = await runSbx.files.read("/home/user/output.json", {
       requestTimeoutMs: REQUEST_TIMEOUT_MS,
     });
     if (Buffer.byteLength(outputText, "utf8") > MAX_OUTPUT_BYTES) {
@@ -107,8 +132,26 @@ with open("/home/user/output.json", "w") as handle:
   } catch {
     return { output: {}, error: "App execution failed" };
   } finally {
-    await sbx?.kill().catch(() => undefined);
+    await installSbx?.kill().catch(() => undefined);
+    await runSbx?.kill().catch(() => undefined);
   }
+}
+
+function sandboxOptions({ allowInternetAccess }: { allowInternetAccess: boolean }) {
+  return {
+    apiKey: process.env.E2B_API_KEY,
+    allowInternetAccess,
+    secure: true,
+    timeoutMs: SANDBOX_TIMEOUT_MS,
+    requestTimeoutMs: REQUEST_TIMEOUT_MS,
+    lifecycle: { onTimeout: "kill" },
+  } as const;
+}
+
+function toArrayBuffer(bytes: Uint8Array) {
+  const buffer = new ArrayBuffer(bytes.byteLength);
+  new Uint8Array(buffer).set(bytes);
+  return buffer;
 }
 
 export async function runInSandboxContained(

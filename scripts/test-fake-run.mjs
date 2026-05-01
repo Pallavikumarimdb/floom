@@ -896,26 +896,35 @@ async function testSandboxDependenciesAndSecrets() {
   ]);
   const originalCreate = Sandbox.create;
   const commands = [];
-  const writes = new Map();
+  const createOpts = [];
+  const writes = [];
 
   process.env.E2B_API_KEY = 'test-e2b-key';
   delete process.env.FLOOM_EXECUTION_MODE;
   delete process.env.FLOOM_FAKE_E2B;
   process.env.NODE_ENV = 'production';
 
-  Sandbox.create = async (_template, opts) => ({
-    files: {
-      write: async (path, value) => writes.set(path, value),
-      read: async () => '{"ok": true}',
-    },
-    commands: {
-      run: async (command, runOpts) => {
-        commands.push({ command, runOpts });
+  Sandbox.create = async (_template, opts) => {
+    const sandboxIndex = createOpts.length;
+    createOpts.push(opts);
+    return {
+      files: {
+        write: async (path, value) => writes.push({ sandboxIndex, path, value }),
+        read: async (path, opts) => (
+          opts?.format === 'bytes' || path.endsWith('deps.tgz')
+            ? new Uint8Array([1, 2, 3])
+            : '{"ok": true}'
+        ),
       },
-    },
-    kill: async () => undefined,
-    createOpts: opts,
-  });
+      commands: {
+        run: async (command, runOpts) => {
+          commands.push({ sandboxIndex, command, runOpts });
+        },
+      },
+      kill: async () => undefined,
+      createOpts: opts,
+    };
+  };
 
   try {
     const result = await runInSandbox(
@@ -928,12 +937,28 @@ async function testSandboxDependenciesAndSecrets() {
       { OPENAI_API_KEY: 'runtime-secret' }
     );
     assert.deepEqual(result, { output: { ok: true } });
-    assert.equal(writes.get('/home/user/requirements.txt'), `${REQUESTS_HASHED}\n`);
+    assert.equal(createOpts.length, 2);
+    assert.equal(createOpts[0].allowInternetAccess, true);
+    assert.equal(createOpts[1].allowInternetAccess, false);
+    assert.equal(
+      writes.find((item) => item.sandboxIndex === 0 && item.path === '/home/user/requirements.txt')?.value,
+      `${REQUESTS_HASHED}\n`
+    );
     assert.match(commands[0].command, /pip install/);
     assert.match(commands[0].command, /--require-hashes/);
-    assert.match(commands[1].command, /runner\.py/);
-    assert.deepEqual(commands[1].runOpts.envs, { OPENAI_API_KEY: 'runtime-secret' });
-    assert.match(writes.get('/home/user/runner.py'), /\/home\/user\/\.deps/);
+    assert.equal(commands[0].sandboxIndex, 0);
+    assert.equal(commands[0].runOpts.envs, undefined);
+    assert.match(commands[1].command, /deps\.tgz/);
+    assert.equal(commands[1].sandboxIndex, 0);
+    assert.match(commands[2].command, /deps\.tgz/);
+    assert.equal(commands[2].sandboxIndex, 1);
+    assert.match(commands[3].command, /runner\.py/);
+    assert.equal(commands[3].sandboxIndex, 1);
+    assert.deepEqual(commands[3].runOpts.envs, { OPENAI_API_KEY: 'runtime-secret' });
+    assert.match(
+      writes.find((item) => item.sandboxIndex === 1 && item.path === '/home/user/runner.py')?.value,
+      /\/home\/user\/\.deps/
+    );
   } finally {
     Sandbox.create = originalCreate;
     restoreEnv(saved);

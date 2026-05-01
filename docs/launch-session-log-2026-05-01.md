@@ -6,7 +6,7 @@ Launch target is v0.1, not v0-only.
 
 The launch claim is:
 
-> localhost to live in 60 seconds
+> localhost to live and secure in 60 seconds
 
 For launch readiness, v0.1 must support:
 
