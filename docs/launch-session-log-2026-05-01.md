@@ -82,6 +82,8 @@ For launch readiness, v0.1 must support:
 - Independent security audit verified the dependency install sandbox no longer receives secrets and the secret runtime sandbox has no internet.
 - `f614a33` fixes publish response URLs so API/MCP publish responses use the configured canonical origin instead of the Vercel alias.
 - Post-`f614a33` production MCP publish verified returned app URL `https://floom.dev/p/url-canon-20260501074153-30a48c`, run execution `79b9d828-0a94-4074-bc0c-547412c71c0c`, and coordinator cleanup succeeded.
+- `main` deployed to production at commit `5a83c0a8abef02e4bfc89af72089d157f037111d`.
+- Final production v0.1 live gate passed after the `main` deploy with dependency slug `req-gate-20260501074701-5acba7`, secret slug `secret-gate-20260501074701-5acba7`, and all 16 automated checks green.
 
 ## Subagent Browser QA
 
