@@ -3,7 +3,7 @@ import { ImageResponse } from "next/og";
 export const runtime = "edge";
 export const contentType = "image/png";
 export const size = { width: 1200, height: 630 };
-export const alt = "Floom — Ship AI apps fast";
+export const alt = "Floom — Localhost to live in 60 seconds";
 
 export default function OpengraphImage() {
   return new ImageResponse(
@@ -48,7 +48,7 @@ export default function OpengraphImage() {
         <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
           <div
             style={{
-              fontSize: 96,
+              fontSize: 84,
               fontWeight: 900,
               lineHeight: 1.02,
               letterSpacing: "-0.04em",
@@ -57,14 +57,14 @@ export default function OpengraphImage() {
               gap: 18,
             }}
           >
-            <span>Ship AI apps</span>
+            <span>Localhost to</span>
             <span style={{ color: "#047857", textDecoration: "underline", textDecorationThickness: 6, textUnderlineOffset: 14 }}>
-              fast
+              live
             </span>
-            <span>.</span>
+            <span>in 60 seconds.</span>
           </div>
           <div style={{ fontSize: 32, color: "#5a564f", fontWeight: 500 }}>
-            Localhost to live and secure in 60 seconds.
+            Python function &rarr; browser page, REST endpoint, MCP tool.
           </div>
         </div>
 
