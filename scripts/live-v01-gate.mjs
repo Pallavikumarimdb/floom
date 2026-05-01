@@ -195,7 +195,7 @@ async function assertSecretRouteAuthNegatives() {
     output_schema: fixture.outputSchema,
   }, {
     authToken: null,
-    expectedError: /Unauthorized/,
+    expectedError: /Authorization bearer token|Unauthorized/,
     label: 'unauthenticated publish_app',
   });
 
