@@ -17,6 +17,7 @@ import {
 } from "@/lib/floom/limits";
 import { validatePythonRequirementsText } from "@/lib/floom/requirements";
 import { parseAndValidateJsonSchemaText } from "@/lib/floom/schema";
+import { resolveMcpForwardOrigin } from "@/lib/mcp/origin";
 
 export async function POST(req: NextRequest) {
   if (!hasSupabaseConfig()) {
@@ -234,7 +235,7 @@ export async function POST(req: NextRequest) {
       id: app.id,
       slug: app.slug,
       name: app.name,
-      url: new URL(`/p/${app.slug}`, req.url).toString(),
+      url: new URL(`/p/${app.slug}`, resolveMcpForwardOrigin(req.url) || req.url).toString(),
     },
   });
 }
