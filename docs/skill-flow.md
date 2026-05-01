@@ -50,7 +50,13 @@ Add in v0.1:
 - Owner-scoped encrypted secret storage and E2B runtime injection.
 
 Self-serve secret values are set through `GET`/`PUT`/`DELETE /api/apps/:slug/secrets`
-or `cli/secrets.ts`. Responses contain metadata only.
+or the public CLI. Responses contain metadata only.
+
+```bash
+printf '%s' "$VALUE" | FLOOM_TOKEN="$FLOOM_TOKEN" FLOOM_API_URL="$FLOOM_API_URL" npx @floomhq/cli@latest secrets set <app-slug> OPENAI_API_KEY --value-stdin
+FLOOM_TOKEN="$FLOOM_TOKEN" FLOOM_API_URL="$FLOOM_API_URL" npx @floomhq/cli@latest secrets list <app-slug>
+FLOOM_TOKEN="$FLOOM_TOKEN" FLOOM_API_URL="$FLOOM_API_URL" npx @floomhq/cli@latest secrets delete <app-slug> OPENAI_API_KEY
+```
 
 Still reject until later: FastAPI/OpenAPI apps, arbitrary HTTP servers,
 TypeScript/Node apps, background workers, multi-service repos, and long-running
@@ -81,7 +87,8 @@ Run every item from a fresh shell/session.
    - Publish with:
 
 ```bash
-npx tsx /Users/federicodeponte/floom-60sec/cli/deploy.ts <app-dir>
+cd <app-dir>
+FLOOM_API_URL="https://floom.dev" npx @floomhq/cli@latest deploy
 ```
 
    - Record elapsed time from command start to printed `/p/:slug`.

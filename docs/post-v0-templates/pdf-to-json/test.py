@@ -2,7 +2,7 @@
 Smoke test for the PDF to JSON handler.
 
 Usage:
-    python templates/pdf-to-json/test.py
+    python docs/post-v0-templates/pdf-to-json/test.py
 
 Exit 0 = pass. Prints extracted JSON so you can eyeball the output.
 """

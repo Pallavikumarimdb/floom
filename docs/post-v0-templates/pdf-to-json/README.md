@@ -2,12 +2,10 @@
 
 > **Status: experimental.** This template is a working reference for the
 > PDF → structured-JSON pattern, with passing local tests. It is **not yet
-> wired into the canonical Floom runtime** — the v0 deploy path does not yet
-> ship `pypdf` / `google-genai` in the sandbox image, and per-app
-> `requirements.txt` resolution is a planned follow-up. Treat this as a
-> reference handler you can run locally; full end-to-end deploy on
-> floom-60sec.vercel.app will land alongside the runtime work tracked in
-> floomhq/floom-minimal.
+> wired into the canonical Floom v0.1 contract** — it needs file upload style
+> inputs, Gemini secrets, and broader PDF/runtime handling. Treat this as a
+> post-v0 reference handler you can run locally, not as a deployable launch
+> template.
 
 Extract structured data from any PDF using a Python sandbox and Gemini 3.
 
@@ -133,16 +131,15 @@ Running `handler.run({"pdf": <sample.pdf as data-url>, "extract": "invoice line 
 
 ---
 
-## Deploy (planned)
+## Deploy status
 
-This template will be deployable once the Floom v0 runtime supports per-app
-`requirements.txt` resolution and the sandbox image bundles `pypdf` and
-`google-genai`. Today, only the demo-app handler is wired into canonical.
+This template is intentionally stored under `docs/post-v0-templates`, not
+`templates`, because it is not deployable in v0.1.
 
 When the runtime work lands, deploy will be:
 
 ```bash
-cd templates/pdf-to-json
+cd docs/post-v0-templates/pdf-to-json
 floom publish .
 ```
 
@@ -154,7 +151,7 @@ bundle, uploads it, and returns the public run endpoint.
 ## Local test
 
 ```bash
-python templates/pdf-to-json/test.py
+python docs/post-v0-templates/pdf-to-json/test.py
 ```
 
 Runs three checks: missing-PDF error handling, full invoice extraction, and

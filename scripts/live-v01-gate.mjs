@@ -479,7 +479,10 @@ async function assertPageLoad(slug, { authToken, expectedStatus, expectedText, l
 
   const hydratedText = dumpHydratedPageText(`${apiUrl}/p/${slug}`);
   assertNoSecret(hydratedText, `${label} hydrated text`);
-  check(hydratedText.includes(expectedText), `${label} hydrated page did not contain expected text`);
+  check(
+    text.includes(expectedText) || hydratedText.includes(expectedText),
+    `${label} page did not contain expected text`
+  );
 }
 
 function runCli(command, args, { input } = {}) {

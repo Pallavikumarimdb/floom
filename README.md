@@ -63,6 +63,9 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 AGENT_TOKEN_PEPPER=your-random-server-only-pepper
 FLOOM_SECRET_ENCRYPTION_KEY=base64-encoded-32-byte-key
+FLOOM_ORIGIN=https://floom.dev
+NEXT_PUBLIC_FLOOM_ORIGIN=https://floom.dev
+NEXT_PUBLIC_APP_URL=https://floom.dev
 
 # E2B (required for production runs; local tests can use explicit fake mode)
 E2B_API_KEY=your-e2b-api-key
@@ -121,9 +124,9 @@ secrets:
 Set, list, and delete values with the owner token:
 
 ```bash
-printf '%s' "$VALUE" | FLOOM_TOKEN=<agent-token> FLOOM_API_URL=<url> npx tsx cli/secrets.ts set <app-slug> OPENAI_API_KEY
-FLOOM_TOKEN=<agent-token> FLOOM_API_URL=<url> npx tsx cli/secrets.ts list <app-slug>
-FLOOM_TOKEN=<agent-token> FLOOM_API_URL=<url> npx tsx cli/secrets.ts delete <app-slug> OPENAI_API_KEY
+printf '%s' "$VALUE" | FLOOM_TOKEN=<agent-token> FLOOM_API_URL=https://floom.dev npx @floomhq/cli@latest secrets set <app-slug> OPENAI_API_KEY --value-stdin
+FLOOM_TOKEN=<agent-token> FLOOM_API_URL=https://floom.dev npx @floomhq/cli@latest secrets list <app-slug>
+FLOOM_TOKEN=<agent-token> FLOOM_API_URL=https://floom.dev npx @floomhq/cli@latest secrets delete <app-slug> OPENAI_API_KEY
 ```
 
 The REST surface is `GET`, `PUT`, and `DELETE /api/apps/:slug/secrets`. `PUT` accepts `{ "name": "...", "value": "..." }`; responses return only `name`, `created_at`, and `updated_at` metadata.
@@ -198,7 +201,7 @@ Launch tools:
 
 MCP cannot create or return raw agent tokens. Create agent tokens from the signed-in `/tokens` page, where the raw token is shown once. The publish/run tools accept a Floom agent token when the token has the required scope.
 
-MCP does not return raw app secret values. App secret values are managed through the REST route or `cli/secrets.ts`; list responses contain metadata only.
+MCP does not return raw app secret values. App secret values are managed through the REST route or `npx @floomhq/cli@latest secrets`; list responses contain metadata only.
 
 `get_app_contract` returns the current v0.1 manifest, `app.py`, input/output schema examples, dependency/secret fields, and explicit unsupported cases. Agents use it before generating app files so they do not create FastAPI/OpenAPI, TypeScript, multi-file, server, or multi-action apps for this function runtime.
 
@@ -210,6 +213,8 @@ MCP does not return raw app secret values. App secret values are managed through
 - `meeting_action_items`
 
 Each template includes `floom.yaml`, `app.py`, `input.schema.json`, and `output.schema.json`. They use one stdlib-only Python file and no secrets.
+
+The deployable filesystem template in this repository is `templates/meeting-action-items`. Post-v0 references that need file upload, Gemini, or broader app hosting live under `docs/post-v0-templates`.
 
 ## v0.1 Scope
 

@@ -207,6 +207,9 @@ export default function DocsPage() {
             </li>
             <li>Owner-scoped encrypted storage and E2B runtime injection.</li>
           </ul>
+          <CodeBlock>{`printf '%s' "$VALUE" | FLOOM_TOKEN=YOUR_FLOOM_AGENT_TOKEN FLOOM_API_URL=https://floom.dev npx @floomhq/cli@latest secrets set YOUR_PRIVATE_SLUG OPENAI_API_KEY --value-stdin
+FLOOM_TOKEN=YOUR_FLOOM_AGENT_TOKEN FLOOM_API_URL=https://floom.dev npx @floomhq/cli@latest secrets list YOUR_PRIVATE_SLUG
+FLOOM_TOKEN=YOUR_FLOOM_AGENT_TOKEN FLOOM_API_URL=https://floom.dev npx @floomhq/cli@latest secrets delete YOUR_PRIVATE_SLUG OPENAI_API_KEY`}</CodeBlock>
           <p className="text-sm text-neutral-500">
             FastAPI/OpenAPI, arbitrary HTTP servers, TypeScript apps,
             background workers, and full repo hosting remain later milestones.
