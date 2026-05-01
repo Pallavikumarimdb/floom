@@ -84,6 +84,10 @@ For launch readiness, v0.1 must support:
 - Post-`f614a33` production MCP publish verified returned app URL `https://floom.dev/p/url-canon-20260501074153-30a48c`, run execution `79b9d828-0a94-4074-bc0c-547412c71c0c`, and coordinator cleanup succeeded.
 - `main` deployed to production at commit `5a83c0a8abef02e4bfc89af72089d157f037111d`.
 - Final production v0.1 live gate passed after the `main` deploy with dependency slug `req-gate-20260501074701-5acba7`, secret slug `secret-gate-20260501074701-5acba7`, and all 16 automated checks green.
+- Checklist hardening audit added `20` explicit gap gates and raised the checklist artifact to `100/100`; product launch score remains evidence-gated.
+- QA run D verified CLI/MCP publish/run from scratch; coordinator cleanup removed `qa-cli-mcp-20260501-094948` and `qa-mcp-20260501-20260501075451`.
+- QA run E found one P0 UI overpromise in the app Source tab. Commit `40971f5` removed unsupported self-host Docker/BYOK copy and replaced it with v0.1-safe `floom.yaml` plus HTTP API guidance.
+- Rendered production Source-tab verification after `40971f5`: `/tmp/floom-source-tab-v01-safe.png`, sha256 `b45027f41dc36749d2c13b431e15e2c667373f6cabd80abc3e83106a71526102`.
 
 ## Subagent Browser QA
 

@@ -1444,7 +1444,7 @@ export default function AppPermalinkPage() { // exported as default so the serve
         </section>
         )}
 
-        {/* Source tab. v26 parity: repo card + spec card + self-host card */}
+        {/* Source tab. v0.1 contract: repo card, manifest card, API automation card. */}
         {activeTab === 'source' && (
           <section id="tabpanel-source" role="tabpanel" aria-labelledby="tab-source" data-testid="tab-content-source">
             {!githubRepo && (
@@ -1457,7 +1457,7 @@ export default function AppPermalinkPage() { // exported as default so the serve
                   lineHeight: 1.55,
                 }}
               >
-                The published source isn&rsquo;t linked to a public repo. The manifest below describes the contract this app exposes.
+                Source not publicly linked. Check with the app creator.
               </p>
             )}
             <div
@@ -1525,17 +1525,22 @@ export default function AppPermalinkPage() { // exported as default so the serve
                 }}
               >
                 <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10.5, color: 'var(--muted)', letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 600, marginBottom: 8 }}>
-                  Spec (floom.json)
+                  Spec (floom.yaml)
                 </div>
                 <p style={{ fontSize: 12.5, color: 'var(--muted)', margin: '0 0 10px', lineHeight: 1.5 }}>
-                  Deterministic JSON schema for actions and inputs.
+                  v0.1 apps use one Python entrypoint, one handler, JSON schemas, optional hash-locked dependencies, and owner-managed secrets.
                 </p>
                 <SourceSnippet
-                  value={JSON.stringify({
-                    slug: app.slug,
-                    version: app.version ?? '0.1.0',
-                    actions: Object.keys(app.manifest?.actions ?? {}).slice(0, 2),
-                  }, null, 2)}
+                  value={[
+                    `name: ${app.name}`,
+                    `slug: ${app.slug}`,
+                    'runtime: python',
+                    'entrypoint: app.py',
+                    'handler: run',
+                    `public: ${app.public ? 'true' : 'false'}`,
+                    'input_schema: input.schema.json',
+                    'output_schema: output.schema.json',
+                  ].join('\n')}
                 />
                 <a
                   href={`${typeof window !== 'undefined' ? window.location.origin : ''}/api/apps/${app.slug}`}
@@ -1543,17 +1548,32 @@ export default function AppPermalinkPage() { // exported as default so the serve
                   rel="noreferrer"
                   style={{ marginTop: 10, display: 'inline-block', fontSize: 12.5, color: 'var(--accent)', fontWeight: 600, textDecoration: 'none' }}
                 >
-                  View manifest &rarr;
+                  View app metadata &rarr;
                 </a>
               </div>
             </div>
 
-            {/* Self-host card removed — there is no published
-                ghcr.io/floomhq/<slug>:latest image yet, and the v0 runtime
-                does not ship a per-app Docker artifact. Showing a fake
-                docker-run command is the same trust-killer pattern as the
-                stale 'Get 3 critiques + 3 rewrites' description was. Add
-                this card back when the BYOK self-host runtime ships. */}
+            {/* API automation card (full width) */}
+            <div
+              data-testid="source-api-card"
+              style={{
+                background: 'var(--card)',
+                border: '1px solid var(--line)',
+                borderRadius: 12,
+                padding: '18px 20px',
+              }}
+            >
+              <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10.5, color: 'var(--muted)', letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 600, marginBottom: 8 }}>
+                API
+              </div>
+              <h3 style={{ fontSize: 14, fontWeight: 600, margin: '0 0 8px' }}>Run this app from HTTP clients.</h3>
+              <p style={{ fontSize: 13, color: 'var(--muted)', margin: '0 0 12px', lineHeight: 1.55 }}>
+                Public apps can be called anonymously. Private apps need an owner agent token.
+              </p>
+              <SourceSnippet
+                value={`curl -X POST ${typeof window !== 'undefined' ? window.location.origin : ''}/api/apps/${app.slug}/run \\\n  -H "Authorization: Bearer YOUR_FLOOM_AGENT_TOKEN" \\\n  -H "Content-Type: application/json" \\\n  -d '{"inputs":{}}'`}
+              />
+            </div>
           </section>
         )}
 
