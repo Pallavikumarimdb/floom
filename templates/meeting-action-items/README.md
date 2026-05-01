@@ -2,7 +2,7 @@
 
 Paste raw meeting notes, transcript, or chat log. Get a structured list of action items: who owns each task, when it's due, and a one-line summary of the meeting.
 
-> **Status: experimental.** Local-runnable today; deploys to canonical Floom once the v0.1 runtime ships per-app `requirements.txt` resolution and bundles `google-genai` in the sandbox image.
+> **Status: ready to deploy.** v0.1 ships per-app `requirements.txt` resolution + encrypted secrets at rest, so this template — which depends on `google-genai` and a Gemini API key — can be published as the canonical demo. See "Deploy" below.
 
 ## Why this exists
 
@@ -53,7 +53,7 @@ Three smoke tests: short-input rejected, real meeting extracts ≥3 owned action
 
 ## Deploy (planned)
 
-When the v0.1 runtime supports per-app `requirements.txt`:
+v0.1 supports per-app `requirements.txt` and runtime-injected secrets — this template is publish-ready:
 
 ```bash
 cd templates/meeting-action-items

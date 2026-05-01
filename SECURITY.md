@@ -30,6 +30,7 @@ Out of scope: third-party services Floom depends on (Supabase, E2B, Vercel) — 
 - **Public-run rate limiting** by IP (currently 20 requests / 30s rolling window)
 - **Agent tokens** are stored only as **bcrypt hashes**; the raw token is shown once at creation and never persisted
 - Output fields marked `secret` in the app's output schema are **redacted** in API and MCP responses (`[REDACTED]`)
-- Single-file Python apps with **stdlib only** in v0 — no arbitrary package install yet (closes a class of supply-chain risks; encrypted-at-rest secrets land in v0.1)
+- Single-file Python apps with **hash-locked dependencies** declared in `requirements.txt` (v0.1) — the install layer pins exact versions + hashes
+- **Encrypted-at-rest secrets** (v0.1): secret names declared in `floom.yaml`, raw values encrypted in Supabase, runtime-decrypted and injected into the E2B sandbox at execution time. Never written to source, manifest, logs, MCP output, API responses, app versions, or bundle storage
 
 See `/docs#what-secure-means-in-v0` for the public-facing version of this list.

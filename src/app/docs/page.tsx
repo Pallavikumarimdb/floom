@@ -292,20 +292,21 @@ export default function DocsPage() {
           </p>
         </Section>
 
-        <Section title="v0.1 scope">
+        <Section title="v0.1: dependencies + secrets (shipped)">
           <p>
-            v0.1 adds dependencies and secrets without changing Floom into broad
-            app hosting.
+            v0.1 adds two things without expanding Floom into broad app
+            hosting:
           </p>
           <ul className="list-disc space-y-3 pl-5">
             <li>
               Constrained Python dependency installation from{" "}
-              <code>requirements.txt</code>.
+              <code>requirements.txt</code>. Hash-locked exact pins.
             </li>
             <li>
-              Secret names in <code>floom.yaml</code>, never raw secret values.
+              Secret names declared in <code>floom.yaml</code>, raw values
+              encrypted at rest, runtime-injected into the E2B sandbox at
+              execution time.
             </li>
-            <li>Secure secret storage and E2B runtime injection.</li>
           </ul>
           <p className="text-sm text-[var(--muted)] opacity-80">
             FastAPI/OpenAPI, arbitrary HTTP servers, TypeScript apps,
@@ -323,19 +324,16 @@ export default function DocsPage() {
           </ul>
         </Section>
 
-        <Section title="What &ldquo;secure&rdquo; means in v0">
+        <Section title="What &ldquo;secure&rdquo; means">
           <p>
             Each run executes in an isolated E2B sandbox. The site serves over
             HTTPS with CSP, HSTS, X-Frame-Options, and Permissions-Policy
             headers. Public app runs are rate-limited per IP. Agent tokens are
             stored only as hashes; the raw token is shown once at creation.
             Outputs marked secret in the schema are redacted in API and MCP
-            responses.
-          </p>
-          <p className="text-sm text-[var(--muted)] opacity-80">
-            v0.1 adds encrypted-at-rest secrets that the runtime injects into
-            the sandbox at execution time. Apps that need a secret today should
-            wait for v0.1 or use BYOK in inputs.
+            responses. Secrets declared in <code>floom.yaml</code> are
+            encrypted at rest and runtime-injected into the sandbox at
+            execution time (v0.1).
           </p>
         </Section>
 
@@ -442,11 +440,13 @@ export default function DocsPage() {
             Can I use packages from PyPI?
           </h3>
           <p>
-            Not in v0 — Python standard library only. v0.1 lands{" "}
-            <code>requirements.txt</code> with hash-locked dependencies.
-            Apps that need <code>google-genai</code>, <code>openai</code>,
-            or other libraries should wait for v0.1 or use Floom for the
-            stdlib parts and call out to another runtime for the LLM call.
+            Yes — v0.1 supports per-app <code>requirements.txt</code> with
+            hash-locked exact pins. Drop a <code>requirements.txt</code>{" "}
+            next to your <code>app.py</code> and{" "}
+            <code>floom publish</code> handles the install in the sandbox.
+            Common libraries like <code>google-genai</code>,{" "}
+            <code>openai</code>, <code>requests</code>, <code>httpx</code>{" "}
+            all work.
           </p>
 
           <h3 className="text-lg font-bold text-[var(--ink)]">
