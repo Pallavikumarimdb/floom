@@ -150,7 +150,7 @@ function MvpHeroInstall({ appsCount, runs7dSum }: MvpHeroInstallProps) {
         }}
       >
         <Link
-          href="/p/demo-app"
+          href="/p/pitch-coach"
           data-testid="hero-try-live-app"
           style={{
             display: 'inline-flex',

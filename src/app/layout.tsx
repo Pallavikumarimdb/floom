@@ -4,7 +4,7 @@ import "./globals.css";
 const SITE_NAME = "Floom";
 const SITE_TAGLINE = "Ship AI apps fast";
 const SITE_DESCRIPTION =
-  "Localhost to live in 60 seconds. Publish a Python function and get a hosted UI, REST endpoint, and MCP tool.";
+  "Localhost to live in 60 seconds. Python functions become shareable browser apps backed by Supabase and E2B.";
 const SITE_URL = "https://floom-60sec.vercel.app";
 
 export const metadata: Metadata = {

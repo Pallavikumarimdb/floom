@@ -502,7 +502,7 @@ function MobileStackedDemo({ reducedMotion: _reducedMotion }: { reducedMotion: b
               <span style={MOBILE_LIVE_DOT_CORE} />
             </span>
             <div style={MOBILE_DEPLOY_URL_TEXT}>
-              <div style={MOBILE_DEPLOY_URL_MAIN}>/p/demo-app</div>
+              <div style={MOBILE_DEPLOY_URL_MAIN}>/p/pitch-coach</div>
               <div style={MOBILE_DEPLOY_URL_META}>Deployed in 1.2s · HTTPS · edge</div>
             </div>
           </div>
@@ -660,7 +660,7 @@ function EditorSurface({ active, cycle, reducedMotion }: EditorProps) {
           <div style={TERMINAL_PANE}>
             <div style={TERMINAL_LINE}>
               <span style={PROMPT_SIGN}>&gt;</span>
-              <span style={{ color: '#8b8680' }}>claude code &middot; demo-app</span>
+              <span style={{ color: '#8b8680' }}>claude code &middot; pitch-coach</span>
             </div>
             {active && !reducedMotion && codeCap >= HANDLER_CODE.length && (
               <div style={{ ...TERMINAL_LINE, color: '#8b8680' }}>
@@ -853,7 +853,7 @@ function DeploySurface({
               <span style={LIVE_DOT_CORE} />
             </span>
             <div style={DEPLOY_URL_TEXT_WRAP}>
-              <div style={DEPLOY_URL_MAIN}>/p/demo-app</div>
+              <div style={DEPLOY_URL_MAIN}>/p/pitch-coach</div>
               <div style={DEPLOY_URL_META_CARD}>Live preview &middot; HTTPS &middot; edge</div>
             </div>
           </div>
@@ -973,10 +973,10 @@ function RunSurfaceDemo({
         <div style={RUN_CONTEXT}>
           <span style={RUN_CONTEXT_DOT} aria-hidden="true" />
           <span>
-            Live preview · <code style={RUN_CONTEXT_CODE}>demo-app</code>
+            Live preview · <code style={RUN_CONTEXT_CODE}>pitch-coach</code>
           </span>
           <span style={RUN_CONTEXT_SEP} aria-hidden="true">·</span>
-          <span style={RUN_CONTEXT_URL}>/p/demo-app</span>
+          <span style={RUN_CONTEXT_URL}>/p/pitch-coach</span>
         </div>
 
         {/* 2026-04-28: Federico feedback "the use page looks empty and

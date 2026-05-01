@@ -208,7 +208,7 @@ function LoginContent() {
         <p style={{ marginTop: 24, fontSize: 13, color: 'var(--muted)', textAlign: 'center' }}>
           Already have a token?{" "}
           <Link
-            href="/p/demo-app"
+            href="/p/pitch-coach"
             style={{ fontWeight: 600, color: 'var(--accent)', textDecoration: 'none' }}
           >
             Try the live app
