@@ -6,6 +6,10 @@ Scope: production Floom v0.1 at `https://floom.dev`, single-file Python function
 
 Do not run this protocol against production until the coordinator explicitly assigns a run.
 
+Browser/session handoff is defined in `docs/agent-browser-qa-runbook.md`.
+
+Environment/auth ownership is defined in `docs/launch-env-auth-map.md`.
+
 ## No-Secret Rules
 
 - Never print, paste, screenshot, commit, or log raw tokens, JWTs, Supabase service-role keys, E2B keys, Vercel tokens, cookies, or `.env` contents.

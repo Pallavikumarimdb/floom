@@ -37,6 +37,7 @@ For launch readiness, v0.1 must support:
 
 - Branch: `launch/v0.1-deps-secrets`
 - Source: current `main` plus PR #3 `v0.1-hardening-main`
+- Latest audited branch commit: `f614a33`
 - PR #3 conflict status: conflicts resolved locally in:
   - `scripts/test-fake-run.mjs`
   - `src/lib/floom/manifest.ts`
@@ -50,12 +51,12 @@ For launch readiness, v0.1 must support:
 
 ## Open Launch Blockers
 
-1. Google signup/signin and token creation still need one fresh browser QA pass after the v0.1 deploy.
-2. Token revoke and revoked-token rejection still need one fresh browser QA pass after the v0.1 deploy.
-3. Virgin-agent QA for full signup/token/publish/run is in progress.
-4. Independent code-cleanliness/security audit is in progress.
-5. PR #11 UI polish must be updated after v0.1 lands on `main`; it currently conflicts with the v0.1 branch.
-6. Supabase SMTP remains open for public self-serve signup volume beyond the default provider limits.
+1. Merge `launch/v0.1-deps-secrets` to `main` by itself after final canonical URL verification.
+2. Close superseded PR #3 after `main` contains v0.1.
+3. Update PR #11 after v0.1 lands on `main`; it currently conflicts with the v0.1 branch and must not be batched.
+4. Supabase SMTP remains open for public self-serve signup volume beyond the default provider limits.
+5. Sentry / Vercel Analytics remains open.
+6. Fresh Google OAuth callback still needs a post-merge smoke because provider/OAuth/proxy settings can drift outside the repo.
 
 ## Verified On Production
 
@@ -76,6 +77,17 @@ For launch readiness, v0.1 must support:
   - Supabase evidence check proving secrets are not persisted in execution output.
 - Published `@floomhq/cli@latest` is `0.2.16`.
 - Published npm CLI passed isolated `auth login`, `deploy --dry-run`, `deploy`, `run --json`, and REST run against `https://floom.dev`.
+- Virgin QA run A verified browser login/token creation, token revoke, CLI publish/run, public browser/API/MCP run, and 390px overflow.
+- Virgin QA run B verified MCP/CLI publish and run from scratch, including MCP app-contract tools.
+- Independent security audit verified the dependency install sandbox no longer receives secrets and the secret runtime sandbox has no internet.
+- `f614a33` fixes publish response URLs so API/MCP publish responses use the configured canonical origin instead of the Vercel alias.
+- Post-`f614a33` production MCP publish verified returned app URL `https://floom.dev/p/url-canon-20260501074153-30a48c`, run execution `79b9d828-0a94-4074-bc0c-547412c71c0c`, and coordinator cleanup succeeded.
+
+## Subagent Browser QA
+
+Independent agents can use AX41 browser sessions. The required handoff is now documented in `docs/agent-browser-qa-runbook.md`.
+
+Auth/env ownership is documented in `docs/launch-env-auth-map.md`.
 
 Use `node scripts/run-live-v01-gate.mjs` from the repo root to rerun the live gate with redacted output. It expects `/tmp/floom-v01-prod-refresh.env` and `/tmp/floom-v01-agent-token` unless overridden by `FLOOM_VERCEL_ENV_FILE` and `FLOOM_TOKEN_FILE`.
 
