@@ -136,15 +136,11 @@ Running `handler.run({"pdf": <sample.pdf as data-url>, "extract": "invoice line 
 This template is intentionally stored under `docs/post-v0-templates`, not
 `templates`, because it is not deployable in v0.1.
 
-When the runtime work lands, deploy will be:
+When the post-v0 runtime work lands, this reference will need a new manifest,
+external schema files, pinned hashed requirements, and a private secret setup
+before it can move into `templates/`.
 
-```bash
-cd docs/post-v0-templates/pdf-to-json
-floom publish .
-```
-
-The CLI packages `handler.py`, `floom.yaml`, and `requirements.txt` into a
-bundle, uploads it, and returns the public run endpoint.
+Do not use this directory as a launch template.
 
 ---
 
