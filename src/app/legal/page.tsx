@@ -41,7 +41,7 @@ function Section({
 
 export default function LegalPage() {
   return (
-    <main className="min-h-screen overflow-x-hidden bg-[var(--bg)] text-[var(--ink)]">
+    <main id="main" className="min-h-screen overflow-x-hidden bg-[var(--bg)] text-[var(--ink)]">
       <SiteHeader />
 
       <article className="mx-auto max-w-3xl px-5 py-14">

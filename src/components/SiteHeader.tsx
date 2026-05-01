@@ -229,7 +229,8 @@ export function SiteHeader({ compact = false, onStudioMenuOpen }: Props = {}) {
               floom.dev's Apps/Docs/Pricing/Changelog routes don't exist here. */}
 
           {/* Right side */}
-          <div
+          <nav
+            aria-label="Site navigation"
             className="topbar-links topbar-links-desktop"
             style={{
               gap: 8,
@@ -370,7 +371,7 @@ export function SiteHeader({ compact = false, onStudioMenuOpen }: Props = {}) {
                 )}
               </div>
             )}
-          </div>
+          </nav>
 
           {/* Mobile hamburger */}
           {!onStudioMenuOpen && (

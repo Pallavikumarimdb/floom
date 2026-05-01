@@ -115,7 +115,7 @@ function CodeBlock({ children }: { children: string }) {
 
 export default function DocsPage() {
   return (
-    <main className="min-h-screen overflow-x-hidden bg-[var(--bg)] text-[var(--ink)]">
+    <main id="main" className="min-h-screen overflow-x-hidden bg-[var(--bg)] text-[var(--ink)]">
       <SiteHeader />
 
       <article className="mx-auto max-w-4xl px-5 py-14">
@@ -348,6 +348,154 @@ export default function DocsPage() {
             If an email sends you to localhost, update the Supabase Auth Site URL
             to `https://floom-60sec.vercel.app` and add
             `https://floom-60sec.vercel.app/auth/callback` to redirect URLs.
+          </p>
+        </Section>
+
+        <Section title="Why Floom?">
+          <p>
+            Floom occupies a specific seam: agent-written Python becoming a
+            multi-surface artifact in one command. Adjacent products solve
+            related but different problems.
+          </p>
+          <ul className="list-disc space-y-3 pl-5">
+            <li>
+              <strong>vs Modal.</strong> Modal turns a Python decorator into
+              an HTTP endpoint. You still write your own UI and your own MCP
+              server. Floom auto-generates both from the JSON Schema, so a
+              single function ships as a browser page, a REST endpoint, and
+              an MCP tool.
+            </li>
+            <li>
+              <strong>vs Replicate.</strong> Replicate hosts ML models behind
+              an API. Floom hosts arbitrary Python functions and exposes
+              them to agents as tools. Different audience, different shape.
+            </li>
+            <li>
+              <strong>vs Hugging Face Spaces.</strong> Spaces wraps your code
+              in Gradio or Streamlit, which means you write the UI. Floom
+              renders a form from your input schema; no UI code.
+            </li>
+            <li>
+              <strong>vs Val.town.</strong> Val.town does scripts-as-URLs
+              for JavaScript. Floom is Python-first today, JS later, and
+              ships an MCP tool from the same source.
+            </li>
+            <li>
+              <strong>vs Composio.</strong> Composio wraps existing SaaS
+              APIs as agent tools. Floom is the inverse — write a Python
+              function, get an agent tool. Use both: Composio for the
+              SaaS, Floom for your custom logic.
+            </li>
+          </ul>
+        </Section>
+
+        <Section title="FAQ">
+          <h3 className="text-lg font-bold text-[var(--ink)]">
+            Is Floom open source?
+          </h3>
+          <p>
+            The launch site is at{" "}
+            <a
+              href="https://github.com/floomhq/floom-minimal"
+              className="font-semibold text-[var(--accent)] underline underline-offset-2"
+            >
+              floomhq/floom-minimal
+            </a>
+            . The runtime sandbox uses{" "}
+            <a
+              href="https://e2b.dev"
+              className="font-semibold text-[var(--accent)] underline underline-offset-2"
+            >
+              E2B
+            </a>{" "}
+            (open) and Supabase (open core).
+          </p>
+
+          <h3 className="text-lg font-bold text-[var(--ink)]">
+            What does it cost?
+          </h3>
+          <p>
+            Public apps and public runs are free during alpha. No card on
+            file, no automatic charge. See <a
+              href="/legal#pricing"
+              className="font-semibold text-[var(--accent)] underline underline-offset-2"
+            >/legal#pricing</a>.
+          </p>
+
+          <h3 className="text-lg font-bold text-[var(--ink)]">
+            Can I run private apps?
+          </h3>
+          <p>
+            Yes. Set <code>public: false</code> in <code>floom.yaml</code>{" "}
+            (or omit the field). Private apps require an agent token with{" "}
+            <code>run</code> scope. Mint tokens at{" "}
+            <a
+              href="/tokens"
+              className="font-semibold text-[var(--accent)] underline underline-offset-2"
+            >
+              /tokens
+            </a>
+            .
+          </p>
+
+          <h3 className="text-lg font-bold text-[var(--ink)]">
+            Can I use packages from PyPI?
+          </h3>
+          <p>
+            Not in v0 — Python standard library only. v0.1 lands{" "}
+            <code>requirements.txt</code> with hash-locked dependencies.
+            Apps that need <code>google-genai</code>, <code>openai</code>,
+            or other libraries should wait for v0.1 or use Floom for the
+            stdlib parts and call out to another runtime for the LLM call.
+          </p>
+
+          <h3 className="text-lg font-bold text-[var(--ink)]">
+            Does it support TypeScript?
+          </h3>
+          <p>
+            Not yet. Python-only in v0. JavaScript / TypeScript runtime is
+            on the v0.x roadmap.
+          </p>
+
+          <h3 className="text-lg font-bold text-[var(--ink)]">
+            How does my agent call a Floom app?
+          </h3>
+          <p>
+            Floom serves a single MCP endpoint at{" "}
+            <code>/mcp</code>. Add it to your MCP client (Claude Code,
+            Cursor, Codex CLI, etc.) and the <code>run_app</code> tool can
+            execute any public app. See the install section above.
+          </p>
+
+          <h3 className="text-lg font-bold text-[var(--ink)]">
+            What if my run fails?
+          </h3>
+          <p>
+            The browser shows the error message + a retry button. The most
+            common cause is a cold sandbox — give it 5–10 seconds and try
+            again. If a run keeps failing, the app handler likely threw;
+            check the source (Source tab) and your inputs.
+          </p>
+
+          <h3 className="text-lg font-bold text-[var(--ink)]">
+            How do I report a bug or security issue?
+          </h3>
+          <p>
+            Bugs:{" "}
+            <a
+              href="https://github.com/floomhq/floom-minimal/issues"
+              className="font-semibold text-[var(--accent)] underline underline-offset-2"
+            >
+              GitHub issues
+            </a>
+            . Security: <code>security@floom.dev</code> (see{" "}
+            <a
+              href="https://github.com/floomhq/floom-minimal/blob/main/SECURITY.md"
+              className="font-semibold text-[var(--accent)] underline underline-offset-2"
+            >
+              SECURITY.md
+            </a>
+            ).
           </p>
         </Section>
       </article>

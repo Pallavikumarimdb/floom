@@ -341,8 +341,8 @@ export function RunSurface({ app, initialRun, initialInputs, examplePrefillInput
           </div>
         </div>
 
-        {/* Output */}
-        <div className="run-surface-output" style={{ padding: 24, background: 'var(--bg)' }}>
+        {/* Output — aria-live so screen readers announce when results arrive */}
+        <div className="run-surface-output" aria-live="polite" aria-atomic="false" style={{ padding: 24, background: 'var(--bg)' }}>
           <div
             style={{
               display: 'flex',

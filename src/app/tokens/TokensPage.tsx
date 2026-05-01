@@ -158,12 +158,12 @@ export default function TokensPage() {
     return (
       <div style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--ink)' }}>
         <SiteHeader />
-        <section style={{ maxWidth: 900, margin: '0 auto', padding: '56px 24px' }}>
+        <main id="main" style={{ maxWidth: 900, margin: '0 auto', padding: '56px 24px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: 'var(--muted)', fontSize: 14 }}>
             <span style={{ display: 'inline-block', width: 16, height: 16, borderRadius: '50%', border: '2px solid var(--line)', borderTopColor: 'var(--accent)', animation: 'spin 0.7s linear infinite' }} />
             Loading tokens…
           </div>
-        </section>
+        </main>
         <FloomFooter />
       </div>
     );
@@ -180,7 +180,7 @@ export default function TokensPage() {
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--ink)' }}>
       <SiteHeader />
-      <section style={{ maxWidth: 960, margin: '0 auto', padding: '40px 24px 80px' }}>
+      <main id="main" style={{ maxWidth: 960, margin: '0 auto', padding: '40px 24px 80px' }}>
         {/* Header row */}
         <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, marginBottom: 8 }}>
           <div>
@@ -553,7 +553,7 @@ export default function TokensPage() {
         {/* "Production URL: floom-60sec.vercel.app" line removed — the user
             is already on that URL; showing it as a link opens-in-new-tab to
             the same page is noise, not signal. */}
-      </section>
+      </main>
       <FloomFooter />
     </div>
   );
