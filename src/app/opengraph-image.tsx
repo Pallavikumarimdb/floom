@@ -39,8 +39,9 @@ export default function OpengraphImage() {
           >
             f
           </div>
-          <div style={{ fontSize: 28, fontWeight: 800, letterSpacing: "-0.02em" }}>
-            floom<span style={{ color: "#047857" }}>.</span>
+          <div style={{ display: "flex", fontSize: 28, fontWeight: 800, letterSpacing: "-0.02em" }}>
+            <span>floom</span>
+            <span style={{ color: "#047857" }}>.</span>
           </div>
         </div>
 
@@ -79,8 +80,8 @@ export default function OpengraphImage() {
         >
           <div>floom-60sec.vercel.app</div>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <span style={{ width: 8, height: 8, borderRadius: 4, background: "#047857" }} />
-            Open source · MCP · REST · UI
+            <span style={{ display: "flex", width: 8, height: 8, borderRadius: 4, background: "#047857" }} />
+            <span>Open source · MCP · REST · UI</span>
           </div>
         </div>
       </div>

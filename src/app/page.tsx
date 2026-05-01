@@ -14,7 +14,7 @@
  *   7. publicHubApps → inline no-op (all apps treated as public)
  * See docs/v5-port-stubs.md for full stub list.
  */
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { Code2, Rocket, Share2 } from 'lucide-react';
 
@@ -81,26 +81,70 @@ function MvpHeroInstall({ appsCount, runs7dSum }: MvpHeroInstallProps) {
 
   return (
     <div style={{ maxWidth: 560, margin: '28px auto 0', textAlign: 'left' }}>
-      {/* v11: Elevated install card with better hierarchy and Copy CTA */}
+      {/* v12: demo-first hero. Auditor flagged auth-first as activation
+          friction (the only primary CTA was "Create token"). New order:
+          1) "Try the live demo" — solid primary, one click, no signup
+          2) install command card — secondary, for builders who want to
+             publish their own function
+      */}
+      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 22 }}>
+        <Link
+          href="/p/pitch-coach"
+          data-testid="hero-try-live-app"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 10,
+            padding: '13px 28px',
+            border: '1.5px solid var(--accent)',
+            borderRadius: 10,
+            fontSize: 15,
+            fontWeight: 600,
+            color: '#fff',
+            background: 'var(--accent)',
+            textDecoration: 'none',
+            boxShadow: '0 2px 4px rgba(4,120,87,.18), 0 8px 22px rgba(4,120,87,.14)',
+            letterSpacing: '-0.005em',
+          }}
+        >
+          Try the live demo
+          <span aria-hidden="true" style={{ opacity: 0.9 }}>→</span>
+        </Link>
+      </div>
+      <div
+        style={{
+          fontSize: 11.5,
+          fontWeight: 600,
+          letterSpacing: '0.08em',
+          textTransform: 'uppercase',
+          color: 'var(--muted)',
+          fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+          textAlign: 'center',
+          marginBottom: 10,
+        }}
+      >
+        or publish your own
+      </div>
+      {/* Install card: secondary — for builders who want to ship */}
       <div
         className="hero-install-card"
         style={{
           background: 'var(--card)',
-          border: '1.5px solid var(--line)',
-          borderRadius: 12,
-          padding: '10px 10px 10px 20px',
+          border: '1px solid var(--line)',
+          borderRadius: 10,
+          padding: '8px 8px 8px 18px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          gap: 12,
-          boxShadow: '0 1px 3px rgba(22,21,18,.04), 0 4px 20px rgba(22,21,18,.06)',
+          gap: 10,
+          boxShadow: '0 1px 2px rgba(22,21,18,.03)',
         }}
       >
         <pre
           data-testid="hero-npx-command"
           style={{
             fontFamily: "'JetBrains Mono', ui-monospace, monospace",
-            fontSize: 13.5,
+            fontSize: 12.5,
             color: 'var(--ink)',
             overflowX: 'auto',
             whiteSpace: 'pre',
@@ -122,55 +166,21 @@ function MvpHeroInstall({ appsCount, runs7dSum }: MvpHeroInstallProps) {
           onClick={() => void handleCopy()}
           style={{
             flexShrink: 0,
-            fontSize: 13,
+            fontSize: 12.5,
             fontWeight: 600,
-            color: copied ? '#fff' : 'var(--accent)',
-            background: copied ? 'var(--accent)' : 'transparent',
-            border: `1.5px solid ${copied ? 'var(--accent)' : 'var(--accent)'}`,
-            borderRadius: 8,
-            padding: '8px 18px',
+            color: copied ? '#fff' : 'var(--ink)',
+            background: copied ? 'var(--accent)' : 'var(--bg)',
+            border: `1px solid ${copied ? 'var(--accent)' : 'var(--line)'}`,
+            borderRadius: 7,
+            padding: '7px 14px',
             cursor: 'pointer',
             fontFamily: 'inherit',
-            letterSpacing: '0.01em',
             transition: 'background 0.15s, color 0.15s',
           }}
           aria-label={copied ? 'Copied' : 'Copy command'}
         >
           {copied ? '✓ Copied' : 'Copy'}
         </button>
-      </div>
-      {/* v11: "Try a live app" promoted to secondary button beside install */}
-      <div
-        style={{
-          marginTop: 14,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: 10,
-        }}
-      >
-        <Link
-          href="/p/pitch-coach"
-          data-testid="hero-try-live-app"
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 6,
-            padding: '9px 20px',
-            border: '1px solid var(--line)',
-            borderRadius: 8,
-            fontSize: 13.5,
-            fontWeight: 600,
-            color: 'var(--ink)',
-            background: 'var(--card)',
-            textDecoration: 'none',
-            boxShadow: '0 1px 2px rgba(22,21,18,.03)',
-            transition: 'border-color 0.15s, box-shadow 0.15s',
-          }}
-        >
-          Try a live app
-          <span aria-hidden="true" style={{ opacity: 0.6 }}>→</span>
-        </Link>
       </div>
       {/* R15 UI-6 (2026-04-28): hero trust-signals strip. */}
       <HeroTrustSignals appsCount={appsCount} runs7dSum={runs7dSum} />
@@ -179,12 +189,11 @@ function MvpHeroInstall({ appsCount, runs7dSum }: MvpHeroInstallProps) {
 }
 
 /**
- * R15 UI-6 (2026-04-28): trust-signal strip for the MVP hero. Reads the
- * apps + runs_7d totals as props (LandingV17Page already fetches /api/hub
- * for the showcase, so we pass the data down rather than re-fetching).
- * GitHub stars come from `/api/gh-stars` via the same cache key the
- * GitHubStarsBadge uses — we read the cache synchronously and refresh
- * it in the background.
+ * Hero trust-signal strip. Reads apps + runs_7d totals from props.
+ * GitHub-star count is intentionally NOT fetched: floom-minimal v0 has no
+ * /api/gh-stars endpoint, and the hydration-safe alternative (useEffect
+ * read of localStorage that some other unrelated page wrote) creates more
+ * confusion than value.
  */
 function HeroTrustSignals({
   appsCount,
@@ -193,38 +202,6 @@ function HeroTrustSignals({
   appsCount: number;
   runs7dSum: number;
 }) {
-  const [stars, setStars] = useState<number | null>(() => {
-    // Cheap synchronous read of the GitHubStarsBadge cache. Same key.
-    try {
-      const raw = window.localStorage?.getItem('floom:gh-stars');
-      if (!raw) return null;
-      const parsed = JSON.parse(raw) as { count?: number; ts?: number };
-      if (typeof parsed.count === 'number') return parsed.count;
-    } catch {
-      /* ignore */
-    }
-    return null;
-  });
-
-  useEffect(() => {
-    let cancelled = false;
-    fetch('/api/gh-stars', { headers: { Accept: 'application/json' } })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d: { count?: number } | null) => {
-        if (cancelled || !d || typeof d.count !== 'number') return;
-        setStars(d.count);
-      })
-      .catch(() => {
-        /* keep cached/null fallback */
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  // Build the visible parts. Each stat hides when its value isn't
-  // meaningful so a cold launch reads as "10 apps live · ★ 6 stars"
-  // rather than "10 apps live · 0 runs this week · ★ 6 stars".
   const parts: string[] = [];
   if (appsCount > 0) {
     parts.push(`${appsCount} app${appsCount === 1 ? '' : 's'} live`);
@@ -232,12 +209,7 @@ function HeroTrustSignals({
   if (runs7dSum > 0) {
     parts.push(`${runs7dSum} run${runs7dSum === 1 ? '' : 's'} this week`);
   }
-  if (stars && stars > 0) {
-    parts.push(`★ ${stars} star${stars === 1 ? '' : 's'}`);
-  }
 
-  // Hide entirely when nothing meaningful to show (would render as
-  // empty whitespace otherwise).
   if (parts.length === 0) return null;
 
   return (
@@ -262,10 +234,6 @@ export default function LandingV17PageMvp() {
   // fetched from a hub endpoint that doesn't exist on this codebase.
   const totalAppsCount = 1;
   const runs7dSum = 0;
-
-  useEffect(() => {
-    document.title = 'Ship AI apps fast · Floom';
-  }, []);
 
   return (
     <div

@@ -59,11 +59,12 @@ export default async function AppOpengraphImage({ params }: Props) {
           >
             f
           </div>
-          <div style={{ fontSize: 24, fontWeight: 800, letterSpacing: "-0.02em" }}>
-            floom<span style={{ color: "#047857" }}>.</span>
+          <div style={{ display: "flex", fontSize: 24, fontWeight: 800, letterSpacing: "-0.02em" }}>
+            <span>floom</span>
+            <span style={{ color: "#047857" }}>.</span>
           </div>
-          <div style={{ marginLeft: 16, fontSize: 18, color: "#8b8680", fontFamily: "ui-monospace, monospace" }}>
-            /p/{slug}
+          <div style={{ display: "flex", marginLeft: 16, fontSize: 18, color: "#8b8680", fontFamily: "ui-monospace, monospace" }}>
+            <span>{`/p/${slug}`}</span>
           </div>
         </div>
 
@@ -98,8 +99,8 @@ export default async function AppOpengraphImage({ params }: Props) {
             fontFamily: "ui-monospace, monospace",
           }}
         >
-          <span style={{ width: 8, height: 8, borderRadius: 4, background: "#047857" }} />
-          Run live · REST · MCP
+          <span style={{ display: "flex", width: 8, height: 8, borderRadius: 4, background: "#047857" }} />
+          <span>Run live · REST · MCP</span>
         </div>
       </div>
     ),

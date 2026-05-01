@@ -77,6 +77,7 @@ import React, {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
   type CSSProperties,
 } from 'react';
 
@@ -195,19 +196,32 @@ function countLines(source: string, cap: number): number {
 // -----------------------------------------------------------------------------
 // Hooks
 // -----------------------------------------------------------------------------
+// useSyncExternalStore: hydration-safe subscription to a media query.
+// Server snapshot is always false (no window), so SSR HTML matches the
+// hydration client snapshot. After hydrate, the real value flows in via
+// the subscribe callback. No setState-in-effect.
+function subscribeMatchMedia(query: string) {
+  return (onStoreChange: () => void): (() => void) => {
+    if (typeof window === 'undefined' || !window.matchMedia) return () => {};
+    const mq = window.matchMedia(query);
+    mq.addEventListener('change', onStoreChange);
+    return () => mq.removeEventListener('change', onStoreChange);
+  };
+}
+function getMatchMediaSnapshot(query: string): boolean {
+  if (typeof window === 'undefined' || !window.matchMedia) return false;
+  return window.matchMedia(query).matches;
+}
+function getServerMatchMediaSnapshot(): boolean {
+  return false;
+}
 function usePrefersReducedMotion(): boolean {
-  const [reduced, setReduced] = useState<boolean>(() => {
-    if (typeof window === 'undefined' || !window.matchMedia) return false;
-    return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  });
-  useEffect(() => {
-    if (typeof window === 'undefined' || !window.matchMedia) return;
-    const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
-    const onChange = (e: MediaQueryListEvent) => setReduced(e.matches);
-    mq.addEventListener('change', onChange);
-    return () => mq.removeEventListener('change', onChange);
-  }, []);
-  return reduced;
+  const query = '(prefers-reduced-motion: reduce)';
+  return useSyncExternalStore(
+    subscribeMatchMedia(query),
+    () => getMatchMediaSnapshot(query),
+    getServerMatchMediaSnapshot,
+  );
 }
 
 /**
@@ -224,22 +238,12 @@ function usePrefersReducedMotion(): boolean {
  * client effect flips to mobile after hydration.
  */
 function useIsMobile(breakpoint = 768): boolean {
-  // SSR-safe: defaults to false so desktop layout renders on the server and
-  // matches the initial client render. The lazy initializer runs only in the
-  // browser, so it avoids a hydration mismatch while still reading the real
-  // value before the first paint.
-  const [isMobile, setIsMobile] = useState<boolean>(() => {
-    if (typeof window === 'undefined' || !window.matchMedia) return false;
-    return window.matchMedia(`(max-width: ${breakpoint - 1}px)`).matches;
-  });
-  useEffect(() => {
-    if (typeof window === 'undefined' || !window.matchMedia) return;
-    const mq = window.matchMedia(`(max-width: ${breakpoint - 1}px)`);
-    const onChange = (e: MediaQueryListEvent) => setIsMobile(e.matches);
-    mq.addEventListener('change', onChange);
-    return () => mq.removeEventListener('change', onChange);
-  }, [breakpoint]);
-  return isMobile;
+  const query = `(max-width: ${breakpoint - 1}px)`;
+  return useSyncExternalStore(
+    subscribeMatchMedia(query),
+    () => getMatchMediaSnapshot(query),
+    getServerMatchMediaSnapshot,
+  );
 }
 
 /**

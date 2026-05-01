@@ -710,7 +710,7 @@ export default function AppPermalinkPage() { // exported as default so the serve
                 textDecoration: 'none',
               }}
             >
-              Back to all apps
+              Back home
             </Link>
           </div>
         </main>

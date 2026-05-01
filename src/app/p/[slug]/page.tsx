@@ -28,7 +28,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     // Fall back to slug + generic description.
   }
 
-  const title = `${appName} · Floom`;
+  // Title is bare app name; layout.tsx metadata.title.template adds " · Floom".
+  const title = appName;
+  const fullTitle = `${appName} · Floom`;
   const url = `${SITE_URL}/p/${slug}`;
   const ogImage = `${SITE_URL}/p/${slug}/opengraph-image`;
 
@@ -38,15 +40,15 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     alternates: { canonical: url },
     openGraph: {
       type: "website",
-      title,
+      title: fullTitle,
       description: appDescription,
       url,
       siteName: "Floom",
-      images: [{ url: ogImage, width: 1200, height: 630, alt: title }],
+      images: [{ url: ogImage, width: 1200, height: 630, alt: fullTitle }],
     },
     twitter: {
       card: "summary_large_image",
-      title,
+      title: fullTitle,
       description: appDescription,
       images: [ogImage],
     },
