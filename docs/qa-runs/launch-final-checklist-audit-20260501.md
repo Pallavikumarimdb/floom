@@ -91,10 +91,12 @@ I performed the required self-audit for this documentation-only run: inspected t
 
 Fixed after this audit by replacing the public app page Source tab self-host Docker/BYOK card with v0.1-safe `floom.yaml` and HTTP API guidance.
 
-Resolution commit: pending at time of this log update.
+Resolution commit: `40971f5`.
 
-Required post-fix evidence:
+Post-fix evidence:
 
 - source grep has no `ghcr`, `GEMINI_BYOK`, `Self-host`, `One Docker command`, or `floom.json` in `src/app/p/[slug]/AppPermalinkPage.tsx`
-- typecheck, test, lint, build pass
-- production `/p/meeting-action-items` Source tab no longer renders Docker/BYOK copy
+- typecheck, test, lint, and build passed
+- production `/p/meeting-action-items` Source tab renders `Spec (floom.yaml)` and HTTP API guidance, not Docker/BYOK copy
+- screenshot: `/tmp/floom-source-tab-v01-safe.png`
+- screenshot sha256: `b45027f41dc36749d2c13b431e15e2c667373f6cabd80abc3e83106a71526102`
