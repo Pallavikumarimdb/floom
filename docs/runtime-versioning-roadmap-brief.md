@@ -60,19 +60,97 @@ Federico's call (2026-05-01): the current roadmap collapses too many capabilitie
 - **Effort**: medium-large (3-5 days). Audit said 0% done anywhere.
 - **Depends on**: nothing. Could be a v0.x flagship.
 
-## Suggested order (most → least bang per ship-week)
+### G. Async + poll runtime (long-running execution)
+- **Why**: v0.1 is sync-only at the API surface — `POST /api/apps/<slug>/run` blocks until done. This pins every app to <60s (Vercel Hobby cap). Anything real (web crawls, multi-step pipelines, video transcription, large LLM context) needs minutes-to-hours. The `executions` table is already async-shaped (`status`, `created_at`, `completed_at`) — only the API surface is sync.
+- **Scope**: `POST /api/apps/<slug>/run` returns `{execution_id, status: "queued"}` immediately, dispatches background work. New `GET /api/executions/<id>` returns `{status, output, error, started_at, completed_at, progress?}`. `/p/<slug>` polls. MCP `run_app` gains `async: true` mode. Optional `Accept: text/event-stream` for SSE.
+- **Branch**: `feat/v0.x-async-poll-runtime`
+- **Spec**: `docs/v0.x-async-spec.md`
+- **Done**: a long-running template (e.g. "summarize a 50-page PDF") deploys, runs for 5+ min without HTTP timeout, /p/<slug> shows live progress, MCP can either block-and-wait or fire-and-poll.
+- **Effort**: large (1-2 weeks). Touches API contract, run path, UI. Forces a job-queue choice (QStash chosen — see spec).
+- **Depends on**: nothing strictly, but force-multiplier for H, K, F-with-deps.
 
-1. **B. Multi-action** — fastest (port from legacy), unlocks most user requests
-2. **A+E. Node + JS runtime** — biggest TAM expansion (JS-native ICP)
-3. **C. Streaming** — best demo-ability for launches/posts
-4. **F. Multi-file Python** — long-tail of "real" apps
-5. **D. FastAPI / OpenAPI ingest** — power-user feature, bigger lift
+### H. Hosted Docker runtime
+- **Why**: A whole class of useful apps (Playwright/Chromium crawlers, PDF processing with poppler/tesseract, audio with ffmpeg, anything with native deps) doesn't fit "single-file Python with hash-pinned wheels". Existing Floom example `ig-nano-scout/cloud/` is a Docker app today (Playwright + stealth Chromium + residential proxy) and has nowhere to land in v0.1.
+- **Scope**: `floom.yaml: type: hosted, docker_image: ghcr.io/<repo>:<tag>` validates as a new manifest mode. Floom pulls the image into a Floom-managed runtime. Image entrypoint receives `{action, inputs}` JSON, returns `__FLOOM_RESULT__<json>` on stdout. Floom handles lifecycle.
+- **Branch**: `feat/v0.x-hosted-docker`
+- **Done**: ig-nano-scout's `cloud/apps.yaml` deploys via the Floom CLI without modification, runs via /p/<slug> + REST + MCP.
+- **Effort**: large (2-4 weeks). Pick a runtime substrate (E2B custom template is closest to v0.1; Fly.io machines is broader).
+- **Depends on**: G (async + poll) for any image that runs >1 min.
+
+### I. Chromium-baked E2B template (intermediate to H)
+- **Why**: Apps that need browser automation but don't want to build a Docker image. Stealth Playwright in plain Python, deployed as a `runtime: python` app, but the sandbox already has Chromium + Playwright installed.
+- **Scope**: A new E2B template (`floom-chromium`) with Chromium + Playwright + common scraping deps pre-installed. `floom.yaml: runtime: python, sandbox: chromium` selects it. Cold start drops from ~60s to ~3s.
+- **Branch**: `feat/v0.x-chromium-sandbox-template`
+- **Done**: a "fetch + parse a JS-rendered page" template deploys + runs in <10s end-to-end on first run.
+- **Effort**: small-medium (3-5 days).
+- **Depends on**: nothing. Lighter alternative to H.
+
+### J. Output-size + runtime ceilings raised further (post-v0.1)
+- **Why**: v0.1 ships with bumped limits (1 MB output, 256 KB input, 60s timeout). The 60s is a Vercel Hobby cap, not a Floom design choice. Pro tier lifts to 300s; G/H lift the effective ceiling to hours via async dispatch.
+- **Scope**: bump `SANDBOX_TIMEOUT_MS` to 300_000 once on Vercel Pro; gate via env var so Hobby deployments still run. Output-cap bumps as needed per app type.
+- **Branch**: pair with G or do as standalone limits PR.
+- **Effort**: trivial code (constant change + maxDuration export). Cost is the Vercel plan tier, not engineering time.
+
+### K. Connections (user-side integration brokerage via Composio)
+- **Why**: Apps that act on users' Gmail / Slack / Linear / Notion / GitHub data shouldn't require app developers to write per-integration OAuth. The user owns the credentials. Composio handles the auth dance + token storage + per-user `entity_id`. App handlers get a uniform "execute action on this user's account" call. Unblocks the entire multi-tenant SaaS app category.
+- **Scope**: User-facing "Connect Gmail / Slack / Linear / ..." UI on Floom (Composio-powered OAuth). Per-user `connections` table mapping `user_id + provider -> composio_entity_id`. Manifest schema gains `integrations: [gmail, slack, linear]`. At run time, Floom resolves the calling user's connections and proxies Composio calls server-side (the platform Composio key never enters the sandbox — see spec).
+- **Branch**: `feat/v0.x-connections`
+- **Spec**: `docs/v0.x-connections-spec.md`
+- **Done**: a 3-integration template (e.g. "summarize today's Gmail and post to Slack") deploys, runs as multiple Floom users without per-user secret management by the app dev.
+- **Effort**: large (3-4 weeks). OAuth UI + per-user connection storage + manifest schema + runtime proxy + Composio adapter.
+- **Depends on**: G (async + poll) for any flow that takes >60s.
+- **Light-touch interim**: today, app devs can pin `composio-core` in `requirements.txt`, declare a `COMPOSIO_API_KEY` secret, call Composio directly. Works for app-dev-owned credentials but doesn't enable user-owned connections. K is the user-side path.
+
+## ICE-scored priority
+
+Scale 1-10 each, ICE = I × C × E (max 1000). Anchor: 504 (B) is high-impact + high-confidence + easy; 80 (H) is real impact but expensive and uncertain.
+
+| ID | Capability | Impact | Confidence | Ease | ICE |
+|---|---|---|---|---|---|
+| B | Multi-action manifests | 7 | 9 | 8 | **504** |
+| J | Lift timeout 60→300s (Vercel Pro) | 4 | 10 | 10 | **400** |
+| I | Chromium-baked E2B template | 6 | 9 | 7 | **378** |
+| A+E | TS/Node + JS runtime | 9 | 8 | 5 | **360** |
+| G | Async + poll runtime | 10 | 8 | 4 | **320** |
+| F | Multi-file Python | 5 | 8 | 7 | **280** |
+| K | Connections (Composio user-side) | 10 | 6 | 3 | **180** |
+| C | Streaming | 8 | 6 | 3 | **144** |
+| D | FastAPI/OpenAPI ingest | 6 | 6 | 3 | **108** |
+| H | Hosted Docker runtime | 8 | 5 | 2 | **80** |
+
+## Two ways to read the table
+
+**Pure ICE order** (raw quick wins first): B → J → I → A+E → G → F → K → C → D → H
+
+**Force-multiplier-adjusted** (G unblocks C/H/F-with-deps/K; K unblocks every connector after; J is essentially free if on Pro): B + J + I week 1 → A+E + G weeks 2-3 → K weeks 4-7 → C / F as filler → D, H later.
+
+ICE penalizes G for being slow, but G makes everything after it shippable. Same logic for K — once Composio brokerage is in, every additional connector (Slack → Linear → Notion → Stripe) is days, not weeks. Standalone apps that fit in 60s + don't need user connections can ship in v0.1 today.
+
+## Suggested ship sequence (force-multiplier-adjusted)
+
+**Week 1 post-launch** (parallel):
+1. **B. Multi-action** — Codex, port from legacy. Fastest ship.
+2. **I. Chromium E2B template** — Codex. Fast path to browser automation.
+3. **J. Vercel Pro upgrade + `FLOOM_SANDBOX_TIMEOUT_MS=300000`** — 5 min, no code work.
+
+**Weeks 2-3** (parallel):
+4. **A+E. Node + JS runtime** — Codex, biggest TAM unlock.
+5. **G. Async + poll runtime** — biggest architectural lift; force multiplier.
+
+**Weeks 4-7** (sequential, gated on G):
+6. **K. Connections (Composio user-side)** — biggest product unlock. Multi-tenant SaaS apps without OAuth code.
+7. **C. Streaming** — natural extension of G.
+
+**Later, as filler / on-demand**:
+8. F. Multi-file Python.
+9. D. FastAPI/OpenAPI ingest.
+10. H. Hosted Docker runtime — only if a customer specifically needs custom Docker images that I can't cover.
 
 ## Branch + version cadence
 
 - One PR per capability per branch. No bundling.
 - Version assigned at merge time: first to merge after v0.1 = v0.2, next = v0.3, etc.
-- Each branch has its own `docs/v0.x-<capability>-spec.md` with: scope, contract diff, test plan, rollout plan.
+- Each branch has its own `docs/v0.x-<capability>-spec.md` with: scope, contract diff, test plan, rollout plan. Specs already written: G (`docs/v0.x-async-spec.md`), K (`docs/v0.x-connections-spec.md`).
 - Each branch must add: (a) a real template that uses the new capability, (b) MCP `get_app_contract` reflects it, (c) /docs has a section, (d) CHANGELOG entry.
 
 ## What this brief is not
@@ -89,13 +167,6 @@ For "what do we do with the work already done on legacy branches?" → `docs/leg
 
 v0.1 dependencies/secrets, UI polish, and the real `meeting-action-items` demo are merged into `main`. Future runtime branches stay isolated until the v0.1 launch gate is clean: signup/email provider verification, OAuth callback verification, repeated publish-flow QA, and final checklist evidence.
 
-Recommended first wave (parallel):
-- B (multi-action) — Codex agent, 5 days, fastest ship
-- A+E (Node + JS) — Codex agent, 10 days, biggest TAM unlock
-- F (multi-file Python) — Codex agent, 5 days, parallel with B
-
-Second wave (after first wave settles, ~3 weeks post-launch):
-- C (streaming) — flagship for the v0.x demo
-- D (FastAPI/OpenAPI) — power-user feature
+See "Suggested ship sequence (force-multiplier-adjusted)" above for the canonical post-launch order.
 
 Federico picks the dates. Codex executes.
