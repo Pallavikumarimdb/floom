@@ -48,23 +48,22 @@ export default function OpengraphImage() {
         <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
           <div
             style={{
-              fontSize: 84,
+              fontSize: 96,
               fontWeight: 900,
-              lineHeight: 1.04,
-              letterSpacing: "-0.035em",
+              lineHeight: 1.02,
+              letterSpacing: "-0.04em",
               display: "flex",
               flexWrap: "wrap",
               gap: 18,
             }}
           >
-            <span>Localhost to live and</span>
+            <span>Localhost to</span>
             <span style={{ color: "#047857", textDecoration: "underline", textDecorationThickness: 6, textUnderlineOffset: 14 }}>
-              secure
+              live
             </span>
-            <span>,</span>
             <span>in 60 seconds.</span>
           </div>
-          <div style={{ fontSize: 28, color: "#5a564f", fontWeight: 500 }}>
+          <div style={{ fontSize: 30, color: "#5a564f", fontWeight: 500 }}>
             Your AI just wrote some code. Floom puts it online.
           </div>
         </div>

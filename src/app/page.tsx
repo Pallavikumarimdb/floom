@@ -289,9 +289,8 @@ export default function LandingV17PageMvp() {
                 textWrap: 'balance' as unknown as 'balance',
               }}
             >
-              Localhost to live and{' '}
-              <span className="hero-accent-word" style={{ color: 'var(--accent)' }}>secure</span>,
-              <br />
+              Localhost to{' '}
+              <span className="hero-accent-word" style={{ color: 'var(--accent)' }}>live</span>{' '}
               in 60 seconds.
             </h1>
 
