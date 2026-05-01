@@ -7,6 +7,11 @@ Deployed URL tested: https://floom-60sec-mu.vercel.app
 Repo SHA tested: see `git rev-parse HEAD` in /root/floom-minimal
 Skill version: launch-readiness v0.2
 
+> Superseded: this iteration targeted the non-canonical
+> `floom-60sec-mu.vercel.app` alias, which was attached to a different Vercel
+> project with no production environment variables. Current launch QA targets
+> the canonical production URL: `https://floom-60sec.vercel.app`.
+
 ---
 
 ## TL;DR

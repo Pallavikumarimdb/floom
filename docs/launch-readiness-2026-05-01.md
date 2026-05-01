@@ -7,6 +7,11 @@ Deployed URL tested: https://floom-60sec-mu.vercel.app
 Repo SHA tested: see `git rev-parse HEAD` at audit time
 Skill version: launch-readiness v0.1
 
+> Superseded: this audit targeted the non-canonical `floom-60sec-mu.vercel.app`
+> alias, which was attached to a different Vercel project with no production
+> environment variables. Current launch QA targets the canonical production URL:
+> `https://floom-60sec.vercel.app`.
+
 ## TL;DR
 
 floom-minimal scores **41/100 — BLOCKED**. UI is shippable (88/100) but the deploy is missing 4 P0 infra/env-var configs that make the actual product 100% non-functional for any new user past the demo: MCP `run_app` returns 503 (no `FLOOM_ORIGIN`), `/api/agent-tokens` returns 503 (no `SUPABASE_SERVICE_ROLE_KEY` or `AGENT_TOKEN_PEPPER`), Supabase email signup is rate-limited at 3/hr, and only the hardcoded `demo-app` slug works (any other returns 503). Top blocker: env vars on the `-mu` Vercel deployment. Estimated fix: ~2-4 hours of config + Supabase plan upgrade or transactional email integration.
