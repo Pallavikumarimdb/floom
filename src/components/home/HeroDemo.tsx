@@ -703,10 +703,10 @@ function EditorSurface({ active, cycle, reducedMotion }: EditorProps) {
  * previous implementation.
  */
 const DEPLOY_STEPS = [
-  'build container',
-  'upload bundle',
-  'verify runtime',
-  'register route',
+  'package handler',
+  'upload to floom',
+  'sandbox ready',
+  'live at /p/<slug>',
 ] as const;
 
 function DeploySurface({

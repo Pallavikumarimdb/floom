@@ -96,6 +96,57 @@ export default function LegalPage() {
           </p>
         </Section>
 
+        <Section title="Cookies and tracking">
+          <p>
+            Floom does not use third-party analytics, advertising, or tracking
+            cookies. The only cookies we set are Supabase Auth session cookies
+            (issued after sign-in, scoped to floom-60sec.vercel.app) and a
+            small CSRF cookie used by the auth callback. No banner is shown
+            because no consent is required for strictly necessary auth
+            cookies.
+          </p>
+        </Section>
+
+        <Section title="Pricing">
+          <p>
+            Public apps and public runs are free during alpha. There is no
+            payment, no card on file, and no automatic charge.
+          </p>
+          <p className="text-sm text-neutral-500">
+            Pricing for private apps, dependencies, and higher run limits will
+            be announced before billing starts. Anyone using Floom today owes
+            nothing.
+          </p>
+        </Section>
+
+        <Section title="Status and outages">
+          <p>
+            For service status and outage updates, follow{" "}
+            <a
+              href="https://github.com/floomhq/floom-minimal"
+              className="font-semibold text-emerald-700 underline underline-offset-2"
+            >
+              floomhq/floom-minimal
+            </a>{" "}
+            on GitHub or watch our Discord. A dedicated status page lands in
+            v0.1.
+          </p>
+        </Section>
+
+        <Section title="Security">
+          <p>
+            For security reports, email{" "}
+            <code>security@floom.dev</code>. See{" "}
+            <a
+              href="https://github.com/floomhq/floom-minimal/blob/main/SECURITY.md"
+              className="font-semibold text-emerald-700 underline underline-offset-2"
+            >
+              SECURITY.md
+            </a>{" "}
+            for scope and disclosure policy.
+          </p>
+        </Section>
+
         <Section title="Contact">
           <p>
             For access, deletion, or abuse reports, contact{" "}

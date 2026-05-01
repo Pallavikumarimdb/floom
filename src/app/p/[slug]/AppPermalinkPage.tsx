@@ -60,8 +60,8 @@ const DOCKER_RUNTIME_COMING_SOON_SLUGS = new Set<string>([]);
 // with what the deployed handler actually returns — overclaiming is a
 // trust killer.
 const HERO_SUBHEAD: Record<string, string> = {
-  'pitch-coach':
-    'Paste a startup pitch. Get a quick read on whether it lands.',
+  'meeting-action-items':
+    'Paste meeting notes. Get a structured list of action items — task, owner, due date.',
 };
 
 export default function AppPermalinkPage() { // exported as default so the server page can dynamic-import without renaming
@@ -1342,8 +1342,12 @@ export default function AppPermalinkPage() { // exported as default so the serve
               {createdByLabel && <AboutMetaRow label="Created by" value={createdByLabel} />}
             </div>
 
-            {/* Stats panel */}
-            {(summary || app.runs_7d != null) && (
+            {/* Stats panel — only render when there's real data to show. The
+                old `summary || app.runs_7d != null` check rendered an empty
+                'STATS' header card whenever summary was a {count:0, avg:0}
+                object. Gate explicitly on actual values. */}
+            {((app.runs_7d != null && app.runs_7d > 0) ||
+              (summary && summary.count > 0)) && (
               <div
                 data-testid="about-stats"
                 style={{
@@ -1517,7 +1521,7 @@ export default function AppPermalinkPage() { // exported as default so the serve
                   rel="noreferrer"
                   style={{ marginTop: 10, display: 'inline-block', fontSize: 12.5, color: 'var(--accent)', fontWeight: 600, textDecoration: 'none' }}
                 >
-                  View raw spec &rarr;
+                  View manifest &rarr;
                 </a>
               </div>
             </div>

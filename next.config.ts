@@ -42,8 +42,13 @@ const nextConfig: NextConfig = {
       { source: "/signin", destination: "/login", permanent: false },
       { source: "/sign-in", destination: "/login", permanent: false },
       // Common URL expectations that don't have dedicated pages in v0:
-      { source: "/pricing", destination: "/", permanent: false },
+      { source: "/pricing", destination: "/legal#pricing", permanent: false },
       { source: "/apps", destination: "/", permanent: false },
+      { source: "/security", destination: "/legal#security", permanent: false },
+      { source: "/status", destination: "/legal#status-and-outages", permanent: false },
+      // The canonical demo migrated from pitch-coach (echo stub) to
+      // meeting-action-items (real Gemini handler). Old links keep working.
+      { source: "/p/pitch-coach", destination: "/p/meeting-action-items", permanent: false },
     ];
   },
 };

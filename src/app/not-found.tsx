@@ -68,7 +68,7 @@ export default function NotFound() {
             Back home
           </Link>
           <Link
-            href="/p/pitch-coach"
+            href="/p/meeting-action-items"
             style={{
               padding: "10px 20px",
               background: "var(--card)",

@@ -26,8 +26,8 @@ export const metadata: Metadata = {
   },
 };
 
-const manifestExample = `name: pitch-coach
-slug: pitch-coach
+const manifestExample = `name: meeting-action-items
+slug: meeting-action-items
 runtime: python
 entrypoint: app.py
 handler: run
@@ -35,9 +35,9 @@ public: true
 input_schema: input.schema.json
 output_schema: output.schema.json`;
 
-const apiExample = `curl -X POST https://floom-60sec.vercel.app/api/apps/pitch-coach/run \\
+const apiExample = `curl -X POST https://floom-60sec.vercel.app/api/apps/meeting-action-items/run \\
   -H 'Content-Type: application/json' \\
-  -d '{"inputs":{"pitch":"AI app hosting for agents"}}'`;
+  -d '{"inputs":{"notes":"Standup. Sarah ships migration docs by EOW. Marcus fixes /reports 500 by lunch."}}'`;
 
 const mcpExample = `POST https://floom-60sec.vercel.app/mcp
 tool: get_app_contract
@@ -51,7 +51,7 @@ arguments: { "key": "invoice_calculator" }
 
 POST https://floom-60sec.vercel.app/mcp
 tool: run_app
-arguments: { "slug": "pitch-coach", "inputs": { ... } }`;
+arguments: { "slug": "meeting-action-items", "inputs": { ... } }`;
 
 function Section({
   title,
@@ -106,7 +106,7 @@ export default function DocsPage() {
             Create token
           </Link>
           <Link
-            href="/p/pitch-coach"
+            href="/p/meeting-action-items"
             className="rounded-md border border-[#ded8cc] bg-white px-4 py-2 text-sm font-semibold text-neutral-800"
           >
             Run live demo

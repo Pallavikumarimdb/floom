@@ -24,7 +24,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 0.4,
     },
     {
-      url: `${SITE}/p/pitch-coach`,
+      url: `${SITE}/p/meeting-action-items`,
       lastModified: now,
       changeFrequency: "weekly",
       priority: 0.7,

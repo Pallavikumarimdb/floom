@@ -61,7 +61,9 @@ function LoginContent() {
       return;
     }
 
-    setMessage("Check your email to finish signing in.");
+    setMessage(
+      "Check your email to finish signing in. The link can take up to a minute. If nothing arrives, signups are rate-limited during alpha — try again in a bit.",
+    );
   }
 
   async function signInWithGoogle() {
@@ -251,7 +253,7 @@ function LoginContent() {
         <p style={{ marginTop: 24, fontSize: 13, color: 'var(--muted)', textAlign: 'center' }}>
           Already have a token?{" "}
           <Link
-            href="/p/pitch-coach"
+            href="/p/meeting-action-items"
             style={{ fontWeight: 600, color: 'var(--accent)', textDecoration: 'none' }}
           >
             Try the live app
