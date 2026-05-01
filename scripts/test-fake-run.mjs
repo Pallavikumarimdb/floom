@@ -221,6 +221,8 @@ async function test() {
   assert.equal(contract.limits.max_input_bytes, 16 * 1024);
   assert.equal(contract.limits.max_output_bytes, 64 * 1024);
   assert.match(contract.limits.public_run_rate_limit, /20 runs per caller/);
+  assert.match(contract.auth_and_access.public_apps, /including secret-backed runs/);
+  assert.match(contract.auth_and_access.secrets, /schema secret fields are redacted from output/);
   assert.deepEqual(Object.keys(contract.response_shapes.run_app), [
     'execution_id',
     'status',
@@ -237,6 +239,9 @@ async function test() {
     'csv_stats',
     'meeting_action_items',
   ]);
+  const docsPageText = readFileSync('src/app/docs/page.tsx', 'utf8');
+  assert.match(docsPageText, /Section title="What 'secure' means"/);
+  assert.match(docsPageText, /Public apps with declared secrets still run anonymously in v0\.1/);
 
   await testMcpAppTemplates();
 
@@ -754,7 +759,8 @@ function testSecretRedaction() {
   assert.match(routeText, /redactSecretInput\(latestVersion\.input_schema \?\? \{\}, inputs\)/);
   assert.match(routeText, /redactExactSecretValues\(/);
   assert.match(routeText, /Object\.values\(runtimeSecrets\.envs\)/);
-  assert.match(routeText, /Secret-backed apps require owner authentication/);
+  assert.match(routeText, /public apps may run anonymously even with runtime secrets/);
+  assert.equal(routeText.includes('Secret-backed apps require owner authentication'), false);
   assert.match(routeText, /input: redactedInputs/);
   assert.ok(
     routeText.indexOf('redactSecretInput') < routeText.indexOf('.from("executions")'),
@@ -971,7 +977,7 @@ async function testSandboxDependenciesAndSecrets() {
     assert.deepEqual(result, { output: { ok: true } });
     assert.equal(createOpts.length, 2);
     assert.equal(createOpts[0].allowInternetAccess, true);
-    assert.equal(createOpts[1].allowInternetAccess, false);
+    assert.equal(createOpts[1].allowInternetAccess, true);
     assert.equal(
       writes.find((item) => item.sandboxIndex === 0 && item.path === '/home/user/requirements.txt')?.value,
       `${REQUESTS_HASHED}\n`

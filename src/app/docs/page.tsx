@@ -264,6 +264,12 @@ FLOOM_TOKEN=YOUR_FLOOM_AGENT_TOKEN FLOOM_API_URL=https://floom.dev npx @floomhq/
           </p>
         </Section>
 
+        <Section title="What 'secure' means">
+          <p>
+            Public apps with declared secrets still run anonymously in v0.1. Secret values are injected only as runtime environment variables and never appear in source, manifest files, logs, MCP output, or <code>app_versions</code>; output redaction applies to schema fields marked <code>secret: true</code>, and the same per-caller public run rate limits still apply.
+          </p>
+        </Section>
+
         <Section title="Limits and exclusions">
           <ul className="list-disc space-y-3 pl-5">
             <li>v0.1 is optimized for short function-style apps.</li>

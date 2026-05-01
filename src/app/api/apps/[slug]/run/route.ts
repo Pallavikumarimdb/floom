@@ -96,19 +96,12 @@ export async function POST(
 
   const isOwner = userId === app.owner_id;
   const isPublic = app.public;
-  const hasRuntimeSecrets =
-    Array.isArray(latestVersion.secrets) && latestVersion.secrets.length > 0;
 
   if (!isOwner && !isPublic) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  if (hasRuntimeSecrets && !isOwner) {
-    return NextResponse.json(
-      { error: "Secret-backed apps require owner authentication" },
-      { status: 403 }
-    );
-  }
+  // v0.1 design call: public apps may run anonymously even with runtime secrets; secrets are injected as env vars, secret-marked output fields are redacted, and per-caller public rate limits still apply.
 
   if (caller?.kind === "agent_token" && !callerHasScope(caller, "run")) {
     return NextResponse.json({ error: "Missing run scope" }, { status: 403 });

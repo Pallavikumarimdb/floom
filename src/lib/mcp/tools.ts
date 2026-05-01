@@ -531,9 +531,9 @@ function getAppContract(): McpToolResult {
     auth_and_access: {
       token_source: "Create agent tokens from https://floom.dev/tokens. MCP cannot mint or reveal raw tokens.",
       header: "Authorization: Bearer <agent-token>",
-      public_apps: "public: true apps allow anonymous metadata and runs, with rate limits.",
+      public_apps: "public: true apps allow anonymous metadata and runs, including secret-backed runs, with per-caller and per-app rate limits.",
       private_apps: "public omitted or false apps require the owner session or owner agent token for get_app and run_app.",
-      secrets: "Declare secret names in floom.yaml; set values through CLI or REST. MCP never returns raw secret values.",
+      secrets: "Declare secret names in floom.yaml; set values through CLI or REST. Runtime injects them as env vars, schema secret fields are redacted from output, and MCP never returns raw secret values.",
     },
     setup_commands: [
       "npx @floomhq/cli@latest setup",
