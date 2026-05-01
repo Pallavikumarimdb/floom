@@ -182,7 +182,7 @@ export function SiteHeader({ compact = false, onStudioMenuOpen }: Props = {}) {
         >
           {/* Logo lockup */}
           <Link
-            href={showAuthedChrome ? '/run/apps' : '/'}
+            href="/"
             className="brand"
             style={{
               display: 'inline-flex',
