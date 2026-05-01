@@ -77,7 +77,7 @@ export default function DocsPage() {
             Create token
           </Link>
           <Link
-            href="/p/smoke-1777538613152"
+            href="/p/pitch-coach"
             className="rounded-md border border-[#ded8cc] bg-white px-4 py-2 text-sm font-semibold text-neutral-800"
           >
             Run live demo
