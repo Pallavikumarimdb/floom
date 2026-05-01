@@ -95,6 +95,11 @@ async function test() {
     /dangerouslySetInnerHTML/,
     'public app page must render snippets as React text, not parsed HTML'
   );
+  const appPageText = readFileSync('src/app/p/[slug]/page.tsx', 'utf8');
+  assert.match(appPageText, /notFound\(\)/);
+  assert.match(appPageText, /isDefinitelyUnknownSlug/);
+  assert.match(appPageText, /\.from\("apps"\)/);
+  assert.doesNotMatch(appPageText, /github\.com\/floomhq\/floom"/);
 
   if (isSafePythonEntrypoint('my-app.py')) {
     throw new Error('hyphenated Python entrypoint accepted');

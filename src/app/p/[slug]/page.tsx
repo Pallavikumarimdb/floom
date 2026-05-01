@@ -1,5 +1,8 @@
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 import AppPermalinkPage from "./AppPermalinkPage";
+import { demoApp, hasSupabaseConfig } from "@/lib/demo-app";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 const SITE_URL = "https://floom.dev";
 
@@ -55,6 +58,34 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
-export default function Page() {
+export default async function Page({ params }: Props) {
+  const { slug } = await params;
+  if (await isDefinitelyUnknownSlug(slug)) {
+    notFound();
+  }
+
   return <AppPermalinkPage />;
+}
+
+async function isDefinitelyUnknownSlug(slug: string) {
+  if (!hasSupabaseConfig()) {
+    return slug !== demoApp.slug;
+  }
+
+  try {
+    const admin = createAdminClient();
+    const { data, error } = await admin
+      .from("apps")
+      .select("id")
+      .eq("slug", slug)
+      .maybeSingle();
+
+    if (error) {
+      return false;
+    }
+
+    return !data;
+  } catch {
+    return false;
+  }
 }
