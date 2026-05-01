@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { SiteHeader } from "@/components/SiteHeader";
 import { FloomFooter } from "@/components/FloomFooter";
+import { useIsMobile } from "@/hooks/useIsMobile";
 import { createClient } from "@/lib/supabase/client";
 
 type AgentToken = {
@@ -33,6 +34,7 @@ function relative(dateStr: string | null): string {
 
 export default function TokensPage() {
   const router = useRouter();
+  const isMobile = useIsMobile(640);
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [email, setEmail] = useState<string | null>(null);
   const [tokens, setTokens] = useState<AgentToken[]>([]);
@@ -387,86 +389,168 @@ export default function TokensPage() {
               <div style={{ marginBottom: 18 }}>
                 <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0, letterSpacing: '-0.015em' }}>Agent tokens</h2>
               </div>
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', minWidth: 640, borderCollapse: 'collapse', fontSize: 13, textAlign: 'left' }}>
-                  <thead>
-                    <tr>
-                      {['Name', 'Prefix', 'Scopes', 'Status', 'Created', 'Last used', 'Expires', ''].map((h) => (
-                        <th key={h} style={{ borderBottom: '1px solid var(--line)', padding: '6px 12px 10px 0', fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.07em', whiteSpace: 'nowrap' }}>
-                          {h}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {tokens.map((token) => (
-                      <tr key={token.id}>
-                        <td style={{ borderBottom: '1px solid var(--line)', padding: '10px 12px 10px 0', fontWeight: 600, color: 'var(--ink)' }}>
-                          {token.name}
-                        </td>
-                        <td style={{ borderBottom: '1px solid var(--line)', padding: '10px 12px 10px 0', fontFamily: "'JetBrains Mono', monospace", fontSize: 11.5, color: 'var(--muted)' }}>
-                          {token.token_prefix}…
-                        </td>
-                        <td style={{ borderBottom: '1px solid var(--line)', padding: '10px 12px 10px 0', color: 'var(--muted)' }}>
-                          {token.scopes.join(", ")}
-                        </td>
-                        <td style={{ borderBottom: '1px solid var(--line)', padding: '10px 12px 10px 0' }}>
-                          {token.revoked_at ? (
-                            <span style={{ borderRadius: 999, background: 'var(--danger-soft)', border: '1px solid var(--danger-border)', padding: '2px 8px', fontSize: 11, fontWeight: 600, color: 'var(--danger)' }}>
-                              Revoked
-                            </span>
-                          ) : (
-                            <span style={{ borderRadius: 999, background: 'var(--accent-soft)', border: '1px solid var(--accent-border)', padding: '2px 8px', fontSize: 11, fontWeight: 600, color: 'var(--accent)' }}>
-                              Active
-                            </span>
-                          )}
-                        </td>
-                        <td style={{ borderBottom: '1px solid var(--line)', padding: '10px 12px 10px 0', color: 'var(--muted)', whiteSpace: 'nowrap' }}>
-                          {relative(token.created_at)}
-                        </td>
-                        <td style={{ borderBottom: '1px solid var(--line)', padding: '10px 12px 10px 0', color: 'var(--muted)', whiteSpace: 'nowrap' }}>
-                          {relative(token.last_used_at)}
-                        </td>
-                        <td style={{ borderBottom: '1px solid var(--line)', padding: '10px 12px 10px 0', color: 'var(--muted)', whiteSpace: 'nowrap' }}>
-                          {token.expires_at ? new Date(token.expires_at).toLocaleDateString() : "Never"}
-                        </td>
-                        <td style={{ borderBottom: '1px solid var(--line)', padding: '10px 0 10px 0', textAlign: 'right' }}>
-                          {!token.revoked_at && (
-                            confirmRevoke === token.id ? (
-                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                                <button
-                                  type="button"
-                                  disabled={working}
-                                  onClick={() => revokeToken(token.id)}
-                                  style={{ background: 'var(--danger)', color: '#fff', border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 11.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', opacity: working ? 0.6 : 1 }}
-                                >
-                                  Confirm
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => setConfirmRevoke(null)}
-                                  style={{ background: 'var(--card)', color: 'var(--ink)', border: '1px solid var(--line)', borderRadius: 6, padding: '4px 10px', fontSize: 11.5, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}
-                                >
-                                  Cancel
-                                </button>
-                              </span>
-                            ) : (
+              {isMobile ? (
+                /* Mobile: stack each token as a card. The 8-col table at
+                   375px hid Scopes/Status/Created/Last used/Expires AND
+                   the Revoke button behind a horizontal scroll container —
+                   making it impossible to revoke a leaked token from a
+                   phone. */
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                  {tokens.map((token) => (
+                    <div
+                      key={token.id}
+                      style={{
+                        border: '1px solid var(--line)',
+                        borderRadius: 10,
+                        padding: 14,
+                        background: 'var(--card)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 8,
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
+                        <div style={{ minWidth: 0, flex: 1 }}>
+                          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink)', lineHeight: 1.3, wordBreak: 'break-word' }}>{token.name}</div>
+                          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>{token.token_prefix}…</div>
+                        </div>
+                        {token.revoked_at ? (
+                          <span style={{ borderRadius: 999, background: 'var(--danger-soft)', border: '1px solid var(--danger-border)', padding: '2px 8px', fontSize: 11, fontWeight: 600, color: 'var(--danger)', whiteSpace: 'nowrap' }}>
+                            Revoked
+                          </span>
+                        ) : (
+                          <span style={{ borderRadius: 999, background: 'var(--accent-soft)', border: '1px solid var(--accent-border)', padding: '2px 8px', fontSize: 11, fontWeight: 600, color: 'var(--accent)', whiteSpace: 'nowrap' }}>
+                            Active
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', columnGap: 12, rowGap: 4, fontSize: 12.5 }}>
+                        <span style={{ color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: 10.5, fontWeight: 700, alignSelf: 'center' }}>Scopes</span>
+                        <span style={{ color: 'var(--ink)' }}>{token.scopes.join(", ")}</span>
+                        <span style={{ color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: 10.5, fontWeight: 700, alignSelf: 'center' }}>Created</span>
+                        <span style={{ color: 'var(--muted)' }}>{relative(token.created_at)}</span>
+                        <span style={{ color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: 10.5, fontWeight: 700, alignSelf: 'center' }}>Last used</span>
+                        <span style={{ color: 'var(--muted)' }}>{relative(token.last_used_at)}</span>
+                        <span style={{ color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: 10.5, fontWeight: 700, alignSelf: 'center' }}>Expires</span>
+                        <span style={{ color: 'var(--muted)' }}>{token.expires_at ? new Date(token.expires_at).toLocaleDateString() : "Never"}</span>
+                      </div>
+                      {!token.revoked_at && (
+                        <div style={{ marginTop: 4 }}>
+                          {confirmRevoke === token.id ? (
+                            <div style={{ display: 'flex', gap: 8 }}>
                               <button
                                 type="button"
                                 disabled={working}
-                                onClick={() => setConfirmRevoke(token.id)}
-                                style={{ background: 'var(--danger-soft)', color: 'var(--danger)', border: '1px solid var(--danger-border)', borderRadius: 6, padding: '4px 10px', fontSize: 11.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', opacity: working ? 0.6 : 1 }}
+                                onClick={() => revokeToken(token.id)}
+                                style={{ background: 'var(--danger)', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 14px', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', opacity: working ? 0.6 : 1, flex: 1 }}
                               >
-                                Revoke
+                                Confirm revoke
                               </button>
-                            )
+                              <button
+                                type="button"
+                                onClick={() => setConfirmRevoke(null)}
+                                style={{ background: 'var(--card)', color: 'var(--ink)', border: '1px solid var(--line)', borderRadius: 8, padding: '8px 14px', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              disabled={working}
+                              onClick={() => setConfirmRevoke(token.id)}
+                              style={{ background: 'var(--danger-soft)', color: 'var(--danger)', border: '1px solid var(--danger-border)', borderRadius: 8, padding: '8px 14px', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', opacity: working ? 0.6 : 1, width: '100%' }}
+                            >
+                              Revoke
+                            </button>
                           )}
-                        </td>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', minWidth: 640, borderCollapse: 'collapse', fontSize: 13, textAlign: 'left' }}>
+                    <thead>
+                      <tr>
+                        {['Name', 'Prefix', 'Scopes', 'Status', 'Created', 'Last used', 'Expires', ''].map((h) => (
+                          <th key={h} style={{ borderBottom: '1px solid var(--line)', padding: '6px 12px 10px 0', fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.07em', whiteSpace: 'nowrap' }}>
+                            {h}
+                          </th>
+                        ))}
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      {tokens.map((token) => (
+                        <tr key={token.id}>
+                          <td style={{ borderBottom: '1px solid var(--line)', padding: '10px 12px 10px 0', fontWeight: 600, color: 'var(--ink)' }}>
+                            {token.name}
+                          </td>
+                          <td style={{ borderBottom: '1px solid var(--line)', padding: '10px 12px 10px 0', fontFamily: "'JetBrains Mono', monospace", fontSize: 11.5, color: 'var(--muted)' }}>
+                            {token.token_prefix}…
+                          </td>
+                          <td style={{ borderBottom: '1px solid var(--line)', padding: '10px 12px 10px 0', color: 'var(--muted)' }}>
+                            {token.scopes.join(", ")}
+                          </td>
+                          <td style={{ borderBottom: '1px solid var(--line)', padding: '10px 12px 10px 0' }}>
+                            {token.revoked_at ? (
+                              <span style={{ borderRadius: 999, background: 'var(--danger-soft)', border: '1px solid var(--danger-border)', padding: '2px 8px', fontSize: 11, fontWeight: 600, color: 'var(--danger)' }}>
+                                Revoked
+                              </span>
+                            ) : (
+                              <span style={{ borderRadius: 999, background: 'var(--accent-soft)', border: '1px solid var(--accent-border)', padding: '2px 8px', fontSize: 11, fontWeight: 600, color: 'var(--accent)' }}>
+                                Active
+                              </span>
+                            )}
+                          </td>
+                          <td style={{ borderBottom: '1px solid var(--line)', padding: '10px 12px 10px 0', color: 'var(--muted)', whiteSpace: 'nowrap' }}>
+                            {relative(token.created_at)}
+                          </td>
+                          <td style={{ borderBottom: '1px solid var(--line)', padding: '10px 12px 10px 0', color: 'var(--muted)', whiteSpace: 'nowrap' }}>
+                            {relative(token.last_used_at)}
+                          </td>
+                          <td style={{ borderBottom: '1px solid var(--line)', padding: '10px 12px 10px 0', color: 'var(--muted)', whiteSpace: 'nowrap' }}>
+                            {token.expires_at ? new Date(token.expires_at).toLocaleDateString() : "Never"}
+                          </td>
+                          <td style={{ borderBottom: '1px solid var(--line)', padding: '10px 0 10px 0', textAlign: 'right' }}>
+                            {!token.revoked_at && (
+                              confirmRevoke === token.id ? (
+                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                                  <button
+                                    type="button"
+                                    disabled={working}
+                                    onClick={() => revokeToken(token.id)}
+                                    style={{ background: 'var(--danger)', color: '#fff', border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 11.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', opacity: working ? 0.6 : 1 }}
+                                  >
+                                    Confirm
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setConfirmRevoke(null)}
+                                    style={{ background: 'var(--card)', color: 'var(--ink)', border: '1px solid var(--line)', borderRadius: 6, padding: '4px 10px', fontSize: 11.5, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}
+                                  >
+                                    Cancel
+                                  </button>
+                                </span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  disabled={working}
+                                  onClick={() => setConfirmRevoke(token.id)}
+                                  style={{ background: 'var(--danger-soft)', color: 'var(--danger)', border: '1px solid var(--danger-border)', borderRadius: 6, padding: '4px 10px', fontSize: 11.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', opacity: working ? 0.6 : 1 }}
+                                >
+                                  Revoke
+                                </button>
+                              )
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
 
             {/* Demoted create form */}
