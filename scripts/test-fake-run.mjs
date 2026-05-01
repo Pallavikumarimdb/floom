@@ -89,6 +89,12 @@ async function test() {
   assert.equal(classifyPermalinkLoadError({ status: 403 }), 'private');
   assert.equal(classifyPermalinkLoadError({ status: 503 }), 'retryable');
   assert.equal(classifyPermalinkLoadError(new TypeError('Failed to fetch')), 'retryable');
+  const appPermalinkPageText = readFileSync('src/app/p/[slug]/AppPermalinkPage.tsx', 'utf8');
+  assert.doesNotMatch(
+    appPermalinkPageText,
+    /dangerouslySetInnerHTML/,
+    'public app page must render snippets as React text, not parsed HTML'
+  );
 
   if (isSafePythonEntrypoint('my-app.py')) {
     throw new Error('hyphenated Python entrypoint accepted');

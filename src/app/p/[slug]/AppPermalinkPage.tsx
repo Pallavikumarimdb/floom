@@ -1800,8 +1800,9 @@ function InstallCard({
             whiteSpace: 'pre-wrap',
             wordBreak: 'break-all',
           }}
-          dangerouslySetInnerHTML={{ __html: snippetValue.replace(/\n/g, '<br/>') }}
-        />
+        >
+          {snippetValue}
+        </span>
         <button
           type="button"
           onClick={handleCopy}
