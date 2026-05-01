@@ -24,7 +24,6 @@ import { DescriptionMarkdown } from '@/components/DescriptionMarkdown';
 import { Confetti } from '@/components/Confetti';
 import { ShareModal } from '@/components/share/ShareModal';
 import { SkillModal } from '@/components/share/SkillModal';
-import { InstallPopover } from '@/components/share/InstallPopover';
 import { Download as DownloadIcon } from 'lucide-react';
 import { ApiError } from '@/api/client';
 import { useSession } from '@/hooks/useSession';
@@ -84,7 +83,6 @@ export default function AppPermalinkPage() { // exported as default so the serve
   const [shareModalOpen, setShareModalOpen] = useState(false);
   const [shareModalUrl, setShareModalUrl] = useState<string>('');
   const [claudeSkillModalOpen, setClaudeSkillModalOpen] = useState(false);
-  const [installPopoverOpen, setInstallPopoverOpen] = useState(false);
 
   type PTab = 'run' | 'about' | 'install' | 'source' | 'runs';
   const initialTab = (searchParams?.get('tab') as PTab | null) ?? 'run';
@@ -1012,44 +1010,33 @@ export default function AppPermalinkPage() { // exported as default so the serve
                 flexWrap: 'wrap',
               }}
             >
-              {/* R7.6 (2026-04-28): unified Install button */}
-              <div style={{ position: 'relative' }}>
-                <button
-                  type="button"
-                  data-testid="cta-install"
-                  aria-label="Install"
-                  aria-haspopup="dialog"
-                  aria-expanded={installPopoverOpen}
-                  onClick={() => setInstallPopoverOpen((o) => !o)}
-                  style={{
-                    padding: '8px 14px',
-                    border: '1px solid var(--line)',
-                    borderRadius: 10,
-                    fontSize: 12.5,
-                    fontWeight: 600,
-                    color: 'var(--ink)',
-                    background: 'var(--card)',
-                    cursor: 'pointer',
-                    fontFamily: 'inherit',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 6,
-                  }}
-                >
-                  <DownloadIcon size={14} aria-hidden="true" /> Install
-                </button>
-                {app && (
-                  <InstallPopover
-                    open={installPopoverOpen}
-                    onClose={() => setInstallPopoverOpen(false)}
-                    slug={app.slug}
-                    appName={app.name}
-                    isAuthenticated={!!session && session.user?.is_local !== true}
-                    hasToken={false}
-                    firstInputName={claudeSkillFirstInput}
-                  />
-                )}
-              </div>
+              {/* Install button: switches to the Install tab. Replaces the
+                  earlier popover (which duplicated the tab content + had an
+                  outside-click bug Federico flagged). The Install tab is
+                  the canonical place for install instructions; one
+                  affordance, not two. */}
+              <button
+                type="button"
+                data-testid="cta-install"
+                aria-label="Install"
+                onClick={() => setActiveTab('install')}
+                style={{
+                  padding: '8px 14px',
+                  border: '1px solid var(--line)',
+                  borderRadius: 10,
+                  fontSize: 12.5,
+                  fontWeight: 600,
+                  color: 'var(--ink)',
+                  background: 'var(--card)',
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                }}
+              >
+                <DownloadIcon size={14} aria-hidden="true" /> Install
+              </button>
               <button
                 type="button"
                 data-testid="cta-share"

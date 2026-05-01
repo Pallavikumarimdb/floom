@@ -1,79 +1,95 @@
-# Floom v0 Architecture
+# Floom v0.1 Architecture
 
 Production URL: `https://floom-60sec.vercel.app`
 
-Current verified scope: single-file Python function apps with JSON Schema input/output, published with a Floom agent token.
+Current shipped scope (v0.1): single-file Python function apps with JSON Schema input/output, `requirements.txt` with hash-locked pins, encrypted-at-rest secrets injected as env vars at runtime, published with a Floom agent token.
 
 ```mermaid
 flowchart TD
-  User[User or agent] -->|sign up / sign in| Web[Floom web app on Vercel]
-  User -->|FLOOM_TOKEN + app dir| CLI[Floom CLI / skill]
-  Agent[MCP client] --> MCP[/mcp]
+  User["User or agent"] -->|sign up / sign in| Web["Floom web app on Vercel"]
+  User -->|FLOOM_TOKEN + app dir| CLI["Floom CLI / skill"]
+  Agent["MCP client"] --> MCP["/mcp JSON-RPC"]
 
-  Web --> Auth[Supabase Auth]
-  Web --> Tokens[agent_tokens]
-  CLI -->|floom.yaml + app.py + schemas| Publish[POST /api/apps]
+  Web --> Auth["Supabase Auth"]
+  Web --> Tokens["agent_tokens"]
+
+  CLI -->|floom.yaml + app.py + schemas + requirements.txt| Publish["POST /api/apps"]
   MCP -->|publish_app| Publish
 
-  Publish --> Apps[apps table]
-  Publish --> Versions[app_versions table]
-  Publish --> Bundles[Supabase Storage app-bundles]
-  CLI -->|metadata-only secret commands| SecretsAPI[GET/PUT/DELETE /api/apps/:slug/secrets]
-  SecretsAPI --> Secrets[app_secrets encrypted values]
+  Publish --> ManifestVal["validate manifest + secret names"]
+  ManifestVal --> Apps["apps table"]
+  ManifestVal --> Versions["app_versions table"]
+  ManifestVal --> Bundles["Supabase Storage app-bundles"]
 
-  Browser[/p/:slug] --> Run[POST /api/apps/:slug/run]
-  API[REST caller] --> Run
+  CLI -->|metadata-only secret commands| SecretsAPI["GET/PUT/DELETE /api/apps/:slug/secrets"]
+  SecretsAPI --> Secrets["app_secrets encrypted values"]
+
+  Browser["/p/:slug"] --> Run["POST /api/apps/:slug/run"]
+  REST["REST caller"] --> Run
   MCP -->|run_app| Run
 
-  Run --> Access[auth + public/private + rate limit]
+  Run --> Access["auth + public/private RLS + rate limit"]
   Access --> Bundles
   Access --> Secrets
-  Secrets -->|server decrypt + names only| Run
-  Run --> E2B[E2B sandbox]
-  E2B --> Handler[call run(inputs)]
-  Handler --> Output[JSON output]
-  Output --> Redaction[secret-field redaction]
-  Redaction --> Executions[executions table]
+  Run --> E2B["E2B sandbox"]
+  Secrets -->|server decrypt + inject as env vars| E2B
+  Bundles -->|extract + pip install -r requirements.txt --require-hashes| E2B
+  E2B --> Handler["call run inputs"]
+  Handler --> Output["JSON output"]
+  Output --> Redaction["secret-field redaction"]
+  Redaction --> Executions["executions table"]
   Redaction --> Browser
-  Redaction --> API
+  Redaction --> REST
   Redaction --> MCP
+
+  Status["/api/status"] --> Auth
+  Status --> E2B
+  Status --> MCP
 ```
 
-## Current v0 Contract
+## v0.1 Contract
 
 Required app files:
 
-- `floom.yaml`
-- one Python file, usually `app.py`
+- `floom.yaml` (manifest)
+- one Python file, usually `app.py` with `def run(inputs: dict) -> dict`
 - `input.schema.json`
 - `output.schema.json`
+- `requirements.txt` (optional, hash-pinned)
 
-Current v0 accepts:
+v0.1 accepts:
 
-- `runtime: python`
-- one handler function, usually `run(inputs: dict) -> dict`
-- Python standard library only in v0, exact-pinned and hash-locked dependencies in v0.1
-- public apps via `public: true`
-- private apps when `public` is omitted or false
-- manifest-declared secret names in v0.1
+- `runtime: python` (Python 3.11+)
+- one handler function per app
+- third-party Python packages via exact-pinned, hash-locked `requirements.txt` declared as `dependencies.python: ./requirements.txt`
+- `secrets: [NAME, ...]` in `floom.yaml` — names only, never values
+- public apps via `public: true`, gated by RLS on `apps.public = true`
+- private apps (default) — owner-only via Supabase Auth or matching agent token
+- size limits: bundle 10 MB, single file 5 MB, output 1 MB, runtime 60 s, memory 512 MB
+- rate limit: 60 s window per caller
 
-Current v0 rejects:
+v0.1 rejects:
 
-- raw secret values
+- raw secret values anywhere (manifest, source, logs, MCP output, API responses, app versions, executions, bundle storage, docs)
 - FastAPI/OpenAPI servers
 - TypeScript/Node apps
-- multi-file Python projects
-- long-running processes
+- multi-file Python projects (one entrypoint module)
 - multiple manifest actions
+- streaming responses
+- long-running processes
 
-## v0 Launch Blockers
+## Secret storage
 
-Public self-serve launch is blocked by Supabase email configuration:
+`FLOOM_SECRET_ENCRYPTION_KEY` is a server-only base64-encoded 32-byte key. App owners manage values via `GET/PUT/DELETE /api/apps/:slug/secrets` or `npx @floomhq/cli@latest secrets`. List responses contain only `name`, `created_at`, and `updated_at` metadata. Values decrypt server-side at run time and are injected as E2B environment variables — never round-tripped to the client.
 
-- Production signup returns `email rate limit exceeded`.
+## v0.1 Launch Blockers
+
+Public self-serve sign-up is gated on Supabase email configuration:
+
+- Production sign-up returns `email rate limit exceeded`.
 - Email confirmation links are not verified end-to-end.
 - Supabase Auth SMTP/Site URL config could not be updated with the current Supabase token; the Management API returned `403`.
-- The provided Resend key is send-only. It cannot manage domains through the Resend API.
+- The provided Resend key is send-only.
 - `send.floom.dev` currently has SES/Amazon DNS records, not Resend DNS records.
 
 Verified working:
@@ -81,70 +97,28 @@ Verified working:
 - Agent token creation in authenticated browser sessions.
 - CLI publish with `FLOOM_TOKEN`.
 - Public app metadata and run.
-- Private anonymous metadata/run blocked.
+- Private anonymous metadata/run blocked at API and RLS layers.
 - Private owner token metadata/run.
-- Browser, REST API, and MCP run surfaces.
+- Browser, REST, and MCP run surfaces.
+- E2B-backed execution with `requirements.txt` install.
+- Secret injection into E2B as env vars (no values in source/manifest/logs/output).
 - Supabase app/version/execution/storage evidence in virgin QA runs.
-- E2B-backed execution for the current function runtime.
+- `/api/status` health probe (Supabase + E2B + MCP self-check).
+- Middleware HTTP 307 for `/tokens` when no Supabase session cookie.
 
-## Runtime Roadmap
+## Versioning Roadmap (post-launch)
 
-### v0.1: Python Dependencies + Self-Serve Secret Storage
+See `docs/runtime-versioning-roadmap-brief.md` for the canonical brief.
 
-Goal: unlock useful `input -> API/AI call -> output` apps.
+Model: one capability per minor version, one branch per capability. Version number is assigned at merge time (first to merge becomes v0.2, next v0.3, and so on). Each branch must ship together: real template using the capability, `get_app_contract` updated, `/docs` section, `CHANGELOG.md` entry.
 
-Separate branch scope:
+Capabilities in flight:
 
-- exact-pinned and hash-locked `requirements.txt` packages via `dependencies.python: ./requirements.txt`
-- manifest-declared secret names
-- owner-managed encrypted secret values in `app_secrets`
-- server-only decryption and E2B env injection at run time
-- no raw secret values in source, manifest, logs, MCP output, API responses, app versions, executions, bundle storage, or docs
+- TypeScript / Node runtime
+- Multi-action manifests (more than one endpoint per app)
+- Streaming responses (SSE)
+- FastAPI / OpenAPI app mode
+- JavaScript runtime
+- Multi-file Python bundles
 
-`FLOOM_SECRET_ENCRYPTION_KEY` is a server-only base64-encoded 32-byte key. Secret list responses contain only `name`, `created_at`, and `updated_at` metadata.
-
-Branch: `v0.1-deps-secrets`
-
-### v0.2: Multi-File Bundles
-
-Goal: allow small Python projects with helper modules.
-
-Scope:
-
-- safe bundle format
-- path traversal protection
-- file count and byte limits
-- E2B extraction
-- one entrypoint/handler remains the run model
-
-Branch: `v0.2-multi-file-bundles`
-
-### v0.3: OpenAPI / HTTP App Mode
-
-Goal: support OpenBlog-style projects.
-
-Scope:
-
-- dependency install
-- secret injection
-- start command
-- health/ready checks
-- request relay or port proxy
-- OpenAPI endpoint-to-UI/action mapping
-- sandbox lifecycle and timeout policy
-
-Branch: `v0.3-openapi-http-apps`
-
-## OpenBlog Status
-
-OpenBlog does not work with multi-file bundles alone.
-
-It needs multiple roadmap items together:
-
-- multi-file bundle support
-- dependencies
-- secret names and secure injection
-- HTTP server/OpenAPI handling
-- likely async/stateful pipeline behavior
-
-The config file is not the bottleneck. `floom.yaml` can express more modes later. The bottleneck is runtime support: packaging, install, secrets, process lifecycle, endpoint mapping, and safe execution.
+Constraint: no more than three capability branches in flight at once. Sequencing decided post-launch (`docs/runtime-versioning-roadmap-brief.md`).
