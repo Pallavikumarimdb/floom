@@ -16,10 +16,36 @@ function LoginContent() {
   const [mode, setMode] = useState<Mode>(initialMode);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [resetLoading, setResetLoading] = useState(false);
+
+  async function sendPasswordReset() {
+    if (!email.trim()) {
+      setError("Enter your email above first, then click Forgot password.");
+      return;
+    }
+    setResetLoading(true);
+    setError(null);
+    setMessage(null);
+    const supabase = createClient();
+    const redirectTo = `${window.location.origin}/auth/callback?next=/tokens`;
+    const { error: resetError } = await supabase.auth.resetPasswordForEmail(
+      email.trim(),
+      { redirectTo },
+    );
+    setResetLoading(false);
+    if (resetError) {
+      setError(resetError.message);
+      return;
+    }
+    setMessage(
+      "Password reset email sent if the address exists. Check your inbox.",
+    );
+  }
 
   useEffect(() => {
     const supabase = createClient();
@@ -61,7 +87,9 @@ function LoginContent() {
       return;
     }
 
-    setMessage("Check your email to finish signing in.");
+    setMessage(
+      "Check your email to finish signing in. The link can take up to a minute. If nothing arrives, signups are rate-limited during alpha — try again in a bit.",
+    );
   }
 
   async function signInWithGoogle() {
@@ -88,7 +116,8 @@ function LoginContent() {
     <div style={{ minHeight: '100vh', background: 'var(--bg)', color: 'var(--ink)' }}>
       <SiteHeader />
       {/* v11: Apple-style centered login card */}
-      <section
+      <main
+        id="main"
         style={{
           maxWidth: 400,
           margin: '0 auto',
@@ -138,24 +167,68 @@ function LoginContent() {
           </div>
 
           <div style={{ marginBottom: 20 }}>
-            <label
-              style={{ display: 'block', fontSize: 12.5, fontWeight: 600, color: 'var(--muted)', marginBottom: 6 }}
-              htmlFor="password"
-            >
-              Password
-            </label>
-            <input
-              id="password"
-              type="password"
-              autoComplete={mode === "signin" ? "current-password" : "new-password"}
-              required
-              minLength={6}
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              className="input-field"
-              placeholder={mode === "signup" ? "At least 6 characters" : "Your password"}
-              style={{ width: '100%', boxSizing: 'border-box' }}
-            />
+            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 6 }}>
+              <label
+                style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--muted)' }}
+                htmlFor="password"
+              >
+                Password
+              </label>
+              {mode === "signin" && (
+                <button
+                  type="button"
+                  onClick={() => void sendPasswordReset()}
+                  disabled={resetLoading}
+                  style={{
+                    fontSize: 11.5,
+                    fontWeight: 500,
+                    color: 'var(--accent)',
+                    background: 'transparent',
+                    border: 'none',
+                    padding: 0,
+                    cursor: resetLoading ? 'wait' : 'pointer',
+                    fontFamily: 'inherit',
+                  }}
+                >
+                  {resetLoading ? 'Sending…' : 'Forgot password?'}
+                </button>
+              )}
+            </div>
+            <div style={{ position: 'relative' }}>
+              <input
+                id="password"
+                type={showPassword ? "text" : "password"}
+                autoComplete={mode === "signin" ? "current-password" : "new-password"}
+                required
+                minLength={6}
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                className="input-field"
+                placeholder={mode === "signup" ? "At least 6 characters" : "Your password"}
+                style={{ width: '100%', boxSizing: 'border-box', paddingRight: 56 }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                style={{
+                  position: 'absolute',
+                  right: 8,
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  fontSize: 11,
+                  fontWeight: 500,
+                  color: 'var(--muted)',
+                  background: 'transparent',
+                  border: 'none',
+                  padding: '4px 8px',
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                }}
+              >
+                {showPassword ? 'Hide' : 'Show'}
+              </button>
+            </div>
           </div>
 
           {/* Error callout */}
@@ -227,27 +300,9 @@ function LoginContent() {
             type="button"
             onClick={signInWithGoogle}
             disabled={loading || googleLoading}
-            className="flex w-full items-center justify-center gap-3 rounded-lg border border-[#cfc7b8] bg-white px-5 py-3 font-semibold text-[#11110f] shadow-sm disabled:opacity-50"
+            className="w-full rounded-lg border border-[#cfc7b8] bg-white px-5 py-3 font-semibold text-[#11110f] shadow-sm disabled:opacity-50"
           >
-            <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
-              <path
-                fill="#4285F4"
-                d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.92c1.7-1.57 2.68-3.88 2.68-6.62Z"
-              />
-              <path
-                fill="#34A853"
-                d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.26c-.8.54-1.84.86-3.04.86a5.35 5.35 0 0 1-5.02-3.7H.96v2.34A9 9 0 0 0 9 18Z"
-              />
-              <path
-                fill="#FBBC05"
-                d="M3.98 10.72a5.41 5.41 0 0 1 0-3.44V4.94H.96a9 9 0 0 0 0 8.12l3.02-2.34Z"
-              />
-              <path
-                fill="#EA4335"
-                d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58A8.66 8.66 0 0 0 9 0 9 9 0 0 0 .96 4.94l3.02 2.34A5.35 5.35 0 0 1 9 3.58Z"
-              />
-            </svg>
-            <span>{googleLoading ? "Redirecting..." : "Continue with Google"}</span>
+            {googleLoading ? "Redirecting..." : "Continue with Google"}
           </button>
         </form>
 
@@ -267,16 +322,16 @@ function LoginContent() {
         </button>
 
         <p style={{ marginTop: 24, fontSize: 13, color: 'var(--muted)', textAlign: 'center' }}>
-          Want to see Floom first?{" "}
+          Already have a token?{" "}
           <Link
             href="/p/meeting-action-items"
             style={{ fontWeight: 600, color: 'var(--accent)', textDecoration: 'none' }}
           >
             Try the live app
-          </Link>
-          .
+          </Link>{" "}
+          or publish with the CLI.
         </p>
-      </section>
+      </main>
       <FloomFooter />
     </div>
   );

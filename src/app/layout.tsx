@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
 import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
+import { SkipLink } from "@/components/SkipLink";
 
 const SITE_NAME = "Floom";
-const SITE_TAGLINE = "Ship AI apps fast";
+const SITE_TAGLINE = "Localhost to live and secure in 60 seconds";
 const SITE_DESCRIPTION =
-  "Localhost to live and secure in 60 seconds. Python functions become shareable browser apps backed by Supabase and E2B.";
+  "Python functions become shareable browser apps backed by Supabase and E2B.";
 const SITE_URL = "https://floom.dev";
 
 export const metadata: Metadata = {
@@ -43,6 +44,42 @@ export const metadata: Metadata = {
   },
 };
 
+// JSON-LD structured data — describes Floom as a SoftwareApplication so
+// search engines and previewers can render rich results. Kept minimal +
+// truthful. No fake star ratings or aggregate review counts.
+const STRUCTURED_DATA = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": `${SITE_URL}#org`,
+      name: SITE_NAME,
+      url: SITE_URL,
+      logo: `${SITE_URL}/floom-mark.svg`,
+      sameAs: [
+        "https://github.com/floomhq/floom-minimal",
+        "https://discord.gg/8fXGXjxcRz",
+      ],
+    },
+    {
+      "@type": "SoftwareApplication",
+      "@id": `${SITE_URL}#app`,
+      name: SITE_NAME,
+      url: SITE_URL,
+      description: SITE_DESCRIPTION,
+      applicationCategory: "DeveloperApplication",
+      operatingSystem: "Web, macOS, Linux, Windows",
+      offers: {
+        "@type": "Offer",
+        price: "0",
+        priceCurrency: "USD",
+        description: "Public apps and public runs are free during alpha.",
+      },
+      publisher: { "@id": `${SITE_URL}#org` },
+    },
+  ],
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -51,6 +88,11 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="min-h-screen bg-white text-slate-900">
+        <SkipLink />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(STRUCTURED_DATA) }}
+        />
         {children}
         <Analytics />
       </body>

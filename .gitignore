@@ -53,6 +53,7 @@ docs/ui-screenshots-*/
 *.tsbuildinfo
 next-env.d.ts
 templates/pdf-to-json/__pycache__/
+templates/meeting-action-items/__pycache__/
 
 # Python cache
 __pycache__/

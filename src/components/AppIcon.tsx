@@ -19,6 +19,26 @@ function IconForSlug({ slug, size }: { slug: string; size: number }) {
     color: 'var(--accent)',
   };
 
+  // Meeting / action-items / task / todo apps — clipboard-with-checkmark
+  if (
+    slug.includes('meeting') ||
+    slug.includes('action') ||
+    slug.includes('task') ||
+    slug.includes('todo')
+  ) {
+    return (
+      <span style={base}>
+        <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          {/* clipboard body */}
+          <path d="M9 2h6a1 1 0 0 1 1 1v1H8V3a1 1 0 0 1 1-1z" />
+          <path d="M16 4H8a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z" />
+          {/* checkmark lines */}
+          <polyline points="9 12 11 14 15 10" />
+        </svg>
+      </span>
+    );
+  }
+
   // Pitch / writing apps
   if (slug.includes('pitch') || slug.includes('coach') || slug.includes('writ')) {
     return (

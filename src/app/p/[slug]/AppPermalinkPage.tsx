@@ -57,16 +57,12 @@ const GITHUB_REPOS: Record<string, string> = {
 // R37 (2026-04-29): empty set — all slugs are runnable.
 const DOCKER_RUNTIME_COMING_SOON_SLUGS = new Set<string>([]);
 
-// v23 PR-D: per-slug hero subhead for the 3 launch demos.
+// Per-slug hero subhead for the canonical demo apps. Keep these in sync
+// with what the deployed handler actually returns — overclaiming is a
+// trust killer.
 const HERO_SUBHEAD: Record<string, string> = {
-  'competitor-lens':
-    'Paste 2 URLs (yours + competitor). Get the positioning, pricing, and angle diff in under 5 seconds.',
-  'ai-readiness-audit':
-    'Paste a company URL. Get a readiness score, 3 risks, 3 opportunities, and one concrete next step.',
-  'pitch-coach':
-    'Paste a 20-500 char startup pitch. Get 3 direct critiques, 3 rewrites by angle, and a one-line TL;DR.',
   'meeting-action-items':
-    'Paste meeting notes. Get action items with owners and due dates.',
+    'Paste meeting notes. Get a structured list of action items — task, owner, due date.',
 };
 
 export default function AppPermalinkPage() { // exported as default so the server page can dynamic-import without renaming
@@ -172,26 +168,24 @@ export default function AppPermalinkPage() { // exported as default so the serve
 
       // Data seam: getApp(slug) → fetch('/api/apps/' + slug)
       const res = await fetch(`/api/apps/${slug}`, { headers });
-      if (!res.ok) {
-        const err = new ApiError('App not found', res.status);
-        const outcome = classifyPermalinkLoadError(err);
-        setNotFound(outcome === 'not_found');
-        setLoadFailure(outcome === 'retryable' ? outcome : null);
-        setLoading(false);
-        return;
-      }
-      const a = await res.json() as AppDetail & {
-        handler?: string;
-        input_schema?: unknown;
-        output_schema?: unknown;
-      };
-      return a;
+        if (!res.ok) {
+          const err = new ApiError('App not found', res.status);
+          const outcome = classifyPermalinkLoadError(err);
+          setNotFound(outcome === 'not_found');
+          setLoadFailure(outcome === 'retryable' ? outcome : null);
+          setLoading(false);
+          return;
+        }
+      return await res.json() as AppDetail & {
+          handler?: string;
+          input_schema?: unknown;
+          output_schema?: unknown;
+        };
     };
 
     loadApp()
-      .then(async (res) => {
-        if (!res) return;
-        const a = res;
+      .then(async (a) => {
+        if (!a) return;
         // Synthesize manifest from the floom-minimal API shape:
         // /api/apps/[slug] returns { id, slug, name, runtime, entrypoint,
         // handler, input_schema, output_schema, public }. The v5-ported
@@ -510,13 +504,19 @@ export default function AppPermalinkPage() { // exported as default so the serve
   const howItWorks = useMemo<Array<{ label: string; description?: string }>>(() => {
     if (!app) return [];
     const entries = Object.entries(app.manifest?.actions ?? {}) as Array<[string, ActionSpec]>;
-    if (entries.length > 0) {
+    // A "how it works" strip only makes sense for multi-action apps. A
+    // single-action app (e.g. v0's typical {run: ...} manifest) renders as a
+    // lone "Step 1 / <app-name>" card that adds nothing — hide it.
+    if (entries.length > 1) {
       return entries.slice(0, HOW_IT_WORKS_MAX).map(([, spec]) => ({
         label: spec.label,
         description: spec.description,
       }));
     }
-    return (app.actions || []).slice(0, HOW_IT_WORKS_MAX).map((name) => ({ label: name }));
+    if ((app.actions || []).length > 1) {
+      return (app.actions || []).slice(0, HOW_IT_WORKS_MAX).map((name) => ({ label: name }));
+    }
+    return [];
   }, [app]);
 
   const createdByLabel = useMemo(() => {
@@ -797,6 +797,29 @@ export default function AppPermalinkPage() { // exported as default so the serve
   // floom-minimal serves a single MCP endpoint at /mcp; per-app routing is handled internally.
   const mcpEndpoint = `${typeof window !== 'undefined' ? window.location.origin : ''}/mcp`;
   const githubRepo = GITHUB_REPOS[app.slug];
+
+  // Build a real cURL example payload from the first action's first input.
+  // Generic placeholders for type, sample text from app-examples when known.
+  const curlExampleBody = (() => {
+    const sample = getLaunchDemoExampleTextInputs(app.slug);
+    if (sample && Object.keys(sample).length > 0) {
+      return JSON.stringify({ inputs: sample });
+    }
+    const firstActionKey = Object.keys(app.manifest?.actions ?? {})[0];
+    const firstInput = firstActionKey
+      ? app.manifest?.actions[firstActionKey]?.inputs?.[0]
+      : undefined;
+    if (firstInput) {
+      const placeholder =
+        firstInput.type === 'integer' || firstInput.type === 'number'
+          ? 1
+          : firstInput.type === 'boolean'
+          ? true
+          : 'your input here';
+      return JSON.stringify({ inputs: { [firstInput.name]: placeholder } });
+    }
+    return JSON.stringify({ inputs: {} });
+  })();
   const topBarCompact = Boolean(runIdFromUrl || initialRun);
   void topBarCompact; // SiteHeader doesn't have compact prop yet — TODO(v5-port)
 
@@ -833,7 +856,7 @@ export default function AppPermalinkPage() { // exported as default so the serve
             }}
           >
             <Link href="/" style={{ color: 'var(--muted)', textDecoration: 'none' }}>
-              Apps
+              Home
             </Link>
             <span aria-hidden="true" style={{ color: 'var(--line)' }}>/</span>
             <span style={{ color: 'var(--ink)', fontWeight: 500 }}>{app.name}</span>
@@ -879,9 +902,9 @@ export default function AppPermalinkPage() { // exported as default so the serve
           >
             <div
               style={{
-                width: 44,
-                height: 44,
-                borderRadius: 12,
+                width: 32,
+                height: 32,
+                borderRadius: 8,
                 background: 'var(--bg)',
                 border: '1px solid var(--line)',
                 display: 'flex',
@@ -889,9 +912,10 @@ export default function AppPermalinkPage() { // exported as default so the serve
                 justifyContent: 'center',
                 color: 'var(--accent)',
                 flexShrink: 0,
+                marginTop: 3,
               }}
             >
-              <AppIcon slug={app.slug} size={22} />
+              <AppIcon slug={app.slug} size={16} />
             </div>
             <div className="permalink-hero-title" style={{ flex: 1, minWidth: 0 }}>
               <h1
@@ -1077,7 +1101,9 @@ export default function AppPermalinkPage() { // exported as default so the serve
         {/* Run tab (DEFAULT) */}
         {activeTab === 'run' && (
           <section
-            id="run"
+            id="tabpanel-run"
+            role="tabpanel"
+            aria-labelledby="tab-run"
             ref={runSurfaceRef}
             data-testid="tab-content-run-primary"
             data-surface="run"
@@ -1184,29 +1210,9 @@ export default function AppPermalinkPage() { // exported as default so the serve
                     Inputs are sent to {app.manifest?.name ?? app.name}{' '}to produce a result. Floom doesn&apos;t sell or share run data.
                   </span>
                 </div>
-                {/* v11: Built with Floom credit */}
-                <div
-                  style={{
-                    marginTop: 24,
-                    paddingTop: 20,
-                    borderTop: '1px solid var(--line)',
-                    fontSize: 12,
-                    color: 'var(--muted)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 6,
-                  }}
-                >
-                  <img src="/floom-mark-glow.svg" alt="" aria-hidden="true" width={14} height={14} style={{ opacity: 0.55 }} />
-                  Built with{' '}
-                  <Link
-                    href="/"
-                    style={{ color: 'var(--accent)', fontWeight: 600, textDecoration: 'none' }}
-                  >
-                    Floom
-                  </Link>
-                  {' '}— localhost to live and secure in 60 seconds.
-                </div>
+                {/* "Built with Floom" credit row removed — already in the
+                    site footer right below; doubling the brand on every app
+                    page is noise, not signal. */}
                 {celebrate && (
                   <CelebrationCard
                     slug={app.slug}
@@ -1230,7 +1236,11 @@ export default function AppPermalinkPage() { // exported as default so the serve
 
         {/* About tab. v26 parity: two-column layout */}
         {activeTab === 'about' && (
-        <>
+        <div
+          id="tabpanel-about"
+          role="tabpanel"
+          aria-labelledby="tab-about"
+        >
         <div
           data-testid="about-body"
           style={{
@@ -1241,7 +1251,7 @@ export default function AppPermalinkPage() { // exported as default so the serve
           className="about-body-grid"
         >
           {/* Left: prose + how-it-works + reviews */}
-          <main>
+          <div>
             {/* How it works strip */}
             {howItWorks.length > 0 && (
               <section
@@ -1313,7 +1323,7 @@ export default function AppPermalinkPage() { // exported as default so the serve
                 </section>
               );
             })()}
-          </main>
+          </div>
 
           {/* Right: aside meta panels */}
           <aside data-testid="about-aside">
@@ -1354,8 +1364,12 @@ export default function AppPermalinkPage() { // exported as default so the serve
               {createdByLabel && <AboutMetaRow label="Created by" value={createdByLabel} />}
             </div>
 
-            {/* Stats panel */}
-            {(summary || app.runs_7d != null) && (
+            {/* Stats panel — only render when there's real data to show. The
+                old `summary || app.runs_7d != null` check rendered an empty
+                'STATS' header card whenever summary was a {count:0, avg:0}
+                object. Gate explicitly on actual values. */}
+            {((app.runs_7d != null && app.runs_7d > 0) ||
+              (summary && summary.count > 0)) && (
               <div
                 data-testid="about-stats"
                 style={{
@@ -1381,21 +1395,21 @@ export default function AppPermalinkPage() { // exported as default so the serve
             )}
           </aside>
         </div>
-        </>
+        </div>
         )}
 
         {/* Install tab. v26 parity: 3 install cards */}
         {activeTab === 'install' && (
-        <section id="connectors" data-testid="connectors">
+        <section id="tabpanel-install" role="tabpanel" aria-labelledby="tab-install" data-testid="connectors">
           <div
             style={{ display: 'flex', flexDirection: 'column', gap: 14, maxWidth: 880 }}
             data-testid="connectors-grid"
           >
             <InstallCard
               testId="connector-claude"
-              title="Claude Desktop / Claude Code"
-              desc={`Adds ${app.name} as a Skill. Run via natural language. MCP-installable via Skill add command.`}
-              snippetValue={`claude skill add ${typeof window !== 'undefined' ? window.location.origin : ''}/p/${app.slug}`}
+              title="Claude Code"
+              desc={`Add ${app.name} as an MCP server in Claude Code. Then call its tools via natural language.`}
+              snippetValue="claude mcp add floom https://floom.dev/mcp"
               copyLabel="Copy command"
             />
             <InstallCard
@@ -1408,10 +1422,10 @@ export default function AppPermalinkPage() { // exported as default so the serve
             <InstallCard
               testId="connector-curl"
               title="cURL / JSON API"
-              desc="Bearer-token auth with an Agent token. Same endpoint as the public page, just hit it programmatically."
-              snippetValue={`curl -X POST ${typeof window !== 'undefined' ? window.location.origin : ''}/api/apps/${app.slug}/run \\\n  -H "Authorization: Bearer floom_agent_••••••" \\\n  -H "Content-Type: application/json" \\\n  -d '{"inputs":{}}'`}
+              desc="Public apps run without auth. Private apps need an Agent token in the Authorization header."
+              snippetValue={`curl -X POST ${typeof window !== 'undefined' ? window.location.origin : ''}/api/apps/${app.slug}/run \\\n  -H "Content-Type: application/json" \\\n  -d '${curlExampleBody}'`}
               copyLabel="Copy cURL"
-              copySnippet={`curl -X POST ${typeof window !== 'undefined' ? window.location.origin : ''}/api/apps/${app.slug}/run \\\n  -H "Authorization: Bearer YOUR_TOKEN" \\\n  -H "Content-Type: application/json" \\\n  -d '{"inputs":{}}'`}
+              copySnippet={`curl -X POST ${typeof window !== 'undefined' ? window.location.origin : ''}/api/apps/${app.slug}/run \\\n  -H "Content-Type: application/json" \\\n  -d '${curlExampleBody}'`}
             />
           </div>
           <p
@@ -1432,7 +1446,7 @@ export default function AppPermalinkPage() { // exported as default so the serve
 
         {/* Source tab. v0.1 contract: repo card, manifest card, API automation card. */}
         {activeTab === 'source' && (
-          <section data-testid="tab-content-source">
+          <section id="tabpanel-source" role="tabpanel" aria-labelledby="tab-source" data-testid="tab-content-source">
             {!githubRepo && (
               <p
                 data-testid="source-no-repo-note"
@@ -1565,7 +1579,7 @@ export default function AppPermalinkPage() { // exported as default so the serve
 
         {/* R10 (2026-04-28): Earlier runs tab */}
         {activeTab === 'runs' && (
-          <section data-testid="tab-content-runs">
+          <section id="tabpanel-runs" role="tabpanel" aria-labelledby="tab-runs" data-testid="tab-content-runs">
             <div
               style={{
                 fontFamily: 'JetBrains Mono, monospace',
@@ -1618,12 +1632,13 @@ export default function AppPermalinkPage() { // exported as default so the serve
 
 /* ----------------- TabBar with sliding underline ----------------- */
 
+// History tab hidden until run-history is wired (today it renders a 'coming
+// in v0.1' stub which is just noise). 4 tabs read cleaner on mobile too.
 const TABS: Array<{ id: 'run' | 'about' | 'install' | 'source' | 'runs'; label: string }> = [
   { id: 'run', label: 'Run' },
   { id: 'about', label: 'About' },
   { id: 'install', label: 'Install' },
   { id: 'source', label: 'Source' },
-  { id: 'runs', label: 'History' },
 ];
 
 function TabBar({
@@ -1659,12 +1674,37 @@ function TabBar({
     letterSpacing: isOn ? '-0.01em' : undefined,
   });
 
+  function handleKeyDown(e: React.KeyboardEvent) {
+    const idx = TABS.findIndex((t) => t.id === activeTab);
+    if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      const next = TABS[(idx + 1) % TABS.length];
+      setActiveTab(next.id);
+      tabRefs.current.get(next.id)?.focus();
+    } else if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      const prev = TABS[(idx - 1 + TABS.length) % TABS.length];
+      setActiveTab(prev.id);
+      tabRefs.current.get(prev.id)?.focus();
+    } else if (e.key === 'Home') {
+      e.preventDefault();
+      setActiveTab(TABS[0].id);
+      tabRefs.current.get(TABS[0].id)?.focus();
+    } else if (e.key === 'End') {
+      e.preventDefault();
+      const last = TABS[TABS.length - 1];
+      setActiveTab(last.id);
+      tabRefs.current.get(last.id)?.focus();
+    }
+  }
+
   return (
     <div
       role="tablist"
       aria-label="App content"
       data-testid="permalink-tabs"
       className="permalink-tab-bar"
+      onKeyDown={handleKeyDown}
       style={{
         display: 'flex',
         alignItems: 'stretch',
@@ -1688,7 +1728,10 @@ function TabBar({
             }}
             type="button"
             role="tab"
+            id={`tab-${t.id}`}
             aria-selected={isOn}
+            aria-controls={`tabpanel-${t.id}`}
+            tabIndex={isOn ? 0 : -1}
             data-testid={`permalink-tab-${t.id}`}
             data-state={isOn ? 'active' : 'inactive'}
             onClick={() => setActiveTab(t.id)}

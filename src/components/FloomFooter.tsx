@@ -79,7 +79,7 @@ export function FloomFooter() {
             </span>
           </Link>
           <span style={{ fontSize: 12.5, color: 'var(--muted)' }}>
-            Localhost to live and secure in 60 seconds.
+            Localhost to live in 60 seconds.
           </span>
         </div>
 

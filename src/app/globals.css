@@ -28,12 +28,12 @@
   --terminal-bg: #1b1a17;
   --terminal-ink: #f1efe9;
   --success: #1a7f37;
-  --warning: #c2791c;
+  --warning: #b05513;
   --studio: #f5f4f0;
   --line-hover: #c4c1b8;
   --line-soft: #f1efe9;
   --warning-soft: #fef3c7;
-  --danger: #c44a2b;
+  --danger: #c04829;
   --danger-soft: #fdf1ec;
   --danger-border: #f0d5c9;
   --shadow-2: 0 1px 2px rgba(22, 21, 18, 0.04), 0 1px 3px rgba(22, 21, 18, 0.03);
@@ -92,6 +92,7 @@ input { font-family: inherit; }
   z-index: 100;
   height: 56px;
   background: rgba(250, 250, 248, 0.92);
+  -webkit-backdrop-filter: saturate(180%) blur(12px);
   backdrop-filter: saturate(180%) blur(12px);
   border-bottom: 1px solid var(--line);
   display: flex;
@@ -594,6 +595,33 @@ input { font-family: inherit; }
 }
 .hero-install-card:hover {
   box-shadow: 0 2px 8px rgba(22, 21, 18, 0.08), 0 8px 24px rgba(22, 21, 18, 0.06);
+}
+
+/* ── Skip link ───────────────────────────────────────────── */
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: auto;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  z-index: 9999;
+  background: var(--accent);
+  color: #fff;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 14px;
+  text-decoration: none;
+}
+.skip-link:focus {
+  left: 16px;
+  top: 16px;
+  width: auto;
+  height: auto;
+  overflow: visible;
+  outline: 2px solid #fff;
+  outline-offset: 2px;
 }
 
 /* ── Focus rings on interactive elements ────────────────── */

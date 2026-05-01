@@ -6,7 +6,8 @@ export default function NotFound() {
   return (
     <div style={{ minHeight: "100vh", background: "var(--bg)", color: "var(--ink)", display: "flex", flexDirection: "column" }}>
       <SiteHeader />
-      <section
+      <main
+        id="main"
         style={{
           flex: 1,
           display: "flex",
@@ -83,7 +84,7 @@ export default function NotFound() {
             Try the live demo &rarr;
           </Link>
         </div>
-      </section>
+      </main>
       <FloomFooter />
     </div>
   );

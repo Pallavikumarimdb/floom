@@ -66,7 +66,7 @@ function CodeBlock({ children }: { children: string }) {
 
 export default function DocsPage() {
   return (
-    <main className="min-h-screen overflow-x-hidden bg-[#faf9f5] text-[#11110f]">
+    <main id="main" className="min-h-screen overflow-x-hidden bg-[#faf9f5] text-[#11110f]">
       <SiteHeader />
 
       <article className="mx-auto max-w-4xl px-5 py-14">
