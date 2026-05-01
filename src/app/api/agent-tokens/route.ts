@@ -4,6 +4,9 @@ import { resolveAuthCaller } from "@/lib/supabase/auth";
 import { createAgentToken } from "@/lib/supabase/agent-tokens";
 import { hasAgentTokenConfig } from "@/lib/demo-app";
 
+const MAX_AGENT_TOKEN_NAME_LENGTH = 80;
+const DEFAULT_MAX_ACTIVE_AGENT_TOKENS_PER_USER = 10;
+
 export async function GET(req: NextRequest) {
   if (!hasAgentTokenConfig()) {
     return NextResponse.json(
@@ -47,6 +50,34 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json().catch(() => ({}));
   const name = typeof body.name === "string" && body.name.trim() ? body.name.trim() : "Agent token";
+  if (name.length > MAX_AGENT_TOKEN_NAME_LENGTH) {
+    return NextResponse.json(
+      { error: `Token name must be ${MAX_AGENT_TOKEN_NAME_LENGTH} characters or less` },
+      { status: 400 }
+    );
+  }
+
+  const activeTokenLimit = readPositiveIntegerEnv(
+    "FLOOM_MAX_ACTIVE_AGENT_TOKENS_PER_USER",
+    DEFAULT_MAX_ACTIVE_AGENT_TOKENS_PER_USER
+  );
+  const { count, error: countError } = await admin
+    .from("agent_tokens")
+    .select("id", { count: "exact", head: true })
+    .eq("owner_id", caller.userId)
+    .is("revoked_at", null)
+    .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`);
+
+  if (countError) {
+    return NextResponse.json({ error: "Failed to check token limit" }, { status: 500 });
+  }
+
+  if ((count ?? 0) >= activeTokenLimit) {
+    return NextResponse.json(
+      { error: `Active agent token limit reached (${activeTokenLimit})` },
+      { status: 429 }
+    );
+  }
 
   const { token, record } = await createAgentToken(admin, caller.userId, name);
 
@@ -54,4 +85,9 @@ export async function POST(req: NextRequest) {
     token,
     agent_token: record,
   });
+}
+
+function readPositiveIntegerEnv(name: string, fallback: number) {
+  const value = Number(process.env[name]);
+  return Number.isInteger(value) && value > 0 ? value : fallback;
 }

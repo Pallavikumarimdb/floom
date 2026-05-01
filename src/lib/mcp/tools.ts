@@ -36,12 +36,14 @@ export type McpToolContext = {
 
 type FloomToolName =
   | "auth_status"
+  | "get_app_contract"
+  | "list_app_templates"
+  | "get_app_template"
   | "validate_manifest"
   | "publish_app"
   | "find_candidate_apps"
   | "get_app"
-  | "run_app"
-  | "create_agent_token";
+  | "run_app";
 
 const SLUG_RE = /^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$/;
 
@@ -52,6 +54,39 @@ export const floomTools: McpToolDefinition[] = [
     inputSchema: {
       type: "object",
       properties: {},
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "get_app_contract",
+    description: "Return the exact Floom v0 app contract, copy-paste starter files, and explicit post-v0 unsupported cases.",
+    inputSchema: {
+      type: "object",
+      properties: {},
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "list_app_templates",
+    description: "List useful Floom v0-safe starter app templates that agents can copy before publishing.",
+    inputSchema: {
+      type: "object",
+      properties: {},
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "get_app_template",
+    description: "Return one copy-paste Floom v0-safe app template bundle.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        key: {
+          type: "string",
+          description: "Template key from list_app_templates.",
+        },
+      },
+      required: ["key"],
       additionalProperties: false,
     },
   },
@@ -162,20 +197,6 @@ export const floomTools: McpToolDefinition[] = [
       additionalProperties: false,
     },
   },
-  {
-    name: "create_agent_token",
-    description: "Create an agent token for the authenticated Floom user.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        name: {
-          type: "string",
-          description: "Human-readable token name.",
-        },
-      },
-      additionalProperties: false,
-    },
-  },
 ];
 
 export async function callFloomTool(
@@ -212,12 +233,20 @@ async function callFloomToolUnchecked(
     return runApp(args, context);
   }
 
-  if (name === "create_agent_token") {
-    return createAgentToken(args, context);
-  }
-
   if (name === "auth_status") {
     return authStatus(context);
+  }
+
+  if (name === "get_app_contract") {
+    return getAppContract();
+  }
+
+  if (name === "list_app_templates") {
+    return listAppTemplates();
+  }
+
+  if (name === "get_app_template") {
+    return getAppTemplate(args);
   }
 
   if (name === "validate_manifest") {
@@ -285,31 +314,6 @@ async function runApp(args: JsonObject, context: McpToolContext): Promise<McpToo
   });
 }
 
-async function createAgentToken(
-  args: JsonObject,
-  context: McpToolContext
-): Promise<McpToolResult> {
-  if (!context.authorization) {
-    return errorResult("create_agent_token requires an Authorization bearer token");
-  }
-
-  const name = args.name;
-  if (name !== undefined && typeof name !== "string") {
-    return errorResult("name must be a string when provided");
-  }
-
-  return proxyJson(`${context.baseUrl}/api/agent-tokens`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...forwardedHeaders(context),
-    },
-    body: JSON.stringify({
-      ...(typeof name === "string" ? { name } : {}),
-    }),
-  });
-}
-
 async function authStatus(context: McpToolContext): Promise<McpToolResult> {
   if (!context.authorization) {
     return okResult({
@@ -357,8 +361,532 @@ async function authStatus(context: McpToolContext): Promise<McpToolResult> {
     scopes:
       caller.kind === "agent_token"
         ? caller.scopes
-        : ["read", "run", "publish", "revoke"],
+        : ["read", "run", "publish"],
   });
+}
+
+function getAppContract(): McpToolResult {
+  return okResult({
+    version: "v0",
+    supported: [
+      "single-file Python",
+      "Python standard library only",
+      "one handler function that accepts a JSON object and returns a JSON object",
+      "floom.yaml plus input.schema.json and output.schema.json",
+      "public apps with public: true; private apps when public is omitted or false",
+    ],
+    unsupported: [
+      {
+        case: "requirements.txt or pyproject.toml",
+        reason: "Dependency installation is post-v0. v0 runs one stdlib Python file without an install step.",
+      },
+      {
+        case: "openapi.json, FastAPI, Flask, or HTTP servers",
+        reason: "HTTP app routing is post-v0. v0 exposes one JSON Schema form and one handler.",
+      },
+      {
+        case: "package.json, TypeScript, or Node apps",
+        reason: "TypeScript/Node runtime parity is post-v0. v0 runtime is runtime: python.",
+      },
+      {
+        case: "multiple Python files",
+        reason: "Multi-file bundles are post-v0. v0 packaging accepts one top-level Python entrypoint file.",
+      },
+      {
+        case: "manifest fields actions, dependencies, or secrets",
+        reason: "Multiple actions, dependency installs, and app secrets are post-v0 features.",
+      },
+      {
+        case: "OpenBlog/OpenAPI apps",
+        reason: "OpenBlog has an HTTP/OpenAPI surface and dependency-style app shape. It belongs to the post-v0 HTTP app runner, not the 60-second v0 function path.",
+      },
+    ],
+    files: {
+      "floom.yaml": [
+        "name: Hello Floom",
+        "slug: hello-floom",
+        "runtime: python",
+        "entrypoint: app.py",
+        "handler: run",
+        "public: true",
+        "input_schema: ./input.schema.json",
+        "output_schema: ./output.schema.json",
+      ].join("\n"),
+      "app.py": [
+        "def run(inputs: dict) -> dict:",
+        "    name = str(inputs.get(\"name\", \"world\"))",
+        "    return {\"message\": f\"Hello, {name}!\"}",
+      ].join("\n"),
+      "input.schema.json": {
+        type: "object",
+        required: ["name"],
+        additionalProperties: false,
+        properties: {
+          name: {
+            type: "string",
+            title: "Name",
+            default: "Federico",
+          },
+        },
+      },
+      "output.schema.json": {
+        type: "object",
+        required: ["message"],
+        additionalProperties: false,
+        properties: {
+          message: {
+            type: "string",
+            title: "Message",
+          },
+        },
+      },
+    },
+    templates_tool: {
+      list: "list_app_templates",
+      get: "get_app_template",
+      available_keys: Object.keys(APP_TEMPLATES),
+    },
+    publish_command:
+      "FLOOM_TOKEN=<agent-token> FLOOM_API_URL=https://floom-60sec.vercel.app npx tsx cli/deploy.ts <app-dir>",
+  });
+}
+
+type AppTemplate = {
+  key: string;
+  name: string;
+  description: string;
+  useful_for: string;
+  files: {
+    "floom.yaml": string;
+    "app.py": string;
+    "input.schema.json": JsonObject;
+    "output.schema.json": JsonObject;
+  };
+  example_inputs: JsonObject;
+};
+
+const APP_TEMPLATES: Record<string, AppTemplate> = {
+  invoice_calculator: {
+    key: "invoice_calculator",
+    name: "Invoice Calculator",
+    description: "Calculate line-item subtotal, discount, tax, and invoice total.",
+    useful_for: "Quotes, invoices, and lightweight internal billing calculators.",
+    files: {
+      "floom.yaml": [
+        "name: Invoice Calculator",
+        "slug: invoice-calculator",
+        "runtime: python",
+        "entrypoint: app.py",
+        "handler: run",
+        "public: true",
+        "input_schema: ./input.schema.json",
+        "output_schema: ./output.schema.json",
+      ].join("\n"),
+      "app.py": [
+        "from decimal import Decimal, ROUND_HALF_UP",
+        "",
+        "",
+        "def money(value):",
+        "    return Decimal(str(value or 0)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)",
+        "",
+        "",
+        "def run(inputs: dict) -> dict:",
+        "    items = inputs.get('items') or []",
+        "    currency = str(inputs.get('currency') or 'USD').upper()[:8]",
+        "    discount_rate = Decimal(str(inputs.get('discount_percent') or 0)) / Decimal('100')",
+        "    tax_rate = Decimal(str(inputs.get('tax_rate_percent') or 0)) / Decimal('100')",
+        "    lines = []",
+        "    subtotal = Decimal('0')",
+        "    for item in items:",
+        "        description = str(item.get('description') or 'Item')",
+        "        quantity = Decimal(str(item.get('quantity') or 0))",
+        "        unit_price = Decimal(str(item.get('unit_price') or 0))",
+        "        line_total = money(quantity * unit_price)",
+        "        subtotal += line_total",
+        "        lines.append({",
+        "            'description': description,",
+        "            'quantity': float(quantity),",
+        "            'unit_price': float(money(unit_price)),",
+        "            'line_total': float(line_total),",
+        "        })",
+        "    subtotal = money(subtotal)",
+        "    discount = money(subtotal * discount_rate)",
+        "    taxable = money(subtotal - discount)",
+        "    tax = money(taxable * tax_rate)",
+        "    total = money(taxable + tax)",
+        "    return {",
+        "        'currency': currency,",
+        "        'line_items': lines,",
+        "        'subtotal': float(subtotal),",
+        "        'discount': float(discount),",
+        "        'tax': float(tax),",
+        "        'total': float(total),",
+        "    }",
+      ].join("\n"),
+      "input.schema.json": {
+        type: "object",
+        required: ["items"],
+        additionalProperties: false,
+        properties: {
+          currency: { type: "string", title: "Currency", default: "USD" },
+          discount_percent: { type: "number", title: "Discount %", default: 0, minimum: 0 },
+          tax_rate_percent: { type: "number", title: "Tax %", default: 0, minimum: 0 },
+          items: {
+            type: "array",
+            title: "Line items",
+            minItems: 1,
+            items: {
+              type: "object",
+              required: ["description", "quantity", "unit_price"],
+              additionalProperties: false,
+              properties: {
+                description: { type: "string", title: "Description" },
+                quantity: { type: "number", title: "Quantity", minimum: 0 },
+                unit_price: { type: "number", title: "Unit price", minimum: 0 },
+              },
+            },
+            default: [
+              { description: "Strategy session", quantity: 2, unit_price: 250 },
+              { description: "Implementation", quantity: 1, unit_price: 900 },
+            ],
+          },
+        },
+      },
+      "output.schema.json": {
+        type: "object",
+        required: ["currency", "line_items", "subtotal", "discount", "tax", "total"],
+        additionalProperties: false,
+        properties: {
+          currency: { type: "string", title: "Currency" },
+          subtotal: { type: "number", title: "Subtotal" },
+          discount: { type: "number", title: "Discount" },
+          tax: { type: "number", title: "Tax" },
+          total: { type: "number", title: "Total" },
+          line_items: {
+            type: "array",
+            title: "Line items",
+            items: {
+              type: "object",
+              additionalProperties: false,
+              properties: {
+                description: { type: "string" },
+                quantity: { type: "number" },
+                unit_price: { type: "number" },
+                line_total: { type: "number" },
+              },
+            },
+          },
+        },
+      },
+    },
+    example_inputs: {
+      currency: "USD",
+      discount_percent: 5,
+      tax_rate_percent: 8.5,
+      items: [
+        { description: "Strategy session", quantity: 2, unit_price: 250 },
+        { description: "Implementation", quantity: 1, unit_price: 900 },
+      ],
+    },
+  },
+  utm_url_builder: {
+    key: "utm_url_builder",
+    name: "UTM URL Builder",
+    description: "Append clean UTM parameters to a landing-page URL.",
+    useful_for: "Campaign links, launch tracking, and partner links.",
+    files: {
+      "floom.yaml": [
+        "name: UTM URL Builder",
+        "slug: utm-url-builder",
+        "runtime: python",
+        "entrypoint: app.py",
+        "handler: run",
+        "public: true",
+        "input_schema: ./input.schema.json",
+        "output_schema: ./output.schema.json",
+      ].join("\n"),
+      "app.py": [
+        "from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit",
+        "",
+        "",
+        "def run(inputs: dict) -> dict:",
+        "    base_url = str(inputs.get('base_url') or '').strip()",
+        "    if not base_url:",
+        "        return {'url': '', 'params': {}, 'warning': 'Add a base URL.'}",
+        "    parts = urlsplit(base_url)",
+        "    existing = dict(parse_qsl(parts.query, keep_blank_values=True))",
+        "    mapping = {",
+        "        'utm_source': inputs.get('source'),",
+        "        'utm_medium': inputs.get('medium'),",
+        "        'utm_campaign': inputs.get('campaign'),",
+        "        'utm_term': inputs.get('term'),",
+        "        'utm_content': inputs.get('content'),",
+        "    }",
+        "    params = {key: str(value).strip() for key, value in mapping.items() if value not in (None, '')}",
+        "    merged = {**existing, **params}",
+        "    url = urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(merged), parts.fragment))",
+        "    return {'url': url, 'params': params, 'warning': ''}",
+      ].join("\n"),
+      "input.schema.json": {
+        type: "object",
+        required: ["base_url", "source", "medium", "campaign"],
+        additionalProperties: false,
+        properties: {
+          base_url: { type: "string", title: "Base URL", default: "https://floom.dev" },
+          source: { type: "string", title: "Source", default: "linkedin" },
+          medium: { type: "string", title: "Medium", default: "social" },
+          campaign: { type: "string", title: "Campaign", default: "launch" },
+          term: { type: "string", title: "Term", default: "" },
+          content: { type: "string", title: "Content", default: "" },
+        },
+      },
+      "output.schema.json": {
+        type: "object",
+        required: ["url", "params", "warning"],
+        additionalProperties: false,
+        properties: {
+          url: { type: "string", title: "Tracked URL" },
+          params: { type: "object", title: "UTM params", additionalProperties: { type: "string" } },
+          warning: { type: "string", title: "Warning" },
+        },
+      },
+    },
+    example_inputs: {
+      base_url: "https://floom.dev",
+      source: "linkedin",
+      medium: "social",
+      campaign: "launch",
+      term: "",
+      content: "hero-cta",
+    },
+  },
+  csv_stats: {
+    key: "csv_stats",
+    name: "CSV Stats",
+    description: "Summarize row count, columns, and numeric stats from pasted CSV text.",
+    useful_for: "Quick checks on exported spreadsheets without uploading files.",
+    files: {
+      "floom.yaml": [
+        "name: CSV Stats",
+        "slug: csv-stats",
+        "runtime: python",
+        "entrypoint: app.py",
+        "handler: run",
+        "public: true",
+        "input_schema: ./input.schema.json",
+        "output_schema: ./output.schema.json",
+      ].join("\n"),
+      "app.py": [
+        "import csv",
+        "import io",
+        "",
+        "",
+        "def number(value):",
+        "    try:",
+        "        return float(str(value).replace(',', '').strip())",
+        "    except ValueError:",
+        "        return None",
+        "",
+        "",
+        "def run(inputs: dict) -> dict:",
+        "    text = str(inputs.get('csv_text') or '')",
+        "    preferred = str(inputs.get('numeric_column') or '').strip()",
+        "    reader = csv.DictReader(io.StringIO(text))",
+        "    rows = list(reader)",
+        "    columns = reader.fieldnames or []",
+        "    target_columns = [preferred] if preferred else columns",
+        "    stats = []",
+        "    for column in target_columns:",
+        "        values = [number(row.get(column, '')) for row in rows]",
+        "        nums = [value for value in values if value is not None]",
+        "        if nums:",
+        "            stats.append({",
+        "                'column': column,",
+        "                'count': len(nums),",
+        "                'min': min(nums),",
+        "                'max': max(nums),",
+        "                'mean': round(sum(nums) / len(nums), 4),",
+        "            })",
+        "    return {",
+        "        'row_count': len(rows),",
+        "        'columns': columns,",
+        "        'numeric_stats': stats,",
+        "    }",
+      ].join("\n"),
+      "input.schema.json": {
+        type: "object",
+        required: ["csv_text"],
+        additionalProperties: false,
+        properties: {
+          csv_text: {
+            type: "string",
+            title: "CSV text",
+            default: "name,revenue,cost\nAlpha,1200,450\nBeta,800,300\nGamma,1500,700",
+          },
+          numeric_column: {
+            type: "string",
+            title: "Numeric column",
+            description: "Leave blank to scan every column.",
+            default: "",
+          },
+        },
+      },
+      "output.schema.json": {
+        type: "object",
+        required: ["row_count", "columns", "numeric_stats"],
+        additionalProperties: false,
+        properties: {
+          row_count: { type: "integer", title: "Rows" },
+          columns: { type: "array", title: "Columns", items: { type: "string" } },
+          numeric_stats: {
+            type: "array",
+            title: "Numeric stats",
+            items: {
+              type: "object",
+              required: ["column", "count", "min", "max", "mean"],
+              additionalProperties: false,
+              properties: {
+                column: { type: "string" },
+                count: { type: "integer" },
+                min: { type: "number" },
+                max: { type: "number" },
+                mean: { type: "number" },
+              },
+            },
+          },
+        },
+      },
+    },
+    example_inputs: {
+      csv_text: "name,revenue,cost\nAlpha,1200,450\nBeta,800,300\nGamma,1500,700",
+      numeric_column: "",
+    },
+  },
+  meeting_action_items: {
+    key: "meeting_action_items",
+    name: "Meeting Action Items",
+    description: "Extract likely action items from pasted notes with simple deterministic heuristics.",
+    useful_for: "Turning meeting notes into a lightweight task list without AI calls.",
+    files: {
+      "floom.yaml": [
+        "name: Meeting Action Items",
+        "slug: meeting-action-items",
+        "runtime: python",
+        "entrypoint: app.py",
+        "handler: run",
+        "public: true",
+        "input_schema: ./input.schema.json",
+        "output_schema: ./output.schema.json",
+      ].join("\n"),
+      "app.py": [
+        "import re",
+        "",
+        "",
+        "PATTERNS = [",
+        "    r'^(?:todo|action|next step)[:\\-]\\s*(?P<task>.+)$',",
+        "    r'\\b(?P<owner>[A-Z][a-z]+)\\s+(?:will|to|needs to|has to)\\s+(?P<task>.+)$',",
+        "    r'\\b(?:follow up|send|prepare|review|schedule|draft|share)\\b(?P<task>.*)$',",
+        "]",
+        "",
+        "",
+        "def clean(text):",
+        "    return re.sub(r'\\s+', ' ', text).strip(' -:.')",
+        "",
+        "",
+        "def due_from(text):",
+        "    match = re.search(r'\\bby\\s+([A-Za-z]+\\s+\\d{1,2}|tomorrow|today|Friday|Monday|Tuesday|Wednesday|Thursday)\\b', text, re.I)",
+        "    return match.group(1) if match else ''",
+        "",
+        "",
+        "def run(inputs: dict) -> dict:",
+        "    transcript = str(inputs.get('transcript') or '')",
+        "    default_owner = str(inputs.get('default_owner') or '').strip()",
+        "    lines = [line.strip() for line in re.split(r'[\\n\\r]+', transcript) if line.strip()]",
+        "    items = []",
+        "    for line in lines:",
+        "        task = ''",
+        "        owner = default_owner",
+        "        for pattern in PATTERNS:",
+        "            match = re.search(pattern, line, re.I)",
+        "            if match:",
+        "                groups = match.groupdict()",
+        "                task = clean(groups.get('task') or line)",
+        "                owner = clean(groups.get('owner') or owner)",
+        "                break",
+        "        if task and task.lower() not in {item['task'].lower() for item in items}:",
+        "            items.append({'task': task, 'owner': owner, 'due': due_from(line)})",
+        "    return {'count': len(items), 'items': items}",
+      ].join("\n"),
+      "input.schema.json": {
+        type: "object",
+        required: ["transcript"],
+        additionalProperties: false,
+        properties: {
+          transcript: {
+            type: "string",
+            title: "Meeting notes",
+            default: "Action: send the launch notes by Friday\nPallavi will review the demo copy\nNeed to schedule QA follow-up tomorrow",
+          },
+          default_owner: {
+            type: "string",
+            title: "Default owner",
+            default: "",
+          },
+        },
+      },
+      "output.schema.json": {
+        type: "object",
+        required: ["count", "items"],
+        additionalProperties: false,
+        properties: {
+          count: { type: "integer", title: "Action item count" },
+          items: {
+            type: "array",
+            title: "Action items",
+            items: {
+              type: "object",
+              required: ["task", "owner", "due"],
+              additionalProperties: false,
+              properties: {
+                task: { type: "string" },
+                owner: { type: "string" },
+                due: { type: "string" },
+              },
+            },
+          },
+        },
+      },
+    },
+    example_inputs: {
+      transcript: "Action: send the launch notes by Friday\nPallavi will review the demo copy\nNeed to schedule QA follow-up tomorrow",
+      default_owner: "",
+    },
+  },
+};
+
+function listAppTemplates(): McpToolResult {
+  return okResult({
+    templates: Object.values(APP_TEMPLATES).map((template) => ({
+      key: template.key,
+      name: template.name,
+      description: template.description,
+      useful_for: template.useful_for,
+    })),
+  });
+}
+
+function getAppTemplate(args: JsonObject): McpToolResult {
+  const key = args.key;
+  if (typeof key !== "string") {
+    return errorResult("key must be a string");
+  }
+
+  const template = APP_TEMPLATES[key];
+  if (!template) {
+    return errorResult(`Unknown app template: ${key}`);
+  }
+
+  return okResult(template);
 }
 
 function validateManifest(args: JsonObject): McpToolResult {
@@ -458,7 +986,15 @@ function findCandidateApps(args: JsonObject): McpToolResult {
       let manifest: FloomManifest | null = null;
 
       try {
-        manifest = parseManifest(yaml.load(manifestText));
+        const rawManifest = yaml.load(manifestText);
+        const rawManifestObject = asObject(rawManifest);
+        const unsupportedFields = rawManifestObject
+          ? unsupportedManifestFields(rawManifestObject)
+          : [];
+        errors.push(...unsupportedFields);
+        if (unsupportedFields.length === 0) {
+          manifest = parseManifest(rawManifest);
+        }
       } catch (error) {
         errors.push(error instanceof Error ? error.message : "Invalid floom.yaml");
       }
@@ -470,7 +1006,14 @@ function findCandidateApps(args: JsonObject): McpToolResult {
         }
 
         for (const unsupportedPath of unsupportedV0Files(appDir, files)) {
-          errors.push(`${unsupportedPath} is not supported in v0`);
+          errors.push(unsupportedFileReason(unsupportedPath));
+        }
+
+        const pythonFiles = pythonFilesInAppDir(appDir, files);
+        if (pythonFiles.length > 1) {
+          errors.push(
+            `Multiple Python files are not supported in v0: ${pythonFiles.join(", ")}. Use one stdlib entrypoint file or wait for post-v0 multi-file bundles.`
+          );
         }
 
         const inputSchemaPath = joinPath(appDir, manifest.input_schema || "input.schema.json");
@@ -509,6 +1052,43 @@ function unsupportedV0Files(appDir: string, files: Record<string, string>) {
     .filter((filePath) => filePath in files);
 }
 
+function unsupportedManifestFields(manifest: JsonObject) {
+  const reasons: string[] = [];
+  if (manifest.actions !== undefined) {
+    reasons.push("floom.yaml field actions is not supported in v0; multiple actions are post-v0.");
+  }
+  if (manifest.dependencies !== undefined) {
+    reasons.push("floom.yaml field dependencies is not supported in v0; dependency installation is post-v0.");
+  }
+  if (manifest.secrets !== undefined) {
+    reasons.push("floom.yaml field secrets is not supported in v0; app secret injection is post-v0.");
+  }
+  return reasons;
+}
+
+function unsupportedFileReason(filePath: string) {
+  const fileName = basename(filePath);
+  if (fileName === "requirements.txt") {
+    return `${filePath} is not supported in v0; Python dependencies require the post-v0 dependency installer.`;
+  }
+  if (fileName === "pyproject.toml") {
+    return `${filePath} is not supported in v0; Python packaging/dependencies require the post-v0 dependency installer.`;
+  }
+  if (fileName === "package.json") {
+    return `${filePath} is not supported in v0; TypeScript/Node apps require the post-v0 TypeScript runner.`;
+  }
+  if (fileName === "openapi.json") {
+    return `${filePath} is not supported in v0; OpenAPI/HTTP apps require the post-v0 HTTP app runner.`;
+  }
+  return `${filePath} is not supported in v0.`;
+}
+
+function pythonFilesInAppDir(appDir: string, files: Record<string, string>) {
+  return Object.keys(files)
+    .filter((filePath) => dirname(filePath) === appDir && basename(filePath).endsWith(".py"))
+    .sort();
+}
+
 function unsupportedRepositoryCandidates(files: Record<string, string>) {
   if (Object.keys(files).some((filePath) => basename(filePath) === "floom.yaml")) {
     return [];
@@ -516,6 +1096,7 @@ function unsupportedRepositoryCandidates(files: Record<string, string>) {
 
   const fileNames = new Set(Object.keys(files).map((filePath) => basename(filePath)));
   const fileText = Object.values(files).join("\n");
+  const pythonFiles = Object.keys(files).filter((filePath) => basename(filePath).endsWith(".py"));
   const candidates = [];
 
   if (fileNames.has("openapi.json") || /FastAPI\s*\(/.test(fileText)) {
@@ -528,6 +1109,14 @@ function unsupportedRepositoryCandidates(files: Record<string, string>) {
 
   if (fileNames.has("package.json")) {
     candidates.push(unsupportedCandidate("TypeScript/Node apps require the post-v0 TypeScript runner"));
+  }
+
+  if (pythonFiles.length > 1) {
+    candidates.push(
+      unsupportedCandidate(
+        `Multi-file Python apps require the post-v0 multi-file bundle path: ${pythonFiles.sort().join(", ")}`
+      )
+    );
   }
 
   return candidates;

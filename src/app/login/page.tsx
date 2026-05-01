@@ -19,6 +19,7 @@ function LoginContent() {
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
 
   useEffect(() => {
     const supabase = createClient();
@@ -36,10 +37,17 @@ function LoginContent() {
     setMessage(null);
 
     const supabase = createClient();
+    const emailRedirectTo = `${window.location.origin}/auth/callback?next=/tokens`;
     const result =
       mode === "signin"
         ? await supabase.auth.signInWithPassword({ email, password })
-        : await supabase.auth.signUp({ email, password });
+        : await supabase.auth.signUp({
+            email,
+            password,
+            options: {
+              emailRedirectTo,
+            },
+          });
 
     setLoading(false);
 
@@ -54,6 +62,26 @@ function LoginContent() {
     }
 
     setMessage("Check your email to finish signing in.");
+  }
+
+  async function signInWithGoogle() {
+    setGoogleLoading(true);
+    setError(null);
+    setMessage(null);
+
+    const supabase = createClient();
+    const redirectTo = `${window.location.origin}/auth/callback?next=/tokens`;
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo,
+      },
+    });
+
+    if (error) {
+      setGoogleLoading(false);
+      setError(error.message);
+    }
   }
 
   return (
@@ -178,15 +206,30 @@ function LoginContent() {
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || googleLoading}
             className="btn-primary full"
-            style={{ opacity: loading ? 0.6 : 1, width: '100%', height: 46, fontSize: 15 }}
+            style={{ opacity: (loading || googleLoading) ? 0.6 : 1, width: '100%', height: 46, fontSize: 15 }}
           >
             {loading
               ? "Working…"
               : mode === "signin"
               ? "Sign in"
               : "Create account"}
+          </button>
+
+          <div className="my-5 flex items-center gap-3 text-xs font-semibold uppercase text-neutral-400">
+            <span className="h-px flex-1 bg-[#ded8cc]" />
+            or
+            <span className="h-px flex-1 bg-[#ded8cc]" />
+          </div>
+
+          <button
+            type="button"
+            onClick={signInWithGoogle}
+            disabled={loading || googleLoading}
+            className="w-full rounded-lg border border-[#cfc7b8] bg-white px-5 py-3 font-semibold text-[#11110f] shadow-sm disabled:opacity-50"
+          >
+            {googleLoading ? "Redirecting..." : "Continue with Google"}
           </button>
         </form>
 

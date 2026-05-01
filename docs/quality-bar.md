@@ -15,7 +15,7 @@ It does not mean every app gets a new Vercel project.
 - Super clean codebase with clear module ownership.
 - Supabase is live, reproducible, and documented.
 - Supabase Auth is configured for email auth first.
-- Google Auth is later.
+- Google OAuth sign-in is available in the login UI once the Supabase Google provider is configured.
 - Agent token flow exists for app publishing.
 - MCP exists for agent-driven create/test/publish.
 - Floom skill instructs agents how to find and package deployable apps.
@@ -69,7 +69,7 @@ Required:
 - A builder can create/revoke an agent token.
 - Agent token permits app publish/update through MCP/CLI.
 - Agent token is stored hashed in Supabase.
-- Agent token scopes are explicit: `read`, `run`, `publish`, `revoke`.
+- Agent token scopes are explicit: `read`, `run`, `publish`.
 - Agent tokens expire by default.
 - Token prefix is stored for display; raw token is shown once.
 - Token hashing uses a server-only pepper outside the database.
@@ -84,8 +84,9 @@ Required:
 - Service-role API routes have black-box authorization tests; do not rely only on Supabase RLS tests.
 - Publish is atomic across storage upload, `apps`, and `app_versions`, or leaves a clean rollback state.
 - Uploaded JSON Schemas pass metaschema validation and complexity limits before storage.
-- Per-app and per-IP run limits exist before public sharing.
+- Caller-derived and per-app run limits execute before sandbox execution.
 - Source bundle size, file count, input size, output size, stdout size, timeout, and concurrency limits are enforced.
+- Execution inputs and outputs are redacted before persistence using schema `secret: true` markers plus secret-like key detection.
 - Public run endpoint blocks private apps and disabled apps.
 - Production execution fails closed if E2B, Supabase service-role, anon key, or agent-token pepper env is missing.
 - User code never receives Floom service-role credentials.
@@ -101,20 +102,23 @@ Required:
 Required tools:
 
 - `auth_status`
-- `create_agent_token`
+- `get_app_contract`
+- `list_app_templates`
+- `get_app_template`
 - `find_candidate_apps`
 - `validate_manifest`
 - `publish_app`
 - `run_app`
 - `get_app`
 
-The MCP must be tested by another agent from token creation through publish and live run.
+MCP must not mint or return raw agent tokens. Token creation happens only through the signed-in `/tokens` page, where the raw token is shown once. The MCP must be tested by another agent from a `/tokens`-created token through publish and live run.
 
 MCP safety requirements:
 
 - Authorization forwarding uses a pinned/allowlisted Floom origin, not an arbitrary request-derived host.
 - Tool failures always become JSON-RPC errors or tool `isError` results.
 - Network/provider failures do not crash the MCP route or leak tokens.
+- Unknown or removed token-creation tools do not proxy to `/api/agent-tokens`.
 
 ## Skill And CLI Bar
 

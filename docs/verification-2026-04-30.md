@@ -83,7 +83,7 @@ Verified live policies:
 - Storage bucket `app-bundles` is private.
 - `storage.objects` has RLS enabled.
 - `app-bundles` has owner-scoped select, insert, update, and delete policies.
-- `agent_tokens.scopes` defaults to `read`, `run`, `publish`, and `revoke`.
+- `agent_tokens.scopes` defaults to `read`, `run`, and `publish`.
 
 Verified RPC:
 

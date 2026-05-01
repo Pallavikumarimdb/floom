@@ -1,15 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { callerHasScope, resolveAuthCaller } from "@/lib/supabase/auth";
+import { callerHasScope, getBearerToken, resolveAuthCaller } from "@/lib/supabase/auth";
 import { demoApp, hasSupabaseConfig, runDemoApp } from "@/lib/demo-app";
 import { runInSandboxContained } from "@/lib/e2b/runner";
 import { MAX_INPUT_BYTES, MAX_REQUEST_BYTES, MAX_SOURCE_BYTES } from "@/lib/floom/limits";
-import { getPublicRunCallerKey, getPublicRunRateLimitKey } from "@/lib/floom/rate-limit";
-import { redactSecretOutput } from "@/lib/floom/schema";
+import {
+  getPublicRunAppRateLimitKey,
+  getPublicRunRateLimitKey,
+  getRunCallerKey,
+} from "@/lib/floom/rate-limit";
+import { redactSecretInput, redactSecretOutput } from "@/lib/floom/schema";
 import Ajv from "ajv";
 
 const ajv = new Ajv({ strict: false });
 const DEFAULT_PUBLIC_RUN_RATE_LIMIT_MAX = 20;
+const DEFAULT_PUBLIC_RUN_APP_RATE_LIMIT_MAX = 100;
 const DEFAULT_PUBLIC_RUN_RATE_LIMIT_WINDOW_SECONDS = 60;
 
 export async function POST(
@@ -75,7 +80,12 @@ export async function POST(
   }
 
   // Auth / sharing check
+  const bearerToken = getBearerToken(req);
   const caller = await resolveAuthCaller(req, admin);
+  if (bearerToken && !caller) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const userId = caller?.userId ?? null;
 
   const isOwner = userId === app.owner_id;
@@ -97,19 +107,18 @@ export async function POST(
       { status: 400 }
     );
   }
+  const redactedInputs = redactSecretInput(latestVersion.input_schema ?? {}, inputs);
 
-  if (!caller && isPublic) {
-    const rateLimit = await checkPublicRunRateLimit(
-      admin,
-      app.id,
-      getPublicRunCallerKey(req.headers)
+  const rateLimit = await checkPublicRunRateLimit(
+    admin,
+    app.id,
+    getRunCallerKey(caller, req.headers)
+  );
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      { error: rateLimit.error },
+      { status: rateLimit.status }
     );
-    if (!rateLimit.allowed) {
-      return NextResponse.json(
-        { error: rateLimit.error },
-        { status: rateLimit.status }
-      );
-    }
   }
 
   // Create execution record
@@ -120,7 +129,7 @@ export async function POST(
       version_id: latestVersion.id,
       caller_user_id: caller?.kind === "user" ? caller.userId : null,
       caller_agent_token_id: caller?.kind === "agent_token" ? caller.agentTokenId : null,
-      input: inputs,
+      input: redactedInputs,
       status: "running",
     })
     .select()
@@ -227,32 +236,49 @@ async function checkPublicRunRateLimit(
       error: string;
     }
 > {
-  const { data, error } = await admin.rpc("check_public_run_rate_limit", {
-    p_rate_key: getPublicRunRateLimitKey(appId, callerKey),
-    p_limit: readPositiveIntegerEnv(
-      "FLOOM_PUBLIC_RUN_RATE_LIMIT_MAX",
-      DEFAULT_PUBLIC_RUN_RATE_LIMIT_MAX
-    ),
-    p_window_seconds: readPositiveIntegerEnv(
-      "FLOOM_PUBLIC_RUN_RATE_LIMIT_WINDOW_SECONDS",
-      DEFAULT_PUBLIC_RUN_RATE_LIMIT_WINDOW_SECONDS
-    ),
-  });
+  const windowSeconds = readPositiveIntegerEnv(
+    "FLOOM_PUBLIC_RUN_RATE_LIMIT_WINDOW_SECONDS",
+    DEFAULT_PUBLIC_RUN_RATE_LIMIT_WINDOW_SECONDS
+  );
+  const checks = [
+    {
+      key: getPublicRunRateLimitKey(appId, callerKey),
+      limit: readPositiveIntegerEnv(
+        "FLOOM_PUBLIC_RUN_RATE_LIMIT_MAX",
+        DEFAULT_PUBLIC_RUN_RATE_LIMIT_MAX
+      ),
+    },
+    {
+      key: getPublicRunAppRateLimitKey(appId),
+      limit: readPositiveIntegerEnv(
+        "FLOOM_PUBLIC_RUN_APP_RATE_LIMIT_MAX",
+        DEFAULT_PUBLIC_RUN_APP_RATE_LIMIT_MAX
+      ),
+    },
+  ];
 
-  if (error) {
-    return {
-      allowed: false,
-      status: 503,
-      error: "Run rate limit check failed",
-    };
-  }
+  for (const check of checks) {
+    const { data, error } = await admin.rpc("check_public_run_rate_limit", {
+      p_rate_key: check.key,
+      p_limit: check.limit,
+      p_window_seconds: windowSeconds,
+    });
 
-  if (data !== true) {
-    return {
-      allowed: false,
-      status: 429,
-      error: "Run rate limit exceeded",
-    };
+    if (error) {
+      return {
+        allowed: false,
+        status: 503,
+        error: "Run rate limit check failed",
+      };
+    }
+
+    if (data !== true) {
+      return {
+        allowed: false,
+        status: 429,
+        error: "Run rate limit exceeded",
+      };
+    }
   }
 
   return { allowed: true };

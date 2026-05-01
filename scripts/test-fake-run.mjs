@@ -7,8 +7,10 @@ import { execFileSync } from 'node:child_process';
 import { Sandbox } from 'e2b';
 import { runInSandbox, runInSandboxContained } from '../src/lib/e2b/runner.ts';
 import {
+  getPublicRunAppRateLimitKey,
   getPublicRunCallerKey,
   getPublicRunRateLimitKey,
+  getRunCallerKey,
 } from '../src/lib/floom/rate-limit.ts';
 import {
   parseManifest,
@@ -17,6 +19,7 @@ import {
 } from '../src/lib/floom/manifest.ts';
 import {
   REDACTED_OUTPUT_VALUE,
+  redactSecretInput,
   redactSecretOutput,
   validateJsonSchemaValue,
 } from '../src/lib/floom/schema.ts';
@@ -42,15 +45,25 @@ async function test() {
   const toolNames = floomTools.map((tool) => tool.name);
   for (const toolName of [
     'auth_status',
+    'get_app_contract',
+    'list_app_templates',
+    'get_app_template',
     'validate_manifest',
     'publish_app',
     'find_candidate_apps',
     'get_app',
     'run_app',
-    'create_agent_token',
   ]) {
     assert.ok(toolNames.includes(toolName), `missing MCP tool: ${toolName}`);
   }
+  assert.ok(!toolNames.includes('create_agent_token'), 'MCP must not mint agent tokens');
+  const disabledTokenTool = await callFloomTool(
+    'create_agent_token',
+    { name: 'blocked' },
+    { baseUrl: 'http://localhost:3000', authorization: 'Bearer user-jwt' }
+  );
+  assert.equal(disabledTokenTool.isError, true);
+  assert.match(parseToolResult(disabledTokenTool).error, /Unknown tool/);
 
   if (isSafePythonEntrypoint('my-app.py')) {
     throw new Error('hyphenated Python entrypoint accepted');
@@ -127,13 +140,33 @@ async function test() {
   assert.equal(complexResult.ok, false);
   assert.match(complexResult.error, /too complex/);
 
-  testSecretOutputRedaction();
+  testSecretRedaction();
   testPublicRunRateLimitHardening();
+  testOAuthCallbackErrorHandling();
   await testSandboxErrorContainment();
 
   const authStatus = await callFloomTool('auth_status', {}, { baseUrl: 'http://localhost:3000' });
   assert.equal(authStatus.isError, undefined);
   assert.equal(parseToolResult(authStatus).authenticated, false);
+
+  const appContract = await callFloomTool('get_app_contract', {}, { baseUrl: 'http://localhost:3000' });
+  assert.equal(appContract.isError, undefined);
+  const contract = parseToolResult(appContract);
+  assert.equal(contract.version, 'v0');
+  assert.match(contract.files['floom.yaml'], /runtime: python/);
+  assert.match(contract.files['app.py'], /def run/);
+  assert.equal(contract.files['input.schema.json'].type, 'object');
+  assert.equal(contract.files['output.schema.json'].type, 'object');
+  assert.match(JSON.stringify(contract.unsupported), /OpenBlog/);
+  assert.match(JSON.stringify(contract.unsupported), /requirements\.txt/);
+  assert.deepEqual(contract.templates_tool.available_keys, [
+    'invoice_calculator',
+    'utm_url_builder',
+    'csv_stats',
+    'meeting_action_items',
+  ]);
+
+  await testMcpAppTemplates();
 
   const candidates = await callFloomTool(
     'find_candidate_apps',
@@ -155,6 +188,7 @@ async function test() {
       files: {
         'openapi.json': '{"openapi":"3.1.0"}',
         'api.py': 'from fastapi import FastAPI\napp = FastAPI()\n',
+        'worker.py': 'def helper():\n    return True\n',
         'requirements.txt': 'fastapi\n',
         'package.json': '{"scripts":{}}',
       },
@@ -168,6 +202,65 @@ async function test() {
   assert.match(unsupportedReasons, /FastAPI\/OpenAPI/);
   assert.match(unsupportedReasons, /dependencies/);
   assert.match(unsupportedReasons, /TypeScript\/Node/);
+  assert.match(unsupportedReasons, /Multi-file Python/);
+
+  const manifestUnsupportedCandidates = await callFloomTool(
+    'find_candidate_apps',
+    {
+      files: {
+        'bad/floom.yaml': [
+          'name: Bad',
+          'slug: bad-app',
+          'runtime: python',
+          'entrypoint: app.py',
+          'handler: run',
+          'actions:',
+          '  first: {}',
+          'dependencies:',
+          '  python:',
+          '    - requests',
+          'secrets:',
+          '  - API_KEY',
+        ].join('\n'),
+        'bad/app.py': 'def run(inputs):\n    return {"ok": True}\n',
+        'bad/input.schema.json': '{}',
+        'bad/output.schema.json': '{}',
+      },
+    },
+    { baseUrl: 'http://localhost:3000' }
+  );
+  const manifestUnsupportedReason = parseToolResult(manifestUnsupportedCandidates)
+    .candidates[0]
+    .unsupported_reason;
+  assert.match(manifestUnsupportedReason, /actions/);
+  assert.match(manifestUnsupportedReason, /dependencies/);
+  assert.match(manifestUnsupportedReason, /secrets/);
+
+  const manifestFileUnsupportedCandidates = await callFloomTool(
+    'find_candidate_apps',
+    {
+      files: {
+        'blocked/floom.yaml': manifestText,
+        'blocked/app.py': sourceText,
+        'blocked/helper.py': 'VALUE = 1\n',
+        'blocked/input.schema.json': inputSchemaText,
+        'blocked/output.schema.json': outputSchemaText,
+        'blocked/requirements.txt': 'requests\n',
+        'blocked/pyproject.toml': '[project]\nname = "blocked"\n',
+        'blocked/package.json': '{"scripts":{}}\n',
+        'blocked/openapi.json': '{"openapi":"3.1.0"}',
+      },
+    },
+    { baseUrl: 'http://localhost:3000' }
+  );
+  const manifestFileUnsupportedReason = parseToolResult(manifestFileUnsupportedCandidates)
+    .candidates[0]
+    .unsupported_reason;
+  assert.match(manifestFileUnsupportedReason, /requirements\.txt/);
+  assert.match(manifestFileUnsupportedReason, /pyproject\.toml/);
+  assert.match(manifestFileUnsupportedReason, /package\.json/);
+  assert.match(manifestFileUnsupportedReason, /openapi\.json/);
+  assert.match(manifestFileUnsupportedReason, /Multiple Python files/);
   testCliRejectsUnsupportedV0Shapes(manifestText, inputSchemaText, outputSchemaText);
 
   const originalFetch = globalThis.fetch;
@@ -265,6 +358,88 @@ async function test() {
   }
 }
 
+async function testMcpAppTemplates() {
+  const templatesResult = await callFloomTool(
+    'list_app_templates',
+    {},
+    { baseUrl: 'http://localhost:3000' }
+  );
+  assert.equal(templatesResult.isError, undefined);
+  const templates = parseToolResult(templatesResult).templates;
+  assert.deepEqual(
+    templates.map((template) => template.key),
+    ['invoice_calculator', 'utm_url_builder', 'csv_stats', 'meeting_action_items']
+  );
+
+  for (const templateInfo of templates) {
+    const templateResult = await callFloomTool(
+      'get_app_template',
+      { key: templateInfo.key },
+      { baseUrl: 'http://localhost:3000' }
+    );
+    assert.equal(templateResult.isError, undefined);
+    const template = parseToolResult(templateResult);
+    assert.equal(template.key, templateInfo.key);
+    assert.ok(template.files['floom.yaml'], `${templateInfo.key} missing floom.yaml`);
+    assert.ok(template.files['app.py'], `${templateInfo.key} missing app.py`);
+    assert.equal(template.files['input.schema.json'].type, 'object');
+    assert.equal(template.files['output.schema.json'].type, 'object');
+    assert.doesNotMatch(template.files['app.py'], /requests|fastapi|openai|anthropic|supabase/i);
+    assert.doesNotMatch(template.files['floom.yaml'], /dependencies|secrets|actions/);
+
+    const manifestValidation = await callFloomTool(
+      'validate_manifest',
+      {
+        manifest: template.files['floom.yaml'],
+        input_schema: template.files['input.schema.json'],
+        output_schema: template.files['output.schema.json'],
+      },
+      { baseUrl: 'http://localhost:3000' }
+    );
+    assert.equal(manifestValidation.isError, undefined);
+    assert.equal(parseToolResult(manifestValidation).valid, true);
+
+    runTemplatePython(template);
+  }
+
+  const unknownTemplate = await callFloomTool(
+    'get_app_template',
+    { key: 'not-real' },
+    { baseUrl: 'http://localhost:3000' }
+  );
+  assert.equal(unknownTemplate.isError, true);
+  assert.match(parseToolResult(unknownTemplate).error, /Unknown app template/);
+}
+
+function runTemplatePython(template) {
+  const appDir = mkdtempSync(join(tmpdir(), `floom-template-${template.key}-`));
+  try {
+    writeFileSync(join(appDir, 'app.py'), template.files['app.py']);
+    const output = execFileSync(
+      'python3',
+      [
+        '-c',
+        [
+          'import importlib.util, json, pathlib, sys',
+          'path = pathlib.Path(sys.argv[1]) / "app.py"',
+          'spec = importlib.util.spec_from_file_location("template_app", path)',
+          'module = importlib.util.module_from_spec(spec)',
+          'spec.loader.exec_module(module)',
+          'print(json.dumps(module.run(json.loads(sys.argv[2])), sort_keys=True))',
+        ].join('\n'),
+        appDir,
+        JSON.stringify(template.example_inputs),
+      ],
+      { encoding: 'utf8' }
+    );
+    const parsed = JSON.parse(output);
+    assert.equal(typeof parsed, 'object');
+    assert.notEqual(parsed, null);
+  } finally {
+    rmSync(appDir, { recursive: true, force: true });
+  }
+}
+
 function makeDeepSchema(depth) {
   let schema = { type: 'object' };
   let cursor = schema;
@@ -306,8 +481,8 @@ function testMcpOriginResolution() {
   }
 }
 
-function testSecretOutputRedaction() {
-  const outputSchema = {
+function testSecretRedaction() {
+  const schema = {
     type: 'object',
     $defs: {
       SecretString: { type: 'string', secret: true },
@@ -363,7 +538,7 @@ function testSecretOutputRedaction() {
       },
     },
   };
-  outputSchema.$defs.RefRow = {
+  schema.$defs.RefRow = {
     type: 'object',
     properties: {
       name: { type: 'string' },
@@ -371,7 +546,7 @@ function testSecretOutputRedaction() {
     },
   };
 
-  const output = {
+  const value = {
     answer: 'ok',
     token: 'secret-token',
     ref_token: 'ref-private',
@@ -397,7 +572,7 @@ function testSecretOutputRedaction() {
     },
   };
 
-  assert.deepEqual(redactSecretOutput(outputSchema, output), {
+  const expectedRedacted = {
     answer: 'ok',
     token: REDACTED_OUTPUT_VALUE,
     ref_token: REDACTED_OUTPUT_VALUE,
@@ -421,9 +596,20 @@ function testSecretOutputRedaction() {
       credential: REDACTED_OUTPUT_VALUE,
       authorization: REDACTED_OUTPUT_VALUE,
     },
-  });
-  assert.equal(output.token, 'secret-token');
-  assert.equal(output.rows[0].row_secret, 'row-private');
+  };
+
+  assert.deepEqual(redactSecretOutput(schema, value), expectedRedacted);
+  assert.deepEqual(redactSecretInput(schema, value), expectedRedacted);
+  assert.equal(value.token, 'secret-token');
+  assert.equal(value.rows[0].row_secret, 'row-private');
+
+  const routeText = readFileSync('src/app/api/apps/[slug]/run/route.ts', 'utf8');
+  assert.match(routeText, /redactSecretInput\(latestVersion\.input_schema \?\? \{\}, inputs\)/);
+  assert.match(routeText, /input: redactedInputs/);
+  assert.ok(
+    routeText.indexOf('redactSecretInput') < routeText.indexOf('.from("executions")'),
+    'execution inputs must be redacted before insert'
+  );
 }
 
 function testPublicRunRateLimitHardening() {
@@ -434,6 +620,7 @@ function testPublicRunRateLimitHardening() {
   );
 
   assert.equal(getPublicRunRateLimitKey('app_123'), 'public-run:app_123:anonymous');
+  assert.equal(getPublicRunAppRateLimitKey('app/123'), 'public-run-app:app-123');
   const callerA = getPublicRunCallerKey(new Headers({
     'x-forwarded-for': '203.0.113.8, 10.0.0.1',
     'user-agent': 'ua-a',
@@ -446,13 +633,41 @@ function testPublicRunRateLimitHardening() {
   assert.notEqual(callerA, callerB);
   assert.equal(getPublicRunCallerKey(new Headers()), 'anonymous');
   assert.equal(getPublicRunRateLimitKey('app/123', callerA), `public-run:app-123:${callerA}`);
+  assert.match(getRunCallerKey(
+    { kind: 'user', userId: 'user-123', agentTokenId: null },
+    new Headers()
+  ), /^[a-f0-9]{32}$/);
+  assert.notEqual(
+    getRunCallerKey({ kind: 'user', userId: 'user-123', agentTokenId: null }, new Headers()),
+    getRunCallerKey({
+      kind: 'agent_token',
+      userId: 'user-123',
+      agentTokenId: 'token-123',
+      scopes: ['run'],
+    }, new Headers())
+  );
   assert.match(routeText, /check_public_run_rate_limit/);
   assert.ok(
     routeText.indexOf('checkPublicRunRateLimit') < routeText.indexOf('runInSandboxContained('),
     'public run rate limit must run before sandbox execution'
   );
-  assert.match(routeText, /getPublicRunCallerKey\(req\.headers\)/);
+  assert.match(routeText, /getBearerToken\(req\)/);
+  assert.match(routeText, /bearerToken && !caller/);
+  assert.match(routeText, /getRunCallerKey\(caller, req\.headers\)/);
+  assert.doesNotMatch(routeText, /if \(!caller && isPublic\)/);
   assert.match(routeText, /getPublicRunRateLimitKey\(appId, callerKey\)/);
+  assert.match(routeText, /getPublicRunAppRateLimitKey\(appId\)/);
+  assert.match(routeText, /FLOOM_PUBLIC_RUN_APP_RATE_LIMIT_MAX/);
+  assert.ok(
+    routeText.indexOf('getPublicRunRateLimitKey(appId, callerKey)') <
+      routeText.indexOf('getPublicRunAppRateLimitKey(appId)'),
+    'caller-derived rate limit must be checked before the app-level rate limit'
+  );
+  assert.ok(
+    routeText.indexOf('const rateLimit = await checkPublicRunRateLimit') <
+      routeText.indexOf('runInSandboxContained('),
+    'all run rate limits must run before sandbox execution'
+  );
   assert.match(routeText, /Run rate limit check failed/);
   assert.match(routeText, /redactSecretOutput/);
   assert.match(routeText, /output: redactedOutput/);
@@ -506,7 +721,8 @@ function testPublicRunRateLimitHardening() {
   );
   assertSqlContains(storageHardeningText, "update storage.buckets set public = false where id = 'app-bundles'");
   assertSqlContains(storageHardeningText, 'alter table storage.objects enable row level security');
-  assertSqlContains(storageHardeningText, "alter table public.agent_tokens alter column scopes set default array['read', 'run', 'publish', 'revoke']::text[]");
+  assertSqlContains(storageHardeningText, "alter table public.agent_tokens alter column scopes set default array['read', 'run', 'publish']::text[]");
+  assert.doesNotMatch(storageHardeningText, /publish', 'revoke/);
   assertSqlContains(storageHardeningText, 'create policy "app bundles readable by owning user"');
   assertSqlContains(storageHardeningText, 'create policy "app bundles writable by owning user"');
   assertSqlContains(storageHardeningText, 'create policy "app bundles updateable by owning user"');
@@ -514,6 +730,43 @@ function testPublicRunRateLimitHardening() {
   assert.doesNotMatch(migrationText, /create or replace function public\.set_updated_at\(\)/);
   assert.doesNotMatch(migrationText, /create or replace function public\.handle_new_user\(\)/);
   assert.doesNotMatch(migrationText, /on conflict \(id\) do update\s+set public = excluded\.public/);
+
+  const tokenRouteText = readFileSync('src/app/api/agent-tokens/route.ts', 'utf8');
+  assert.match(tokenRouteText, /MAX_AGENT_TOKEN_NAME_LENGTH = 80/);
+  assert.match(tokenRouteText, /DEFAULT_MAX_ACTIVE_AGENT_TOKENS_PER_USER = 10/);
+  assert.match(tokenRouteText, /\.select\("id", \{ count: "exact", head: true \}\)/);
+  assert.match(tokenRouteText, /status: 400/);
+  assert.match(tokenRouteText, /status: 429/);
+
+  const tokenLibText = readFileSync('src/lib/supabase/agent-tokens.ts', 'utf8');
+  assert.match(tokenLibText, /scopes: string\[\] = \["read", "run", "publish"\]/);
+  assert.doesNotMatch(tokenLibText, /"revoke"\]/);
+}
+
+function testOAuthCallbackErrorHandling() {
+  const routeText = readFileSync('src/app/auth/callback/route.ts', 'utf8');
+
+  assert.match(routeText, /AUTH_CALLBACK_ERROR = "oauth_callback"/);
+  assert.match(routeText, /AUTH_CALLBACK_ERROR_MESSAGE = "Authentication failed\. Please try again\."/);
+  assert.match(routeText, /if \(!code\)/);
+  assert.match(routeText, /redirectToLoginWithAuthError\(req\)/);
+  assert.match(routeText, /const \{ error \} = await supabase\.auth\.exchangeCodeForSession\(code\)/);
+  assert.match(routeText, /if \(error\)/);
+  assert.ok(
+    routeText.indexOf('if (error)') < routeText.indexOf('return NextResponse.redirect(new URL(safeNext, req.url))'),
+    'OAuth callback must only use next redirect after successful code exchange'
+  );
+  assert.ok(
+    routeText.indexOf('if (!code)') < routeText.indexOf('await supabase.auth.exchangeCodeForSession(code)'),
+    'OAuth callback must reject missing code before session exchange'
+  );
+  assert.ok(
+    routeText.indexOf('redirectUrl.searchParams.set("error", AUTH_CALLBACK_ERROR)') <
+      routeText.indexOf('redirectUrl.searchParams.set("message", AUTH_CALLBACK_ERROR_MESSAGE)'),
+    'OAuth callback failure redirect must include sanitized error and message query params'
+  );
+  assert.doesNotMatch(routeText, /searchParams\.set\("message",\s*error\.message/);
+  assert.doesNotMatch(routeText, /new URL\(safeNext,[\s\S]*if \(error\)/);
 }
 
 function testCliRejectsUnsupportedV0Shapes(manifestText, inputSchemaText, outputSchemaText) {
