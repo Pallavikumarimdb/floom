@@ -75,8 +75,8 @@ export default function LegalPage() {
 
         <Section title="Contact">
           <p>
-            For access, deletion, or abuse reports, contact Federico at{" "}
-            <code>fede@scaile.tech</code>.
+            For access, deletion, or abuse reports, contact{" "}
+            <code>team@floom.dev</code>.
           </p>
         </Section>
       </article>

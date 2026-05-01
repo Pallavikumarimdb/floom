@@ -56,14 +56,12 @@ const GITHUB_REPOS: Record<string, string> = {
 // R37 (2026-04-29): empty set — all slugs are runnable.
 const DOCKER_RUNTIME_COMING_SOON_SLUGS = new Set<string>([]);
 
-// v23 PR-D: per-slug hero subhead for the 3 launch demos.
+// Per-slug hero subhead for the canonical demo apps. Keep these in sync
+// with what the deployed handler actually returns — overclaiming is a
+// trust killer.
 const HERO_SUBHEAD: Record<string, string> = {
-  'competitor-lens':
-    'Paste 2 URLs (yours + competitor). Get the positioning, pricing, and angle diff in under 5 seconds.',
-  'ai-readiness-audit':
-    'Paste a company URL. Get a readiness score, 3 risks, 3 opportunities, and one concrete next step.',
   'pitch-coach':
-    'Paste a 20-500 char startup pitch. Get 3 direct critiques, 3 rewrites by angle, and a one-line TL;DR.',
+    'Paste a startup pitch. Get a quick read on whether it lands.',
 };
 
 export default function AppPermalinkPage() { // exported as default so the server page can dynamic-import without renaming
@@ -490,13 +488,19 @@ export default function AppPermalinkPage() { // exported as default so the serve
   const howItWorks = useMemo<Array<{ label: string; description?: string }>>(() => {
     if (!app) return [];
     const entries = Object.entries(app.manifest?.actions ?? {}) as Array<[string, ActionSpec]>;
-    if (entries.length > 0) {
+    // A "how it works" strip only makes sense for multi-action apps. A
+    // single-action app (e.g. v0's typical {run: ...} manifest) renders as a
+    // lone "Step 1 / <app-name>" card that adds nothing — hide it.
+    if (entries.length > 1) {
       return entries.slice(0, HOW_IT_WORKS_MAX).map(([, spec]) => ({
         label: spec.label,
         description: spec.description,
       }));
     }
-    return (app.actions || []).slice(0, HOW_IT_WORKS_MAX).map((name) => ({ label: name }));
+    if ((app.actions || []).length > 1) {
+      return (app.actions || []).slice(0, HOW_IT_WORKS_MAX).map((name) => ({ label: name }));
+    }
+    return [];
   }, [app]);
 
   const createdByLabel = useMemo(() => {
@@ -777,6 +781,29 @@ export default function AppPermalinkPage() { // exported as default so the serve
   // floom-minimal serves a single MCP endpoint at /mcp; per-app routing is handled internally.
   const mcpEndpoint = `${typeof window !== 'undefined' ? window.location.origin : ''}/mcp`;
   const githubRepo = GITHUB_REPOS[app.slug];
+
+  // Build a real cURL example payload from the first action's first input.
+  // Generic placeholders for type, sample text from app-examples when known.
+  const curlExampleBody = (() => {
+    const sample = getLaunchDemoExampleTextInputs(app.slug);
+    if (sample && Object.keys(sample).length > 0) {
+      return JSON.stringify({ inputs: sample });
+    }
+    const firstActionKey = Object.keys(app.manifest?.actions ?? {})[0];
+    const firstInput = firstActionKey
+      ? app.manifest?.actions[firstActionKey]?.inputs?.[0]
+      : undefined;
+    if (firstInput) {
+      const placeholder =
+        firstInput.type === 'integer' || firstInput.type === 'number'
+          ? 1
+          : firstInput.type === 'boolean'
+          ? true
+          : 'your input here';
+      return JSON.stringify({ inputs: { [firstInput.name]: placeholder } });
+    }
+    return JSON.stringify({ inputs: {} });
+  })();
   const topBarCompact = Boolean(runIdFromUrl || initialRun);
   void topBarCompact; // SiteHeader doesn't have compact prop yet — TODO(v5-port)
 
@@ -813,7 +840,7 @@ export default function AppPermalinkPage() { // exported as default so the serve
             }}
           >
             <Link href="/" style={{ color: 'var(--muted)', textDecoration: 'none' }}>
-              Apps
+              Home
             </Link>
             <span aria-hidden="true" style={{ color: 'var(--line)' }}>/</span>
             <span style={{ color: 'var(--ink)', fontWeight: 500 }}>{app.name}</span>
@@ -1373,9 +1400,9 @@ export default function AppPermalinkPage() { // exported as default so the serve
           >
             <InstallCard
               testId="connector-claude"
-              title="Claude Desktop / Claude Code"
-              desc={`Adds ${app.name} as a Skill. Run via natural language. MCP-installable via Skill add command.`}
-              snippetValue={`claude skill add ${typeof window !== 'undefined' ? window.location.origin : ''}/p/${app.slug}`}
+              title="Claude Code"
+              desc={`Add ${app.name} as an MCP server in Claude Code. Then call its tools via natural language.`}
+              snippetValue={`claude mcp add floom https://floom-60sec.vercel.app/mcp`}
               copyLabel="Copy command"
             />
             <InstallCard
@@ -1388,10 +1415,10 @@ export default function AppPermalinkPage() { // exported as default so the serve
             <InstallCard
               testId="connector-curl"
               title="cURL / JSON API"
-              desc="Bearer-token auth with an Agent token. Same endpoint as the public page, just hit it programmatically."
-              snippetValue={`curl -X POST ${typeof window !== 'undefined' ? window.location.origin : ''}/api/apps/${app.slug}/run \\\n  -H "Authorization: Bearer floom_agent_••••••" \\\n  -H "Content-Type: application/json" \\\n  -d '{"inputs":{}}'`}
+              desc="Public apps run without auth. Private apps need an Agent token in the Authorization header."
+              snippetValue={`curl -X POST ${typeof window !== 'undefined' ? window.location.origin : ''}/api/apps/${app.slug}/run \\\n  -H "Content-Type: application/json" \\\n  -d '${curlExampleBody}'`}
               copyLabel="Copy cURL"
-              copySnippet={`curl -X POST ${typeof window !== 'undefined' ? window.location.origin : ''}/api/apps/${app.slug}/run \\\n  -H "Authorization: Bearer YOUR_TOKEN" \\\n  -H "Content-Type: application/json" \\\n  -d '{"inputs":{}}'`}
+              copySnippet={`curl -X POST ${typeof window !== 'undefined' ? window.location.origin : ''}/api/apps/${app.slug}/run \\\n  -H "Content-Type: application/json" \\\n  -d '${curlExampleBody}'`}
             />
           </div>
           <p
