@@ -17,7 +17,7 @@ type AgentToken = {
   revoked_at: string | null;
 };
 
-const PRODUCTION_FLOOM_URL = "https://floom-60sec.vercel.app";
+const PRODUCTION_FLOOM_URL = "https://floom.dev";
 
 function relative(dateStr: string | null): string {
   if (!dateStr) return "—";

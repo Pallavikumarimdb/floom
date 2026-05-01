@@ -15,7 +15,7 @@ export default async function AppOpengraphImage({ params }: Props) {
   let appName = slug;
   let description: string | null = null;
   try {
-    const res = await fetch(`https://floom-60sec.vercel.app/api/apps/${slug}`, {
+    const res = await fetch(`https://floom.dev/api/apps/${slug}`, {
       next: { revalidate: 300 },
     });
     if (res.ok) {

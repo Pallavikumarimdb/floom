@@ -78,7 +78,7 @@ export default function OpengraphImage() {
             fontFamily: "ui-monospace, monospace",
           }}
         >
-          <div>floom-60sec.vercel.app</div>
+          <div>floom.dev</div>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <span style={{ display: "flex", width: 8, height: 8, borderRadius: 4, background: "#047857" }} />
             <span>Open source · MCP · REST · UI</span>
