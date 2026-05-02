@@ -95,7 +95,7 @@ export default async function StatusPage() {
         <h1 style={{ fontSize: 36, fontWeight: 800, letterSpacing: "-0.025em", margin: "10px 0 8px" }}>
           {data?.overall === "ok" && "All systems operational."}
           {data?.overall === "degraded" && "Some services are degraded."}
-          {data?.overall === "down" && "We&rsquo;re investigating an outage."}
+          {data?.overall === "down" && "We're investigating an outage."}
           {!data && "Status check failed."}
         </h1>
         <p style={{ fontSize: 14, color: "var(--muted)", margin: "0 0 28px", lineHeight: 1.55 }}>

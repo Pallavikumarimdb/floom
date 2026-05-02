@@ -51,7 +51,7 @@ export default function NotFound() {
             margin: "0 0 28px",
           }}
         >
-          The page you&rsquo;re looking for doesn&rsquo;t exist or has moved. Try the live demo, or jump back home.
+          {"The page you're looking for doesn't exist or has moved. Try the live demo, or jump back home."}
         </p>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "center" }}>
           <Link

@@ -303,7 +303,7 @@ export default function LandingV17PageMvp() {
                 margin: '-4px 0 20px',
               }}
             >
-              Your AI just wrote some code. Floom puts it online — as a link, an API, and a tool any agent can call.
+              Your AI wrote you code. Floom puts it online. Anyone can use it. Agents can call it.
             </p>
 
             {/* CTA — demo-first button + secondary install card. */}
