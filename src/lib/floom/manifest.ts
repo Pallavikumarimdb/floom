@@ -1,22 +1,45 @@
-export type FloomManifest = {
-  name: string;
+export type ManifestDependencies = {
+  python?: string;
+};
+
+type SharedManifestFields = {
+  mode: "stock_e2b" | "legacy_python";
+  name?: string;
   slug: string;
   description?: string;
-  runtime: "python";
-  entrypoint: string;
-  handler: string;
   public?: boolean;
   input_schema?: string;
   output_schema?: string;
-  dependencies?: {
-    python?: "requirements.txt";
-  };
+  dependencies?: ManifestDependencies;
   secrets?: string[];
+  bundle_exclude?: string[];
+};
+
+export type StockE2BManifest = SharedManifestFields & {
+  mode: "stock_e2b";
+  command?: string;
+};
+
+export type LegacyPythonManifest = SharedManifestFields & {
+  mode: "legacy_python";
+  runtime: "python";
+  entrypoint: string;
+  handler: string;
+};
+
+export type FloomManifest = StockE2BManifest | LegacyPythonManifest;
+
+export type PythonDependencyConfig = {
+  path: string;
+  requireHashes: boolean;
 };
 
 const SLUG_RE = /^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$/;
 const PYTHON_FILE_RE = /^[A-Za-z_][A-Za-z0-9_]*\.py$/;
 const IDENTIFIER_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
+const RELATIVE_FILE_RE = /^(?:\.\/)?[A-Za-z0-9._/-]+$/;
+const SECRET_NAME_RE = /^[A-Z][A-Z0-9_]{1,63}$/;
+const PYTHON_DEPENDENCY_RE = /^(?:\.\/)?requirements\.txt(?:\s+--require-hashes)?$/;
 const POST_V01_FIELDS = [
   "actions",
   "type",
@@ -27,7 +50,6 @@ const POST_V01_FIELDS = [
   "secrets_needed",
   "openapi_spec_url",
 ];
-const SECRET_NAME_RE = /^[A-Z][A-Z0-9_]{1,63}$/;
 
 function requiredString(value: unknown, field: string): string {
   if (typeof value !== "string" || value.trim() === "") {
@@ -36,63 +58,122 @@ function requiredString(value: unknown, field: string): string {
   return value.trim();
 }
 
+function optionalString(value: unknown): string | undefined {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+
+  const trimmed = value.trim();
+  return trimmed === "" ? undefined : trimmed;
+}
+
+function optionalBoolean(value: unknown): boolean | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (typeof value !== "boolean") {
+    throw new Error("public must be true or false");
+  }
+
+  return value;
+}
+
+function optionalRelativePath(value: unknown, field: string): string | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (typeof value !== "string" || value.trim() === "") {
+    throw new Error(`${field} must be a file path string`);
+  }
+
+  const normalized = value.trim().replace(/\\/g, "/");
+  if (
+    !RELATIVE_FILE_RE.test(normalized) ||
+    normalized.startsWith("/") ||
+    normalized.includes("../") ||
+    normalized === ".."
+  ) {
+    throw new Error(`${field} must stay inside the app directory`);
+  }
+
+  return normalized.startsWith("./") ? normalized.slice(2) : normalized;
+}
+
+function parseSharedFields(data: Record<string, unknown>) {
+  for (const field of POST_V01_FIELDS) {
+    if (data[field] !== undefined) {
+      throw new Error(`floom.yaml does not support field: ${field}`);
+    }
+  }
+
+  return {
+    name: optionalString(data.name),
+    slug: requiredString(data.slug, "slug"),
+    description: optionalString(data.description),
+    public: optionalBoolean(data.public),
+    input_schema: optionalRelativePath(data.input_schema, "input_schema"),
+    output_schema: optionalRelativePath(data.output_schema, "output_schema"),
+    dependencies: parseDependencies(data.dependencies),
+    secrets: parseSecretNames(data.secrets),
+    bundle_exclude: parseBundleExclude(data.bundle_exclude),
+  };
+}
+
 export function parseManifest(value: unknown): FloomManifest {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw new Error("floom.yaml must contain an object");
   }
 
   const data = value as Record<string, unknown>;
-  for (const field of POST_V01_FIELDS) {
-    if (data[field] !== undefined) {
-      throw new Error(`v0.1 does not support floom.yaml field: ${field}`);
-    }
-  }
-  if (data.input_schema !== undefined && typeof data.input_schema !== "string") {
-    throw new Error("input_schema must be a file path string in v0.1");
-  }
-  if (data.output_schema !== undefined && typeof data.output_schema !== "string") {
-    throw new Error("output_schema must be a file path string in v0.1");
-  }
-  if (data.public !== undefined && typeof data.public !== "boolean") {
-    throw new Error("public must be true or false in v0.1");
-  }
+  const shared = parseSharedFields(data);
 
-  const manifest: FloomManifest = {
-    name: requiredString(data.name, "name"),
-    slug: requiredString(data.slug, "slug"),
-    description: typeof data.description === "string" && data.description.trim() !== ""
-      ? data.description.trim()
-      : undefined,
-    runtime: requiredString(data.runtime, "runtime") as FloomManifest["runtime"],
-    entrypoint: requiredString(data.entrypoint, "entrypoint"),
-    handler: requiredString(data.handler, "handler"),
-    public: data.public === true,
-    input_schema: typeof data.input_schema === "string" ? data.input_schema : undefined,
-    output_schema: typeof data.output_schema === "string" ? data.output_schema : undefined,
-    dependencies: parseDependencies(data.dependencies),
-    secrets: parseSecretNames(data.secrets),
-  };
-
-  if (manifest.runtime !== "python") {
-    throw new Error("v0.1 only supports runtime: python");
-  }
-
-  if (!SLUG_RE.test(manifest.slug)) {
+  if (!SLUG_RE.test(shared.slug)) {
     throw new Error("slug must be lowercase letters, numbers, and hyphens");
   }
 
-  if (!PYTHON_FILE_RE.test(manifest.entrypoint)) {
+  const hasCommand = optionalString(data.command) !== undefined;
+  const hasLegacyFields = data.runtime !== undefined || data.entrypoint !== undefined || data.handler !== undefined;
+
+  if (hasCommand && hasLegacyFields) {
+    throw new Error("floom.yaml must use either command: or runtime: python + entrypoint:/handler:, not both");
+  }
+
+  if (hasCommand || !hasLegacyFields) {
+    return {
+      mode: "stock_e2b",
+      ...shared,
+      command: optionalString(data.command),
+    };
+  }
+
+  const runtime = requiredString(data.runtime, "runtime");
+  const entrypoint = requiredString(data.entrypoint, "entrypoint");
+  const handler = requiredString(data.handler, "handler");
+
+  if (runtime !== "python") {
+    throw new Error("legacy apps must use runtime: python");
+  }
+
+  if (!PYTHON_FILE_RE.test(entrypoint)) {
     throw new Error("entrypoint must be a single Python file basename");
   }
 
-  if (!IDENTIFIER_RE.test(manifest.handler)) {
+  if (!IDENTIFIER_RE.test(handler)) {
     throw new Error("handler must be a valid Python identifier");
   }
 
-  return manifest;
+  return {
+    mode: "legacy_python",
+    ...shared,
+    runtime: "python",
+    entrypoint,
+    handler,
+  };
 }
 
-function parseDependencies(value: unknown): FloomManifest["dependencies"] {
+function parseDependencies(value: unknown): ManifestDependencies | undefined {
   if (value === undefined) {
     return undefined;
   }
@@ -107,11 +188,19 @@ function parseDependencies(value: unknown): FloomManifest["dependencies"] {
     throw new Error("dependencies only supports python: ./requirements.txt");
   }
 
-  if (data.python !== "requirements.txt" && data.python !== "./requirements.txt") {
-    throw new Error("dependencies.python must be ./requirements.txt");
+  if (data.python === undefined) {
+    return undefined;
   }
 
-  return { python: "requirements.txt" };
+  if (typeof data.python !== "string" || !PYTHON_DEPENDENCY_RE.test(data.python.trim())) {
+    throw new Error("dependencies.python must be ./requirements.txt or ./requirements.txt --require-hashes");
+  }
+
+  const normalized = data.python.trim().startsWith("./")
+    ? data.python.trim().slice(2)
+    : data.python.trim();
+
+  return { python: normalized };
 }
 
 function parseSecretNames(value: unknown): string[] | undefined {
@@ -141,6 +230,60 @@ function parseSecretNames(value: unknown): string[] | undefined {
   return names;
 }
 
+function parseBundleExclude(value: unknown): string[] | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (!Array.isArray(value)) {
+    throw new Error("bundle_exclude must be an array of glob-like strings");
+  }
+
+  const patterns = value.map((item) => {
+    if (typeof item !== "string" || item.trim() === "") {
+      throw new Error("bundle_exclude must contain only non-empty strings");
+    }
+    return item.trim();
+  });
+
+  if (new Set(patterns).size !== patterns.length) {
+    throw new Error("bundle_exclude must not contain duplicate values");
+  }
+
+  return patterns;
+}
+
+export function resolveManifestDisplayName(manifest: FloomManifest) {
+  return manifest.name?.trim() || manifest.slug
+    .split("-")
+    .filter(Boolean)
+    .map((part) => part[0]?.toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+export function isLegacyPythonManifest(manifest: FloomManifest): manifest is LegacyPythonManifest {
+  return manifest.mode === "legacy_python";
+}
+
+export function resolvePythonDependencyConfig(
+  manifest: FloomManifest
+): PythonDependencyConfig | null {
+  const spec = manifest.dependencies?.python;
+  if (!spec) {
+    return null;
+  }
+
+  const trimmed = spec.trim();
+  const requireHashes =
+    trimmed.endsWith("--require-hashes") || isLegacyPythonManifest(manifest);
+  const path = trimmed.replace(/\s+--require-hashes$/, "");
+
+  return {
+    path: path.startsWith("./") ? path.slice(2) : path,
+    requireHashes,
+  };
+}
+
 export function isSafePythonEntrypoint(value: string) {
   return PYTHON_FILE_RE.test(value);
 }
@@ -150,6 +293,10 @@ export function isSafePythonIdentifier(value: string) {
 }
 
 export function validatePythonSourceForManifest(source: string, manifest: FloomManifest) {
+  if (!isLegacyPythonManifest(manifest)) {
+    return;
+  }
+
   if (Buffer.byteLength(source, "utf8") === 0) {
     throw new Error("Entrypoint source is empty");
   }

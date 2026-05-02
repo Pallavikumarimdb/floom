@@ -1,6 +1,7 @@
 import yaml from "js-yaml";
 import type { NextRequest } from "next/server";
 import { hasSupabaseConfig } from "@/lib/demo-app";
+import { createBundleFromFileMap } from "@/lib/floom/bundle";
 import {
   MAX_INPUT_BYTES,
   MAX_OUTPUT_BYTES,
@@ -11,6 +12,7 @@ import {
   SANDBOX_TIMEOUT_MS,
 } from "@/lib/floom/limits";
 import {
+  isLegacyPythonManifest,
   parseManifest,
   validatePythonSourceForManifest,
   type FloomManifest,
@@ -55,9 +57,9 @@ type FloomToolName =
   | "run_app";
 
 const SLUG_RE = /^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$/;
-const MAX_MCP_FILE_COUNT = 100;
+const MAX_MCP_FILE_COUNT = 500;
 const MAX_MCP_FILE_PATH_BYTES = 256;
-const MAX_MCP_FILE_BYTES = 64 * 1024;
+const MAX_MCP_FILE_BYTES = MAX_SOURCE_BYTES;
 
 export const floomTools: McpToolDefinition[] = [
   {
@@ -71,7 +73,7 @@ export const floomTools: McpToolDefinition[] = [
   },
   {
     name: "get_app_contract",
-    description: "Call this first. Return the exact Floom v0.1 app contract, copy-paste starter files, hard limits, run response envelope, and explicit post-v0.1 unsupported cases.",
+    description: "Call this first. Return the preferred stock-E2B Floom contract, legacy v0.1 compatibility notes, hard limits, run response envelope, and starter files.",
     inputSchema: {
       type: "object",
       properties: {},
@@ -80,7 +82,7 @@ export const floomTools: McpToolDefinition[] = [
   },
   {
     name: "list_app_templates",
-    description: "List useful Floom v0.1-safe starter app templates that agents can copy before publishing.",
+    description: "List useful stock-E2B Floom starter app templates that agents can copy before publishing.",
     inputSchema: {
       type: "object",
       properties: {},
@@ -89,7 +91,7 @@ export const floomTools: McpToolDefinition[] = [
   },
   {
     name: "get_app_template",
-    description: "Return one copy-paste Floom v0.1-safe app template bundle.",
+    description: "Return one copy-paste Floom app template bundle.",
     inputSchema: {
       type: "object",
       properties: {
@@ -104,7 +106,7 @@ export const floomTools: McpToolDefinition[] = [
   },
   {
     name: "validate_manifest",
-    description: "Validate a floom.yaml manifest and optional JSON schemas. Optional source/files hints return v0.1 runtime coaching, but this does not publish.",
+    description: "Validate a floom.yaml manifest and optional JSON schemas. Optional source/files hints return stock-E2B contract coaching, but this does not publish.",
     inputSchema: {
       type: "object",
       properties: {
@@ -136,7 +138,7 @@ export const floomTools: McpToolDefinition[] = [
   },
   {
     name: "publish_app",
-    description: "Run the full publish check and publish a single-file Python Floom app through the existing app publish API. Requires Authorization: Bearer <agent-token>; call auth_status first when unsure.",
+    description: "Run the full publish check and publish a Floom app through the stock-E2B publish API. Requires Authorization: Bearer <agent-token>; call auth_status first when unsure.",
     inputSchema: {
       type: "object",
       properties: {
@@ -144,30 +146,35 @@ export const floomTools: McpToolDefinition[] = [
           oneOf: [{ type: "string" }, { type: "object", additionalProperties: true }],
           description: "floom.yaml content as YAML text or an already-parsed object.",
         },
+        files: {
+          type: "object",
+          description: "Repository file map keyed by app-relative path. Preferred for stock-E2B multi-file publish.",
+          additionalProperties: { type: "string" },
+        },
         source: {
           type: "string",
-          description: "Python source for the manifest entrypoint.",
+          description: "Legacy shortcut for one-file Python source. Prefer files for multi-file or non-Python apps.",
         },
         input_schema: {
           oneOf: [{ type: "string" }, { type: "object", additionalProperties: true }],
-          description: "Input JSON Schema as JSON text or an object.",
+          description: "Optional input JSON Schema as JSON text or an object. Used only by the legacy one-file shortcut.",
         },
         output_schema: {
           oneOf: [{ type: "string" }, { type: "object", additionalProperties: true }],
-          description: "Output JSON Schema as JSON text or an object.",
+          description: "Optional output JSON Schema as JSON text or an object. Used only by the legacy one-file shortcut.",
         },
         requirements: {
           type: "string",
-          description: "requirements.txt content, required only when floom.yaml declares dependencies.python.",
+          description: "Optional requirements.txt content for the legacy one-file shortcut.",
         },
       },
-      required: ["manifest", "source", "input_schema", "output_schema"],
+      required: ["manifest"],
       additionalProperties: false,
     },
   },
   {
     name: "find_candidate_apps",
-    description: "Scan a repository file map for directories that already contain floom.yaml and are ready, invalid, or clearly unsupported for Floom v0.1.",
+    description: "Scan a repository file map for directories that already contain floom.yaml and are ready, invalid, or need contract fixes for stock-E2B publish.",
     inputSchema: {
       type: "object",
       properties: {
@@ -204,7 +211,7 @@ export const floomTools: McpToolDefinition[] = [
   },
   {
     name: "run_app",
-    description: "Run a Floom app with JSON inputs. Returns { execution_id, status, output, error }. Private apps require Authorization: Bearer <agent-token>.",
+    description: "Run a Floom app with optional JSON inputs. Returns { execution_id, status, output, error }. Private apps require Authorization: Bearer <agent-token>.",
     inputSchema: {
       type: "object",
       properties: {
@@ -213,12 +220,10 @@ export const floomTools: McpToolDefinition[] = [
           description: "The Floom app slug.",
         },
         inputs: {
-          type: "object",
-          description: "Inputs matching the app input_schema.",
-          additionalProperties: true,
+          description: "Optional JSON inputs. If the app declares input_schema they must match it; otherwise they pass through as raw JSON.",
         },
       },
-      required: ["slug", "inputs"],
+      required: ["slug"],
       additionalProperties: false,
     },
   },
@@ -407,45 +412,37 @@ async function authStatus(context: McpToolContext): Promise<McpToolResult> {
 
 function getAppContract(): McpToolResult {
   return okResult({
-    version: "v0.1",
+    version: "v0.x-stock-e2b",
     use_this_first:
       "Before generating files, call get_app_contract. Before publishing, call auth_status. For existing repos, call find_candidate_apps. For a starter, call list_app_templates then get_app_template.",
+    preferred_mode: "stock_e2b",
     supported: [
-      "single-file Python",
-      "Python standard library, plus exact-pinned hash-locked requirements.txt when declared",
-      "one handler function that accepts a JSON object and returns a JSON object",
-      "floom.yaml plus input.schema.json and output.schema.json",
+      "tarball bundle of the whole app directory rooted at floom.yaml",
+      "stock E2B base runtimes such as Python and Node when your command can run there",
+      "multi-file projects",
+      "optional input_schema and optional output_schema",
+      "requirements.txt auto-install when present; npm install when package.json is present",
+      "stdin plus FLOOM_INPUTS env injection for the same JSON inputs",
       "manifest-declared secret names with owner-managed encrypted secret values; never hardcode credential-looking strings in source, manifests, docs, MCP prompts, or reports",
       "public apps with public: true; private apps when public is omitted or false",
+      "legacy v0.1 runtime: python + entrypoint + handler manifests remain supported",
     ],
     unsupported: [
       {
-        case: "undeclared requirements.txt, pyproject.toml, or unhashed package specs",
-        reason: "v0.1 supports exact-pinned requirements.txt packages with sha256 hashes only when floom.yaml declares dependencies.python.",
+        case: "bundle larger than 5 MB compressed or 25 MB unpacked",
+        reason: "publish rejects oversized bundles even after default exclusions.",
       },
       {
-        case: "openapi.json, FastAPI, Flask, or HTTP servers",
-        reason: "HTTP app routing is post-v0.1. v0.1 exposes one JSON Schema form and one handler.",
+        case: "symlinks, hardlinks, device files, FIFOs, or path traversal inside bundles",
+        reason: "publish rejects unsafe bundle structure before storage upload.",
       },
       {
-        case: "package.json, TypeScript, or Node apps",
-        reason: "TypeScript/Node runtime parity is post-v0.1. v0.1 runtime is runtime: python.",
+        case: "long-running sync jobs beyond 60 seconds",
+        reason: "stock-E2B mode still runs through the current synchronous 60-second execution cap; async + poll ships separately.",
       },
       {
-        case: "Main.java, pom.xml, build.gradle, or Java apps",
-        reason: "Java runtime parity is post-v0.1. v0.1 runtime is runtime: python.",
-      },
-      {
-        case: "multiple Python files",
-        reason: "Multi-file bundles are post-v0.1. v0.1 packaging accepts one top-level Python entrypoint file.",
-      },
-      {
-        case: "manifest field actions",
-        reason: "Multiple actions are post-v0.1. v0.1 still exposes one handler.",
-      },
-      {
-        case: "OpenBlog/OpenAPI apps",
-        reason: "OpenBlog has an HTTP/OpenAPI surface and dependency-style app shape. It belongs to the post-v0.1 HTTP app runner, not the 60-second function path.",
+        case: "HTTP server routing or multi-action tool contracts",
+        reason: "this branch widens what runs inside E2B, but it still exposes one run endpoint and one UI surface per app.",
       },
     ],
     files: {
@@ -453,22 +450,29 @@ function getAppContract(): McpToolResult {
         "name: Text Demo",
         "slug: text-demo",
         "description: Echo text and return a length.",
-        "runtime: python",
-        "entrypoint: app.py",
-        "handler: run",
+        "command: python app.py",
         "public: true",
         "input_schema: ./input.schema.json",
         "output_schema: ./output.schema.json",
-        "# Optional v0.1:",
+        "# Optional:",
         "# dependencies:",
-        "#   python: ./requirements.txt",
+        "#   python: ./requirements.txt --require-hashes",
         "# secrets:",
         "#   - OPENAI_API_KEY",
       ].join("\n"),
       "app.py": [
-        "def run(inputs: dict) -> dict:",
-        "    text = str(inputs.get(\"text\", \"\"))",
-        "    return {\"result\": f\"Hello: {text}\", \"length\": len(text)}",
+        "import json",
+        "import os",
+        "import sys",
+        "",
+        "def main():",
+        "    raw = os.environ.get('FLOOM_INPUTS') or sys.stdin.read() or '{}'",
+        "    inputs = json.loads(raw)",
+        "    text = str(inputs.get('text', ''))",
+        "    print(json.dumps({'result': f'Hello: {text}', 'length': len(text)}))",
+        "",
+        "if __name__ == '__main__':",
+        "    main()",
       ].join("\n"),
       "input.schema.json": {
         type: "object",
@@ -502,6 +506,7 @@ function getAppContract(): McpToolResult {
       "name",
       "slug",
       "description",
+      "command",
       "runtime",
       "entrypoint",
       "handler",
@@ -510,9 +515,15 @@ function getAppContract(): McpToolResult {
       "output_schema",
       "dependencies",
       "secrets",
+      "bundle_exclude",
     ],
+    manifest_modes: {
+      preferred: "command-based stock E2B manifest",
+      legacy_supported: "runtime: python + entrypoint: app.py + handler: run",
+    },
     limits: {
-      python: "E2B base sandbox python3; write portable Python 3.11-compatible code and avoid long-running processes.",
+      bundle_compressed_bytes: 5 * 1024 * 1024,
+      bundle_unpacked_bytes: 25 * 1024 * 1024,
       max_source_bytes: MAX_SOURCE_BYTES,
       max_requirements_bytes: MAX_REQUIREMENTS_BYTES,
       max_schema_bytes: MAX_SCHEMA_BYTES,
@@ -520,32 +531,35 @@ function getAppContract(): McpToolResult {
       max_output_bytes: MAX_OUTPUT_BYTES,
       max_mcp_request_bytes: MAX_REQUEST_BYTES,
       run_timeout_ms: SANDBOX_TIMEOUT_MS,
-      public_run_rate_limit: "defaults: 20 runs per caller per 60s and 100 runs per app per 60s; production env may lower or raise these limits.",
+      public_run_rate_limit: "defaults: 20 runs per anonymous caller per 60s and 100 runs per app per 60s; owner runs skip the public per-caller limit.",
+      per_app_e2b_quota_seconds_per_day: 30 * 60,
+      per_owner_e2b_quota_seconds_per_day: 2 * 60 * 60,
       max_secret_names: 10,
     },
     response_shapes: {
       run_app: {
         execution_id: "string",
-        status: "success | error",
-        output: "object matching the app output_schema when status is success",
-        error: "string | null",
+        status: "success | failed | timed_out",
+        output: "validated JSON when output_schema is declared, parsed JSON when stdout last line is JSON, otherwise { stdout, exit_code }",
+        error: "null | { phase, stderr_tail, exit_code?, elapsed_ms?, detail? }",
       },
       publish_app: {
         app: {
           slug: "string",
           url: "https://floom.dev/p/<slug>",
-          public: "boolean",
         },
+        warnings: "string[]",
       },
       get_app: {
-        app: "metadata plus input_schema and output_schema for public apps or owner-accessible private apps",
+        app: "metadata plus optional input_schema and output_schema for public apps or owner-accessible private apps",
       },
     },
     requirements_example: [
-      "requirements.txt must use exact pins plus sha256 hashes on every package line.",
+      "requirements.txt installs automatically when present.",
+      "Hash locking is optional in stock-E2B mode and stays available as an opt-in.",
       "Example:",
       "humanize==4.9.0 --hash=sha256:ce284a76d5b1377fd8836733b983bfb0b76f1aa1c090de2566fcf008d7f6ab16",
-      "Then declare dependencies.python: ./requirements.txt in floom.yaml.",
+      "Then declare dependencies.python: ./requirements.txt --require-hashes in floom.yaml.",
     ],
     requirements_workflow: [
       "printf 'humanize==4.9.0\\n' > requirements.in",
@@ -558,7 +572,7 @@ function getAppContract(): McpToolResult {
       header: "Authorization: Bearer <agent-token>",
       public_apps: "public: true apps allow anonymous metadata and runs, including secret-backed runs, with per-caller and per-app rate limits.",
       private_apps: "public omitted or false apps require the owner session or owner agent token for get_app and run_app.",
-      secrets: "MCP can publish and run apps that declare secret names in floom.yaml, but it does not set raw secret values today. Set values through the CLI or REST /api/apps/:slug/secrets route. Runtime injects them as env vars, schema secret fields are redacted from output, and MCP never returns raw secret values.",
+      secrets: "MCP can publish and run apps that declare secret names in floom.yaml, but it does not set raw secret values today. Set values through the CLI or REST /api/apps/:slug/secrets route. Runtime injects them as env vars, exact secret values are redacted from output, and MCP never returns raw secret values.",
       hardcoded_credentials:
         "Credential-looking string guidance: if source or docs contain a hardcoded token, key, password, private key, or similar value, replace it with a declared secret name such as OPENAI_API_KEY and read os.environ['OPENAI_API_KEY'] at runtime. Set the value with `npx @floomhq/cli@latest secrets set <app-slug> OPENAI_API_KEY --value-stdin` or the REST /api/apps/:slug/secrets route. Do not paste raw secret values into MCP tool arguments.",
     },
@@ -582,12 +596,12 @@ function getAppContract(): McpToolResult {
     publish_tool: {
       name: "publish_app",
       requires_authorization: true,
-      note: "Use this full publish check from MCP clients when you already have floom.yaml, source, input_schema, output_schema, and optional requirements text in memory.",
+      note: "Use this full publish check from MCP clients when you already have floom.yaml and the app file map in memory. The legacy source shortcut still works for v0.1-style Python apps.",
     },
     run_tool: {
       name: "run_app",
       requires_authorization_for_private_apps: true,
-      response_envelope: "Read result.output for the app output object; the top level contains execution_id, status, output, and error.",
+      response_envelope: "Read result.output for the app result; the top level contains execution_id, status, output, and error.",
     },
   });
 }
@@ -597,12 +611,7 @@ type AppTemplate = {
   name: string;
   description: string;
   useful_for: string;
-  files: {
-    "floom.yaml": string;
-    "app.py": string;
-    "input.schema.json": JsonObject;
-    "output.schema.json": JsonObject;
-  };
+  files: Record<string, string | JsonObject>;
   example_inputs: JsonObject;
 };
 
@@ -1003,6 +1012,133 @@ const APP_TEMPLATES: Record<string, AppTemplate> = {
       default_owner: "",
     },
   },
+  multi_file_python: {
+    key: "multi_file_python",
+    name: "Multi-file Python",
+    description: "Proves multi-file imports work on stock E2B.",
+    useful_for: "Python apps that want helpers, modules, and normal file layout.",
+    files: {
+      "floom.yaml": [
+        "name: Multi-file Python",
+        "slug: multi-file-python",
+        "public: true",
+        "input_schema: ./input.schema.json",
+        "output_schema: ./output.schema.json",
+      ].join("\n"),
+      "app.py": [
+        "import json",
+        "import os",
+        "import sys",
+        "",
+        "from utils import summarize",
+        "",
+        "raw = os.environ.get('FLOOM_INPUTS') or sys.stdin.read() or '{}'",
+        "print(json.dumps(summarize(json.loads(raw))))",
+      ].join("\n"),
+      "utils.py": [
+        "from textwrap import shorten",
+        "",
+        "def summarize(inputs):",
+        "    text = str(inputs.get('text') or '').strip()",
+        "    return {",
+        "        'preview': shorten(text, width=40, placeholder='...'),",
+        "        'length': len(text),",
+        "        'word_count': len([part for part in text.split() if part]),",
+        "    }",
+      ].join("\n"),
+      "input.schema.json": {
+        type: "object",
+        required: ["text"],
+        additionalProperties: false,
+        properties: {
+          text: { type: "string", title: "Text", default: "Multi-file Python works on stock E2B." },
+        },
+      },
+      "output.schema.json": {
+        type: "object",
+        required: ["preview", "length", "word_count"],
+        additionalProperties: false,
+        properties: {
+          preview: { type: "string" },
+          length: { type: "integer" },
+          word_count: { type: "integer" },
+        },
+      },
+    },
+    example_inputs: {
+      text: "Multi-file Python works on stock E2B.",
+    },
+  },
+  node_fetch: {
+    key: "node_fetch",
+    name: "Node Fetch",
+    description: "Fetch a URL and return its HTML title from a Node app.",
+    useful_for: "Proof that Node app bundles publish and run without the Python-only contract.",
+    files: {
+      "floom.yaml": [
+        "name: Node Fetch",
+        "slug: node-fetch",
+        "public: true",
+        "input_schema: ./input.schema.json",
+        "output_schema: ./output.schema.json",
+      ].join("\n"),
+      "package.json": JSON.stringify({
+        name: "floom-node-fetch-template",
+        private: true,
+        type: "module",
+        scripts: { start: "node index.js" },
+      }, null, 2),
+      "index.js": [
+        "const raw = process.env.FLOOM_INPUTS || '{}'",
+        "const inputs = JSON.parse(raw)",
+        "const url = String(inputs.url || 'https://example.com')",
+        "const response = await fetch(url)",
+        "const html = await response.text()",
+        "const match = html.match(/<title[^>]*>(.*?)<\\/title>/i)",
+        "console.log(JSON.stringify({ url, title: match ? match[1].trim() : '', status: response.status }))",
+      ].join("\n"),
+      "input.schema.json": {
+        type: "object",
+        required: ["url"],
+        additionalProperties: false,
+        properties: {
+          url: { type: "string", title: "URL", default: "https://example.com" },
+        },
+      },
+      "output.schema.json": {
+        type: "object",
+        required: ["url", "title", "status"],
+        additionalProperties: false,
+        properties: {
+          url: { type: "string" },
+          title: { type: "string" },
+          status: { type: "integer" },
+        },
+      },
+    },
+    example_inputs: {
+      url: "https://example.com",
+    },
+  },
+  run_only_cron: {
+    key: "run_only_cron",
+    name: "Run-only Cron",
+    description: "Schema-less app that just runs and prints status.",
+    useful_for: "Cron-like jobs and maintenance tasks that only need a Run button and log tail.",
+    files: {
+      "floom.yaml": [
+        "name: Run-only Cron",
+        "slug: run-only-cron",
+        "public: true",
+      ].join("\n"),
+      "app.py": [
+        "from datetime import datetime, timezone",
+        "",
+        "print(f\"cron tick {datetime.now(timezone.utc).isoformat()}\")",
+      ].join("\n"),
+    },
+    example_inputs: {},
+  },
 };
 
 function listAppTemplates(): McpToolResult {
@@ -1088,56 +1224,40 @@ async function publishApp(args: JsonObject, context: McpToolContext): Promise<Mc
     return errorResult(manifestResult.error);
   }
 
-  const source = args.source;
-  if (typeof source !== "string" || source.trim() === "") {
-    return errorResult("source must be a non-empty string");
+  const filesArg = args.files;
+  const filesResult = filesArg === undefined ? null : parseFileMap(filesArg);
+  if (filesResult && !filesResult.ok) {
+    return errorResult(filesResult.error);
   }
 
-  if (Buffer.byteLength(source, "utf8") > MAX_SOURCE_BYTES) {
-    return errorResult("source is too large");
+  let files: Record<string, string>;
+  if (filesResult?.ok) {
+    files = { ...filesResult.files };
+    if (!("floom.yaml" in files)) {
+      files["floom.yaml"] = manifestToYaml(manifestResult.manifest);
+    }
+  } else {
+    const legacyFilesResult = buildLegacyPublishFiles(args, manifestResult.manifest);
+    if (!legacyFilesResult.ok) {
+      return errorResult(legacyFilesResult.error);
+    }
+    files = legacyFilesResult.files;
   }
 
+  let bundle;
   try {
-    validatePythonSourceForManifest(source, manifestResult.manifest);
-  } catch (sourceError) {
-    return errorResult(sourceError instanceof Error ? sourceError.message : "Invalid app source");
-  }
-
-  const inputSchemaResult = parseRequiredSchemaArgument(args.input_schema, "input_schema");
-  if (!inputSchemaResult.ok) {
-    return errorResult(inputSchemaResult.error);
-  }
-
-  const outputSchemaResult = parseRequiredSchemaArgument(args.output_schema, "output_schema");
-  if (!outputSchemaResult.ok) {
-    return errorResult(outputSchemaResult.error);
-  }
-
-  const requirements = args.requirements;
-  if (manifestResult.manifest.dependencies?.python) {
-    if (typeof requirements !== "string") {
-      return errorResult("requirements must be provided when dependencies.python is declared");
-    }
-
-    try {
-      validatePythonRequirementsText(requirements);
-    } catch (requirementsError) {
-      return errorResult(
-        requirementsError instanceof Error ? requirementsError.message : "Invalid requirements.txt"
-      );
-    }
-  } else if (requirements !== undefined) {
-    return errorResult("requirements requires dependencies.python in floom.yaml");
+    bundle = await createBundleFromFileMap(files);
+  } catch (error) {
+    return errorResult(error instanceof Error ? error.message : "Failed to build bundle");
   }
 
   const form = new FormData();
   form.append("manifest", textBlob(manifestToYaml(manifestResult.manifest), "application/x-yaml"), "floom.yaml");
-  form.append("bundle", textBlob(source, "text/x-python"), manifestResult.manifest.entrypoint);
-  form.append("input_schema", textBlob(JSON.stringify(inputSchemaResult.schema), "application/json"), "input.schema.json");
-  form.append("output_schema", textBlob(JSON.stringify(outputSchemaResult.schema), "application/json"), "output.schema.json");
-  if (typeof requirements === "string") {
-    form.append("requirements", textBlob(validatePythonRequirementsText(requirements), "text/plain"), "requirements.txt");
-  }
+  form.append(
+    "bundle",
+    new Blob([new Uint8Array(bundle.buffer)], { type: "application/gzip" }),
+    "bundle.tar.gz"
+  );
 
   return proxyJson(`${context.baseUrl}/api/apps`, {
     method: "POST",
@@ -1186,22 +1306,25 @@ function findCandidateApps(args: JsonObject): McpToolResult {
       }
 
       if (manifest) {
-        const entrypointPath = joinPath(appDir, manifest.entrypoint);
-        if (!(entrypointPath in files)) {
-          errors.push(`Missing entrypoint: ${entrypointPath}`);
-        }
-
-        for (const unsupportedPath of unsupportedV0Files(appDir, files, manifest)) {
-          errors.push(unsupportedFileReason(unsupportedPath));
+        if (isLegacyPythonManifest(manifest)) {
+          const entrypointPath = joinPath(appDir, manifest.entrypoint);
+          if (!(entrypointPath in files)) {
+            errors.push(`Missing entrypoint: ${entrypointPath}`);
+          }
         }
 
         if (manifest.dependencies?.python) {
-          const requirementsPath = joinPath(appDir, manifest.dependencies.python);
+          const requirementsPath = joinPath(
+            appDir,
+            manifest.dependencies.python.replace(/\s+--require-hashes$/, "")
+          );
           if (!(requirementsPath in files)) {
             errors.push(`Missing requirements.txt: ${requirementsPath}`);
           } else {
             try {
-              validatePythonRequirementsText(files[requirementsPath]);
+              validatePythonRequirementsText(files[requirementsPath], {
+                requireHashes: manifest.dependencies.python.endsWith("--require-hashes"),
+              });
             } catch (requirementsError) {
               errors.push(
                 requirementsError instanceof Error
@@ -1210,19 +1333,31 @@ function findCandidateApps(args: JsonObject): McpToolResult {
               );
             }
           }
+        } else if (joinPath(appDir, "requirements.txt") in files) {
+          try {
+            validatePythonRequirementsText(files[joinPath(appDir, "requirements.txt")]);
+          } catch (requirementsError) {
+            errors.push(
+              requirementsError instanceof Error
+                ? requirementsError.message
+                : "Invalid requirements.txt"
+            );
+          }
         }
 
-        const pythonFiles = pythonFilesInAppDir(appDir, files);
-        if (pythonFiles.length > 1) {
-          errors.push(
-            `Multiple Python files are not supported in v0.1: ${pythonFiles.join(", ")}. Use one entrypoint file or wait for post-v0.1 multi-file bundles.`
-          );
+        if (manifest.input_schema) {
+          validateCandidateSchema(files, joinPath(appDir, manifest.input_schema), "input_schema", errors);
+        }
+        if (manifest.output_schema) {
+          validateCandidateSchema(files, joinPath(appDir, manifest.output_schema), "output_schema", errors);
         }
 
-        const inputSchemaPath = joinPath(appDir, manifest.input_schema || "input.schema.json");
-        const outputSchemaPath = joinPath(appDir, manifest.output_schema || "output.schema.json");
-        validateCandidateSchema(files, inputSchemaPath, "input_schema", errors);
-        validateCandidateSchema(files, outputSchemaPath, "output_schema", errors);
+        if (!isLegacyPythonManifest(manifest) && !manifest.command) {
+          const detectedCommand = detectCommandFromFileMap(appDir, files);
+          if (!detectedCommand) {
+            errors.push("No command detected. Add command: to floom.yaml or include app.py, index.js, or package.json with a start script.");
+          }
+        }
       }
 
       return {
@@ -1230,8 +1365,8 @@ function findCandidateApps(args: JsonObject): McpToolResult {
         app_dir: appDir || ".",
         slug: manifest?.slug ?? null,
         name: manifest?.name ?? null,
-        runtime: manifest?.runtime ?? null,
-        entrypoint: manifest?.entrypoint ?? null,
+        runtime: manifest ? manifestRuntimeLabel(manifest, appDir, files) : null,
+        entrypoint: manifest && isLegacyPythonManifest(manifest) ? manifest.entrypoint : null,
         valid: errors.length === 0,
         errors,
         unsupported_reason: errors.length === 0 ? null : errors.join("; "),
@@ -1249,17 +1384,6 @@ function findCandidateApps(args: JsonObject): McpToolResult {
   });
 }
 
-function unsupportedV0Files(appDir: string, files: Record<string, string>, manifest?: FloomManifest) {
-  const unsupported = ["pyproject.toml", "package.json", "openapi.json"];
-  if (!manifest?.dependencies?.python) {
-    unsupported.push("requirements.txt");
-  }
-
-  return unsupported
-    .map((fileName) => joinPath(appDir, fileName))
-    .filter((filePath) => filePath in files);
-}
-
 function unsupportedManifestFields(manifest: JsonObject) {
   const reasons: string[] = [];
   const unsupportedFields = [
@@ -1274,42 +1398,66 @@ function unsupportedManifestFields(manifest: JsonObject) {
   ];
   for (const field of unsupportedFields) {
     if (manifest[field] !== undefined) {
-      reasons.push(`floom.yaml field ${field} is not supported in v0.1.`);
+      reasons.push(`floom.yaml field ${field} is not supported.`);
     }
   }
   if (manifest.input_schema !== undefined && typeof manifest.input_schema !== "string") {
-    reasons.push("floom.yaml field input_schema must be a file path string in v0.1.");
+    reasons.push("floom.yaml field input_schema must be a file path string.");
   }
   if (manifest.output_schema !== undefined && typeof manifest.output_schema !== "string") {
-    reasons.push("floom.yaml field output_schema must be a file path string in v0.1.");
+    reasons.push("floom.yaml field output_schema must be a file path string.");
   }
   if (manifest.public !== undefined && typeof manifest.public !== "boolean") {
-    reasons.push("floom.yaml field public must be true or false in v0.1.");
+    reasons.push("floom.yaml field public must be true or false.");
   }
   return reasons;
 }
 
-function unsupportedFileReason(filePath: string) {
-  const fileName = basename(filePath);
-  if (fileName === "requirements.txt") {
-    return `${filePath} requires floom.yaml dependencies.python: ./requirements.txt.`;
+function manifestRuntimeLabel(
+  manifest: FloomManifest,
+  appDir: string,
+  files: Record<string, string>
+) {
+  if (isLegacyPythonManifest(manifest)) {
+    return "python";
   }
-  if (fileName === "pyproject.toml") {
-    return `${filePath} is not supported in v0.1; use requirements.txt with dependencies.python.`;
+
+  const detected = detectCommandFromFileMap(appDir, files);
+  if (!detected) {
+    return manifest.command ? "stock-e2b" : null;
   }
-  if (fileName === "package.json") {
-    return `${filePath} is not supported in v0.1; TypeScript/Node apps require the post-v0.1 TypeScript runner.`;
-  }
-  if (fileName === "openapi.json") {
-    return `${filePath} is not supported in v0.1; OpenAPI/HTTP apps require the post-v0.1 HTTP app runner.`;
-  }
-  return `${filePath} is not supported in v0.1.`;
+
+  if (detected.startsWith("python ")) return "python";
+  if (detected.startsWith("node ") || detected.startsWith("npm ")) return "node";
+  if (detected.startsWith("bun ")) return "bun";
+  if (detected.startsWith("go ")) return "go";
+  return "stock-e2b";
 }
 
-function pythonFilesInAppDir(appDir: string, files: Record<string, string>) {
-  return Object.keys(files)
-    .filter((filePath) => dirname(filePath) === appDir && basename(filePath).endsWith(".py"))
-    .sort();
+function detectCommandFromFileMap(appDir: string, files: Record<string, string>) {
+  const appPy = joinPath(appDir, "app.py");
+  if (appPy in files) {
+    return "python app.py";
+  }
+
+  const indexJs = joinPath(appDir, "index.js");
+  if (indexJs in files) {
+    return "node index.js";
+  }
+
+  const packageJsonPath = joinPath(appDir, "package.json");
+  if (packageJsonPath in files) {
+    try {
+      const packageJson = JSON.parse(files[packageJsonPath]) as { scripts?: Record<string, string> };
+      if (typeof packageJson.scripts?.start === "string" && packageJson.scripts.start.trim() !== "") {
+        return "npm start";
+      }
+    } catch {
+      return null;
+    }
+  }
+
+  return null;
 }
 
 function filesByDirectory(files: Record<string, string>) {
@@ -1336,27 +1484,21 @@ function unsupportedRepositoryCandidates(files: Record<string, string>, manifest
     const mainJavaPath = javaFiles.find((filePath) => basename(filePath) === "Main.java") ?? null;
 
     if (fileNames.has("openapi.json") || hasFastApiSource(fileText)) {
-      candidates.push(unsupportedCandidate("FastAPI/OpenAPI apps require the post-v0.1 HTTP app runner", null, null, appDir));
+      candidates.push(unsupportedCandidate("Add floom.yaml. Floom will run the command, but it still does not proxy arbitrary HTTP routes from a server app.", null, null, appDir));
     }
 
     if (fileNames.has("requirements.txt") || fileNames.has("pyproject.toml")) {
-      candidates.push(unsupportedCandidate("Python dependencies require a floom.yaml manifest with dependencies.python: ./requirements.txt", null, null, appDir));
+      candidates.push(unsupportedCandidate("Add floom.yaml. Python dependency files are fine in stock-E2B mode.", "python", null, appDir));
     }
 
     if (fileNames.has("package.json")) {
-      candidates.push(unsupportedCandidate("TypeScript/Node apps require the post-v0.1 TypeScript runner", "typescript", null, appDir));
+      candidates.push(unsupportedCandidate("Add floom.yaml. Node apps are supported in stock-E2B mode.", "node", null, appDir));
     }
 
     if (javaFiles.length > 0 || fileNames.has("pom.xml") || fileNames.has("build.gradle")) {
-      const reasons = ["Java apps require the post-v0.1 Java runner"];
+      const reasons = ["Add floom.yaml and an explicit command before publish."];
       if (javaFiles.length > 0) {
-        reasons.push(`Java source files are not supported in v0.1: ${javaFiles.sort().join(", ")}`);
-      }
-      if (fileNames.has("pom.xml")) {
-        reasons.push("pom.xml is not supported in v0.1");
-      }
-      if (fileNames.has("build.gradle")) {
-        reasons.push("build.gradle is not supported in v0.1");
+        reasons.push(`Java source files detected: ${javaFiles.sort().join(", ")}`);
       }
       candidates.push(unsupportedCandidate(reasons.join("; "), "java", mainJavaPath, appDir));
     }
@@ -1364,8 +1506,8 @@ function unsupportedRepositoryCandidates(files: Record<string, string>, manifest
     if (pythonFiles.length > 1) {
       candidates.push(
         unsupportedCandidate(
-          `Multi-file Python apps require the post-v0.1 multi-file bundle path: ${pythonFiles.sort().join(", ")}`,
-          null,
+          `Add floom.yaml. Multi-file Python apps are supported in stock-E2B mode: ${pythonFiles.sort().join(", ")}`,
+          "python",
           null,
           appDir
         )
@@ -1429,19 +1571,19 @@ function runtimeCoachingFromHints({
   const coaching = new Set<string>();
   const addTypeScript = () =>
     coaching.add(
-      "TypeScript/Node detected from manifest or source hints. Floom v0.1 only publishes runtime: python single-file function apps; use app.py with one handler or wait for the post-v0.1 TypeScript runner."
+      "TypeScript/Node detected from manifest or source hints. Stock-E2B mode supports Node app bundles; publish the whole directory and set command: <shell> unless index.js or package.json start can be auto-detected."
     );
   const addJava = () =>
     coaching.add(
-      "Java detected from manifest or source hints. Floom v0.1 only publishes runtime: python single-file function apps; use app.py with one handler or wait for the post-v0.1 Java runner."
+      "Java detected from manifest or source hints. Stock-E2B mode only widens to what the stock E2B base can already run; add an explicit command and verify the runtime exists in your target E2B base before publish."
     );
   const addHttp = () =>
     coaching.add(
-      "FastAPI/OpenAPI or HTTP server shape detected. Floom v0.1 exposes one JSON Schema form and one Python handler, not an HTTP server; convert the request body into handler inputs or wait for the post-v0.1 HTTP runner."
+      "FastAPI/OpenAPI or HTTP server shape detected. Stock-E2B mode can run the command, but Floom still exposes one run endpoint, not arbitrary HTTP route proxying."
     );
   const addMultiFile = () =>
     coaching.add(
-      "Multiple Python files detected. Floom v0.1 packages one top-level Python entrypoint file; inline small helpers into app.py or wait for post-v0.1 multi-file bundles."
+      "Multiple Python files detected. Stock-E2B mode supports multi-file bundles; publish the whole directory instead of flattening helpers into one file."
     );
   const addHardcodedCredential = () =>
     coaching.add(
@@ -1461,7 +1603,7 @@ function runtimeCoachingFromHints({
       addHttp();
     }
     if (manifest.actions !== undefined) {
-      coaching.add("Multiple actions detected. Floom v0.1 supports one handler function; split separate actions into separate apps or wait for post-v0.1 multi-action support.");
+      coaching.add("Multiple actions detected. This runtime branch still exposes one run surface per app; split separate actions into separate apps for now.");
     }
   }
 
@@ -1484,16 +1626,16 @@ function runtimeCoachingFromHints({
     const unsupportedReasons = unsupportedRepositoryCandidates(files)
       .map((candidate) => candidate.unsupported_reason)
       .join("\n");
-    if (/TypeScript\/Node/.test(unsupportedReasons)) {
+    if (/Node apps are supported|TypeScript\/Node/.test(unsupportedReasons)) {
       addTypeScript();
     }
-    if (/Java apps/.test(unsupportedReasons)) {
+    if (/Java source files detected|Java apps/.test(unsupportedReasons)) {
       addJava();
     }
-    if (/FastAPI\/OpenAPI/.test(unsupportedReasons)) {
+    if (/HTTP route/.test(unsupportedReasons) || /FastAPI\/OpenAPI/.test(unsupportedReasons)) {
       addHttp();
     }
-    if (/Multi-file Python/.test(unsupportedReasons)) {
+    if (/Multi-file Python|multi-file Python apps are supported/i.test(unsupportedReasons)) {
       addMultiFile();
     }
     if (Object.values(files).some((text) => hasCredentialLookingString(text))) {
@@ -1615,23 +1757,112 @@ function parseRequiredSchemaArgument(
 }
 
 function manifestToYaml(manifest: FloomManifest) {
-  return yaml.dump({
-    name: manifest.name,
-    slug: manifest.slug,
-    ...(manifest.description ? { description: manifest.description } : {}),
-    runtime: manifest.runtime,
-    entrypoint: manifest.entrypoint,
-    handler: manifest.handler,
-    public: manifest.public ?? false,
-    ...(manifest.input_schema ? { input_schema: manifest.input_schema } : {}),
-    ...(manifest.output_schema ? { output_schema: manifest.output_schema } : {}),
-    ...(manifest.dependencies ? { dependencies: manifest.dependencies } : {}),
-    ...(manifest.secrets ? { secrets: manifest.secrets } : {}),
-  });
+  return yaml.dump(
+    isLegacyPythonManifest(manifest)
+      ? {
+          ...(manifest.name ? { name: manifest.name } : {}),
+          slug: manifest.slug,
+          ...(manifest.description ? { description: manifest.description } : {}),
+          runtime: manifest.runtime,
+          entrypoint: manifest.entrypoint,
+          handler: manifest.handler,
+          public: manifest.public ?? false,
+          ...(manifest.input_schema ? { input_schema: manifest.input_schema } : {}),
+          ...(manifest.output_schema ? { output_schema: manifest.output_schema } : {}),
+          ...(manifest.dependencies ? { dependencies: manifest.dependencies } : {}),
+          ...(manifest.secrets ? { secrets: manifest.secrets } : {}),
+          ...(manifest.bundle_exclude ? { bundle_exclude: manifest.bundle_exclude } : {}),
+        }
+      : {
+          ...(manifest.name ? { name: manifest.name } : {}),
+          slug: manifest.slug,
+          ...(manifest.description ? { description: manifest.description } : {}),
+          ...(manifest.command ? { command: manifest.command } : {}),
+          public: manifest.public ?? false,
+          ...(manifest.input_schema ? { input_schema: manifest.input_schema } : {}),
+          ...(manifest.output_schema ? { output_schema: manifest.output_schema } : {}),
+          ...(manifest.dependencies ? { dependencies: manifest.dependencies } : {}),
+          ...(manifest.secrets ? { secrets: manifest.secrets } : {}),
+          ...(manifest.bundle_exclude ? { bundle_exclude: manifest.bundle_exclude } : {}),
+        }
+  );
 }
 
 function textBlob(text: string, type: string) {
   return new Blob([text], { type });
+}
+
+function buildLegacyPublishFiles(
+  args: JsonObject,
+  manifest: FloomManifest
+): { ok: true; files: Record<string, string> } | { ok: false; error: string } {
+  if (!isLegacyPythonManifest(manifest)) {
+    return {
+      ok: false,
+      error: "publish_app requires files for stock-E2B multi-file or command-based apps; the source shortcut only works for legacy runtime: python apps",
+    };
+  }
+
+  const source = args.source;
+  if (typeof source !== "string" || source.trim() === "") {
+    return { ok: false, error: "source must be a non-empty string" };
+  }
+
+  if (Buffer.byteLength(source, "utf8") > MAX_SOURCE_BYTES) {
+    return { ok: false, error: "source is too large" };
+  }
+
+  try {
+    validatePythonSourceForManifest(source, manifest);
+  } catch (sourceError) {
+    return {
+      ok: false,
+      error: sourceError instanceof Error ? sourceError.message : "Invalid app source",
+    };
+  }
+
+  const inputSchemaResult = parseRequiredSchemaArgument(args.input_schema, "input_schema");
+  if (!inputSchemaResult.ok) {
+    return inputSchemaResult;
+  }
+
+  const outputSchemaResult = parseRequiredSchemaArgument(args.output_schema, "output_schema");
+  if (!outputSchemaResult.ok) {
+    return outputSchemaResult;
+  }
+
+  const files: Record<string, string> = {
+    "floom.yaml": manifestToYaml(manifest),
+    [manifest.entrypoint]: source,
+    [manifest.input_schema ?? "input.schema.json"]: JSON.stringify(inputSchemaResult.schema, null, 2),
+    [manifest.output_schema ?? "output.schema.json"]: JSON.stringify(outputSchemaResult.schema, null, 2),
+  };
+
+  const requirements = args.requirements;
+  if (manifest.dependencies?.python) {
+    if (typeof requirements !== "string") {
+      return { ok: false, error: "requirements must be provided when dependencies.python is declared" };
+    }
+
+    try {
+      files[manifest.dependencies.python.replace(/\s+--require-hashes$/, "").replace(/^\.\//, "")] =
+        validatePythonRequirementsText(requirements, {
+          requireHashes: manifest.dependencies.python.endsWith("--require-hashes"),
+        });
+    } catch (requirementsError) {
+      return {
+        ok: false,
+        error:
+          requirementsError instanceof Error
+            ? requirementsError.message
+            : "Invalid requirements.txt",
+      };
+    }
+  } else if (requirements !== undefined) {
+    return { ok: false, error: "requirements requires dependencies.python in floom.yaml" };
+  }
+
+  return { ok: true, files };
 }
 
 function parseFileMap(

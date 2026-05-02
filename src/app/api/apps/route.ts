@@ -1,23 +1,36 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createAdminClient } from "@/lib/supabase/admin";
-import { callerHasScope, resolveAuthCaller } from "@/lib/supabase/auth";
 import yaml from "js-yaml";
 import { v4 as uuidv4 } from "uuid";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { callerHasScope, resolveAuthCaller } from "@/lib/supabase/auth";
 import { hasSupabaseConfig } from "@/lib/demo-app";
 import {
-  parseManifest,
-  validatePythonSourceForManifest,
-  type FloomManifest,
-} from "@/lib/floom/manifest";
+  BundleValidationError,
+  createBundleFromFileMap,
+  validateUploadedTarball,
+} from "@/lib/floom/bundle";
 import {
+  MAX_BUNDLE_BYTES,
   MAX_REQUEST_BYTES,
-  MAX_REQUIREMENTS_BYTES,
   MAX_SCHEMA_BYTES,
   MAX_SOURCE_BYTES,
 } from "@/lib/floom/limits";
-import { validatePythonRequirementsText } from "@/lib/floom/requirements";
-import { parseAndValidateJsonSchemaText } from "@/lib/floom/schema";
+import {
+  isLegacyPythonManifest,
+  parseManifest,
+  type FloomManifest,
+} from "@/lib/floom/manifest";
 import { resolveMcpForwardOrigin } from "@/lib/mcp/origin";
+
+type ExistingApp = {
+  id: string;
+  owner_id: string;
+  name: string;
+  runtime: string;
+  entrypoint: string | null;
+  handler: string | null;
+  public: boolean;
+};
 
 export async function GET(req: NextRequest) {
   if (!hasSupabaseConfig()) {
@@ -79,44 +92,35 @@ export async function POST(req: NextRequest) {
   const form = await req.formData();
   const manifestFile = getUploadedFile(form, "manifest");
   const bundleFile = getUploadedFile(form, "bundle");
-  const inputSchemaFile = getUploadedFile(form, "input_schema");
-  const outputSchemaFile = getUploadedFile(form, "output_schema");
-  const requirementsFile = getUploadedFile(form, "requirements");
 
   if (!manifestFile || !bundleFile) {
     return NextResponse.json({ error: "Missing manifest or bundle" }, { status: 400 });
   }
 
-  if (!inputSchemaFile || !outputSchemaFile) {
+  if (manifestFile.size > MAX_SCHEMA_BYTES) {
     return NextResponse.json(
-      { error: "Missing input_schema or output_schema upload" },
+      { error: "invalid_manifest", detail: "Manifest is too large" },
       { status: 400 }
     );
   }
 
-  if (manifestFile.size > MAX_SCHEMA_BYTES) {
-    return NextResponse.json({ error: "Manifest is too large" }, { status: 413 });
-  }
-
-  if (bundleFile.size > MAX_SOURCE_BYTES) {
-    return NextResponse.json({ error: "App source is too large" }, { status: 413 });
-  }
-
-  if (
-    (inputSchemaFile && inputSchemaFile.size > MAX_SCHEMA_BYTES) ||
-    (outputSchemaFile && outputSchemaFile.size > MAX_SCHEMA_BYTES) ||
-    (requirementsFile && requirementsFile.size > MAX_REQUIREMENTS_BYTES)
-  ) {
-    return NextResponse.json({ error: "Upload metadata is too large" }, { status: 413 });
+  if (bundleFile.size > MAX_BUNDLE_BYTES && bundleFile.size > MAX_SOURCE_BYTES) {
+    return NextResponse.json(
+      { error: "bundle_too_large", detail: "bundle exceeds the 5 MB compressed limit" },
+      { status: 400 }
+    );
   }
 
   const manifestText = await manifestFile.text();
-  let manifest: FloomManifest;
+  let uploadedManifest: FloomManifest;
   try {
-    manifest = parseManifest(yaml.load(manifestText));
+    uploadedManifest = parseManifest(yaml.load(manifestText));
   } catch (error) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Invalid floom.yaml" },
+      {
+        error: "invalid_manifest",
+        detail: error instanceof Error ? error.message : "Invalid floom.yaml",
+      },
       { status: 400 }
     );
   }
@@ -134,162 +138,191 @@ export async function POST(req: NextRequest) {
 
   const ownerId = caller.userId;
 
-  // Fetch existing app so owners can publish updates to their slug.
   const { data: existing } = await admin
     .from("apps")
     .select("id, owner_id, name, runtime, entrypoint, handler, public")
-    .eq("slug", manifest.slug)
-    .maybeSingle();
+    .eq("slug", uploadedManifest.slug)
+    .maybeSingle<ExistingApp>();
 
   if (existing && existing.owner_id !== ownerId) {
     return NextResponse.json({ error: "Slug already exists" }, { status: 409 });
   }
 
-  const inputResult = parseAndValidateJsonSchemaText(
-    await inputSchemaFile.text(),
-    "input_schema"
-  );
-  if (!inputResult.ok) {
-    return NextResponse.json({ error: inputResult.error }, { status: 400 });
-  }
-  const inputSchema = inputResult.schema;
+  let tarballBuffer = Buffer.from(new Uint8Array(await bundleFile.arrayBuffer()));
+  try {
+    if (!looksLikeTarball(bundleFile, tarballBuffer)) {
+      if (!isLegacyPythonManifest(uploadedManifest)) {
+        return NextResponse.json(
+          {
+            error: "invalid_manifest",
+            detail: "stock-E2B publish requires a .tar.gz bundle rooted at floom.yaml",
+          },
+          { status: 400 }
+        );
+      }
 
-  const outputResult = parseAndValidateJsonSchemaText(
-    await outputSchemaFile.text(),
-    "output_schema"
-  );
-  if (!outputResult.ok) {
-    return NextResponse.json({ error: outputResult.error }, { status: 400 });
-  }
-  const outputSchema = outputResult.schema;
-
-  let pythonRequirements: string | undefined;
-  if (manifest.dependencies?.python) {
-    if (!requirementsFile) {
-      return NextResponse.json({ error: "requirements.txt is required by floom.yaml" }, { status: 400 });
+      tarballBuffer = Buffer.from(
+        new Uint8Array((await createBundleFromLegacyUploads(form, uploadedManifest, manifestText)).buffer)
+      );
     }
+  } catch (error) {
+    return NextResponse.json(
+      {
+        error: "invalid_manifest",
+        detail: error instanceof Error ? error.message : "Failed to assemble bundle",
+      },
+      { status: 400 }
+    );
+  }
 
-    try {
-      pythonRequirements = validatePythonRequirementsText(await requirementsFile.text());
-    } catch (requirementsError) {
+  let validated;
+  try {
+    validated = await validateUploadedTarball(tarballBuffer, manifestText);
+  } catch (error) {
+    if (error instanceof BundleValidationError) {
       return NextResponse.json(
-        {
-          error: requirementsError instanceof Error
-            ? requirementsError.message
-            : "Invalid requirements.txt",
-        },
+        { error: error.code, detail: error.message },
         { status: 400 }
       );
     }
-  } else if (requirementsFile) {
     return NextResponse.json(
-      { error: "requirements.txt requires dependencies.python in floom.yaml" },
+      { error: "invalid_manifest", detail: "Failed to validate bundle" },
       { status: 400 }
     );
   }
 
-  const bundleBuffer = Buffer.from(await bundleFile.arrayBuffer());
-  const bundleText = bundleBuffer.toString("utf8");
   try {
-    validatePythonSourceForManifest(bundleText, manifest);
-  } catch (sourceError) {
-    return NextResponse.json(
-      { error: sourceError instanceof Error ? sourceError.message : "Invalid app source" },
-      { status: 400 }
-    );
+    const bundlePath = `${ownerId}/${validated.manifest.slug}/${uuidv4()}.tar.gz`;
+    const { error: uploadError } = await admin.storage
+      .from("app-bundles")
+      .upload(bundlePath, tarballBuffer, { contentType: "application/gzip" });
+
+    if (uploadError) {
+      return NextResponse.json({ error: "Upload failed" }, { status: 500 });
+    }
+
+    const appMutation = {
+      name: validated.manifest.name?.trim() || existing?.name || validated.displayName,
+      runtime: validated.runtimeLabel,
+      entrypoint: isLegacyPythonManifest(validated.manifest) ? validated.manifest.entrypoint : null,
+      handler: isLegacyPythonManifest(validated.manifest) ? validated.manifest.handler : null,
+      public: validated.manifest.public ?? false,
+    };
+
+    const { data: app, error: appError } = existing
+      ? await admin
+          .from("apps")
+          .update(appMutation)
+          .eq("id", existing.id)
+          .select()
+          .single()
+      : await admin
+          .from("apps")
+          .insert({
+            ...appMutation,
+            slug: validated.manifest.slug,
+            owner_id: ownerId,
+          })
+          .select()
+          .single();
+
+    if (appError || !app) {
+      await admin.storage.from("app-bundles").remove([bundlePath]);
+      return NextResponse.json({ error: "Failed to create app" }, { status: 500 });
+    }
+
+    const { data: latestVersion, error: latestVersionError } = await admin
+      .from("app_versions")
+      .select("version")
+      .eq("app_id", app.id)
+      .order("version", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (latestVersionError) {
+      await rollbackPublish(admin, existing, app.id, bundlePath);
+      return NextResponse.json({ error: "Failed to create app version" }, { status: 500 });
+    }
+
+    const version = (latestVersion?.version ?? 0) + 1;
+    const versionPayload = {
+      app_id: app.id,
+      version,
+      bundle_path: bundlePath,
+      bundle_kind: "tarball",
+      input_schema: validated.inputSchema,
+      output_schema: validated.outputSchema,
+      dependencies: validated.dependencyConfig
+        ? { python_require_hashes: validated.dependencyConfig.requireHashes }
+        : {},
+      secrets: validated.manifest.secrets ?? [],
+    };
+
+    const { error: versionError } = await admin.from("app_versions").insert(versionPayload);
+    if (versionError) {
+      await rollbackPublish(admin, existing, app.id, bundlePath);
+      return NextResponse.json({ error: "Failed to create app version" }, { status: 500 });
+    }
+
+    return NextResponse.json({
+      app: {
+        id: app.id,
+        slug: app.slug,
+        name: app.name,
+        url: new URL(`/p/${app.slug}`, resolveMcpForwardOrigin(req.url) || req.url).toString(),
+      },
+      warnings: validated.warnings,
+    });
+  } finally {
+    await validated.cleanup();
+  }
+}
+
+async function createBundleFromLegacyUploads(
+  form: FormData,
+  manifest: FloomManifest,
+  manifestText: string
+) {
+  const bundleFile = getUploadedFile(form, "bundle");
+  const inputSchemaFile = getUploadedFile(form, "input_schema");
+  const outputSchemaFile = getUploadedFile(form, "output_schema");
+  const requirementsFile = getUploadedFile(form, "requirements");
+
+  if (!bundleFile) {
+    throw new Error("Missing bundle");
   }
 
-  const bundlePath = `${ownerId}/${manifest.slug}/${uuidv4()}-${manifest.entrypoint}`;
-  const { error: uploadError } = await admin.storage
-    .from("app-bundles")
-    .upload(bundlePath, bundleBuffer, { contentType: "application/octet-stream" });
-
-  if (uploadError) {
-    return NextResponse.json({ error: "Upload failed" }, { status: 500 });
+  if (!isLegacyPythonManifest(manifest)) {
+    throw new Error("Legacy upload compatibility requires runtime: python + entrypoint + handler");
   }
 
-  const appMutation = {
-    name: manifest.name,
-    runtime: manifest.runtime,
-    entrypoint: manifest.entrypoint,
-    handler: manifest.handler,
-    public: manifest.public ?? false,
+  if (!inputSchemaFile || !outputSchemaFile) {
+    throw new Error("Legacy uploads require input_schema and output_schema files");
+  }
+
+  const files: Record<string, string> = {
+    "floom.yaml": manifestText,
+    [manifest.entrypoint]: Buffer.from(await bundleFile.arrayBuffer()).toString("utf8"),
+    [manifest.input_schema ?? "input.schema.json"]: await inputSchemaFile.text(),
+    [manifest.output_schema ?? "output.schema.json"]: await outputSchemaFile.text(),
   };
 
-  const { data: app, error: appError } = existing
-    ? await admin
-        .from("apps")
-        .update(appMutation)
-        .eq("id", existing.id)
-        .select()
-        .single()
-    : await admin
-        .from("apps")
-        .insert({
-          ...appMutation,
-          slug: manifest.slug,
-          owner_id: ownerId,
-        })
-        .select()
-        .single();
-
-  if (appError || !app) {
-    await admin.storage.from("app-bundles").remove([bundlePath]);
-    return NextResponse.json({ error: "Failed to create app" }, { status: 500 });
+  const dependencyConfig = manifest.dependencies?.python;
+  if (dependencyConfig) {
+    if (!requirementsFile) {
+      throw new Error("requirements.txt is required by floom.yaml");
+    }
+    files[dependencyConfig.replace(/\s+--require-hashes$/, "").replace(/^\.\//, "")] = await requirementsFile.text();
+  } else if (requirementsFile) {
+    throw new Error("requirements.txt requires dependencies.python in floom.yaml");
   }
 
-  const { data: latestVersion, error: latestVersionError } = await admin
-    .from("app_versions")
-    .select("version")
-    .eq("app_id", app.id)
-    .order("version", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (latestVersionError) {
-    await rollbackPublish(admin, existing, app.id, bundlePath);
-    return NextResponse.json({ error: "Failed to create app version" }, { status: 500 });
-  }
-
-  const version = (latestVersion?.version ?? 0) + 1;
-
-  const { error: versionError } = await admin.from("app_versions").insert({
-    app_id: app.id,
-    version,
-    bundle_path: bundlePath,
-    input_schema: inputSchema,
-    output_schema: outputSchema,
-    dependencies: pythonRequirements ? { python_requirements: pythonRequirements } : {},
-    secrets: manifest.secrets ?? [],
-  });
-
-  if (versionError) {
-    await rollbackPublish(admin, existing, app.id, bundlePath);
-    return NextResponse.json({ error: "Failed to create app version" }, { status: 500 });
-  }
-
-  return NextResponse.json({
-    app: {
-      id: app.id,
-      slug: app.slug,
-      name: app.name,
-      url: new URL(`/p/${app.slug}`, resolveMcpForwardOrigin(req.url) || req.url).toString(),
-    },
-  });
+  return createBundleFromFileMap(files);
 }
 
 async function rollbackPublish(
   admin: ReturnType<typeof createAdminClient>,
-  existing:
-    | {
-        id: string;
-        name: string;
-        runtime: string;
-        entrypoint: string;
-        handler: string;
-        public: boolean;
-      }
-    | null,
+  existing: ExistingApp | null,
   appId: string,
   bundlePath: string
 ) {
@@ -314,4 +347,12 @@ async function rollbackPublish(
 function getUploadedFile(form: FormData, field: string): File | null {
   const value = form.get(field);
   return value instanceof File ? value : null;
+}
+
+function looksLikeTarball(bundleFile: File, buffer: Buffer) {
+  return (
+    bundleFile.name.endsWith(".tar.gz") ||
+    bundleFile.type === "application/gzip" ||
+    (buffer.length >= 2 && buffer[0] === 0x1f && buffer[1] === 0x8b)
+  );
 }

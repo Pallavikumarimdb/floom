@@ -5,6 +5,9 @@ import { demoApp, hasSupabaseConfig } from "@/lib/demo-app";
 
 type AppVersionBundle = {
   bundle_path: string | null;
+  bundle_kind?: string | null;
+  input_schema?: Record<string, unknown> | null;
+  output_schema?: Record<string, unknown> | null;
 };
 
 type DeletableApp = {
@@ -59,8 +62,11 @@ export async function GET(
     entrypoint: app.entrypoint,
     handler: app.handler,
     public: app.public,
-    input_schema: latestVersion?.input_schema ?? {},
-    output_schema: latestVersion?.output_schema ?? {},
+    command:
+      app.entrypoint && app.handler ? undefined : null,
+    input_schema: latestVersion?.input_schema ?? null,
+    output_schema: latestVersion?.output_schema ?? null,
+    bundle_kind: latestVersion?.bundle_kind ?? "single_file",
   });
 }
 

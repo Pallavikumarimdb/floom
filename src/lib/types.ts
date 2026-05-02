@@ -26,6 +26,8 @@ export interface AppDetail {
   author_display?: string;
   creator_handle?: string;
   runtime?: string;
+  command?: string | null;
+  bundle_kind?: string | null;
   version?: string;
   visibility?: 'public' | 'private' | 'unlisted';
   public?: boolean;
@@ -43,9 +45,11 @@ export interface AppDetail {
 export interface RunRecord {
   id: string;
   app_slug?: string;
-  status: 'pending' | 'running' | 'success' | 'error' | 'timeout';
-  inputs?: Record<string, unknown>;
+  status: 'pending' | 'running' | 'success' | 'failed' | 'timed_out' | 'error' | 'timeout';
+  inputs?: unknown;
   output?: unknown;
+  error?: string | null;
+  error_detail?: Record<string, unknown> | null;
   created_at?: string;
 }
 

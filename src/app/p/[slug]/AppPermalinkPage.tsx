@@ -1505,19 +1505,28 @@ export default function AppPermalinkPage() { // exported as default so the serve
                   Spec (floom.yaml)
                 </div>
                 <p style={{ fontSize: 12.5, color: 'var(--muted)', margin: '0 0 10px', lineHeight: 1.5 }}>
-                  v0.1 apps use one Python entrypoint, one handler, JSON schemas, optional hash-locked dependencies, and owner-managed secrets.
+                  New apps publish whole directories on stock E2B. Legacy Python handler manifests still work unchanged.
                 </p>
                 <SourceSnippet
-                  value={[
-                    `name: ${app.name}`,
-                    `slug: ${app.slug}`,
-                    'runtime: python',
-                    'entrypoint: app.py',
-                    'handler: run',
-                    `public: ${app.public ? 'true' : 'false'}`,
-                    'input_schema: input.schema.json',
-                    'output_schema: output.schema.json',
-                  ].join('\n')}
+                  value={(app as AppDetail & { handler?: string | null }).handler
+                    ? [
+                        `name: ${app.name}`,
+                        `slug: ${app.slug}`,
+                        'runtime: python',
+                        'entrypoint: app.py',
+                        'handler: run',
+                        `public: ${app.public ? 'true' : 'false'}`,
+                        'input_schema: input.schema.json',
+                        'output_schema: output.schema.json',
+                      ].join('\n')
+                    : [
+                        `name: ${app.name}`,
+                        `slug: ${app.slug}`,
+                        `public: ${app.public ? 'true' : 'false'}`,
+                        'input_schema: ./input.schema.json',
+                        'output_schema: ./output.schema.json',
+                        '# command: python app.py',
+                      ].join('\n')}
                 />
                 <a
                   href={`${typeof window !== 'undefined' ? window.location.origin : ''}/api/apps/${app.slug}`}

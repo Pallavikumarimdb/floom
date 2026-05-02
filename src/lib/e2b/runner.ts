@@ -1,140 +1,509 @@
 import { Sandbox } from "e2b";
-import { isSafePythonEntrypoint, isSafePythonIdentifier } from "../floom/manifest";
 import type { RuntimeDependencies } from "../floom/requirements";
 import type { RuntimeSecrets } from "../floom/runtime-secrets";
 import {
   COMMAND_TIMEOUT_MS,
   MAX_OUTPUT_BYTES,
-  MAX_SOURCE_BYTES,
+  MAX_STDERR_TAIL_BYTES,
+  MAX_STDOUT_TAIL_BYTES,
   REQUEST_TIMEOUT_MS,
   SANDBOX_TIMEOUT_MS,
 } from "../floom/limits";
 
-export interface RunnerResult {
-  output: Record<string, unknown>;
-  error?: string;
-}
+export type RunnerErrorPhase = "install" | "run" | "output_validation";
+
+export type RunnerErrorDetail = {
+  phase: RunnerErrorPhase;
+  stderr_tail: string;
+  exit_code?: number;
+  elapsed_ms?: number;
+  detail?: string;
+};
+
+export type RunnerResult =
+  | {
+      kind: "success";
+      output: unknown;
+      stdout: string;
+      stderr: string;
+      elapsedMs: number;
+    }
+  | {
+      kind: "failed";
+      error: RunnerErrorDetail;
+      output: null;
+      stdout: string;
+      stderr: string;
+      elapsedMs: number;
+    }
+  | {
+      kind: "timed_out";
+      error: RunnerErrorDetail;
+      output: null;
+      stdout: string;
+      stderr: string;
+      elapsedMs: number;
+    }
+  | {
+      kind: "sandbox_unavailable";
+      retryAfterUnix: number;
+      detail: string;
+    };
+
+export type RunnerConfig = {
+  bundle: Buffer;
+  bundleKind: "single_file" | "tarball";
+  command?: string;
+  legacyEntrypoint?: string | null;
+  inputs: unknown;
+  hasOutputSchema: boolean;
+  dependencies?: RuntimeDependencies;
+  secrets?: RuntimeSecrets;
+};
 
 type SandboxRunner = typeof runInSandbox;
 
-export async function runInSandbox(
-  source: string,
-  inputs: Record<string, unknown>,
-  runtime: "python",
-  entrypoint: string,
-  handler: string,
-  dependencies: RuntimeDependencies = {},
-  secrets: RuntimeSecrets = {}
-): Promise<RunnerResult> {
+export async function runInSandbox(config: RunnerConfig): Promise<RunnerResult> {
   if (!process.env.E2B_API_KEY) {
     if (!isExplicitFakeMode()) {
-      return { output: {}, error: "E2B execution is not configured" };
+      return {
+        kind: "sandbox_unavailable",
+        retryAfterUnix: Math.floor(Date.now() / 1000) + 60,
+        detail: "E2B execution is not configured",
+      };
     }
 
-    return { output: { result: "hello from fake mode", inputs } };
+    return fakeRunnerResult(config);
   }
 
-  if (runtime !== "python") {
-    return { output: {}, error: "v0.1 only supports runtime: python" };
+  let sandbox: Awaited<ReturnType<typeof Sandbox.create>> | null = null;
+  const startedAt = Date.now();
+  try {
+    sandbox = await Sandbox.create("base", sandboxOptions({ allowInternetAccess: true }));
+  } catch {
+    return {
+      kind: "sandbox_unavailable",
+      retryAfterUnix: Math.floor(Date.now() / 1000) + 60,
+      detail: "sandbox boot failed",
+    };
   }
-
-  if (!isSafePythonEntrypoint(entrypoint) || !isSafePythonIdentifier(handler)) {
-    return { output: {}, error: "Invalid app entrypoint or handler" };
-  }
-
-  if (Buffer.byteLength(source, "utf8") > MAX_SOURCE_BYTES) {
-    return { output: {}, error: "App source is too large" };
-  }
-
-  const hasPythonRequirements = Boolean(dependencies.python_requirements?.trim());
-  const hasRuntimeSecrets = Object.keys(secrets).length > 0;
-  let installSbx: Awaited<ReturnType<typeof Sandbox.create>> | null = null;
-  let runSbx: Awaited<ReturnType<typeof Sandbox.create>> | null = null;
 
   try {
-    let dependencyArchive: Uint8Array | null = null;
-    if (hasPythonRequirements && hasRuntimeSecrets && dependencies.python_requirements) {
-      installSbx = await Sandbox.create("base", sandboxOptions({ allowInternetAccess: true }));
-      await installSbx.files.write("/home/user/requirements.txt", dependencies.python_requirements);
-      await installSbx.commands.run(
-        "python3 -m pip install --disable-pip-version-check --no-input --require-hashes --target /home/user/.deps -r /home/user/requirements.txt",
-        {
-          timeoutMs: COMMAND_TIMEOUT_MS,
-          requestTimeoutMs: REQUEST_TIMEOUT_MS,
-        }
-      );
-      await installSbx.commands.run("tar -C /home/user -czf /home/user/deps.tgz .deps", {
-        timeoutMs: COMMAND_TIMEOUT_MS,
-        requestTimeoutMs: REQUEST_TIMEOUT_MS,
-      });
-      dependencyArchive = await installSbx.files.read("/home/user/deps.tgz", {
-        format: "bytes",
-        requestTimeoutMs: REQUEST_TIMEOUT_MS,
-      });
+    await prepareWorkspace(sandbox, config);
+
+    const installResult = await installDependenciesIfNeeded(sandbox, config);
+    if (installResult) {
+      const elapsedMs = Date.now() - startedAt;
+      if (installResult.kind === "failed") {
+        return {
+          kind: "failed",
+          output: null,
+          stdout: installResult.stdout,
+          stderr: installResult.stderr,
+          error: installResult.error,
+          elapsedMs,
+        };
+      }
+      return {
+        kind: "timed_out",
+        output: null,
+        stdout: installResult.stdout,
+        stderr: installResult.stderr,
+        error: installResult.error,
+        elapsedMs,
+      };
     }
 
-    runSbx = await Sandbox.create(
-      "base",
-      sandboxOptions({ allowInternetAccess: true })
-    );
+    const command = config.command?.trim() || await detectCommandInSandbox(sandbox);
+    const runResult = await runCommand(sandbox, command, config.inputs, undefined, config.secrets);
+    const elapsedMs = Date.now() - startedAt;
 
-    await runSbx.files.write(`/home/user/${entrypoint}`, source);
-    if (dependencyArchive) {
-      await runSbx.files.write("/home/user/deps.tgz", toArrayBuffer(dependencyArchive));
-      await runSbx.commands.run("tar -C /home/user -xzf /home/user/deps.tgz", {
-        timeoutMs: COMMAND_TIMEOUT_MS,
-        requestTimeoutMs: REQUEST_TIMEOUT_MS,
-      });
-    } else if (hasPythonRequirements && dependencies.python_requirements) {
-      await runSbx.files.write("/home/user/requirements.txt", dependencies.python_requirements);
-      await runSbx.commands.run(
-        "python3 -m pip install --disable-pip-version-check --no-input --require-hashes --target /home/user/.deps -r /home/user/requirements.txt",
-        {
-          timeoutMs: COMMAND_TIMEOUT_MS,
-          requestTimeoutMs: REQUEST_TIMEOUT_MS,
-        }
-      );
+    if (runResult.kind !== "success") {
+      return {
+        ...runResult,
+        elapsedMs,
+      };
     }
 
-    const moduleName = entrypoint.replace(".py", "");
-    const wrapper = `
-import json
-import sys
-sys.path.insert(0, "/home/user")
-sys.path.insert(0, "/home/user/.deps")
-from ${moduleName} import ${handler}
+    const stdout = runResult.stdout;
+    const stderr = runResult.stderr;
 
-inputs = json.loads(open("/home/user/inputs.json").read())
-result = ${handler}(inputs)
-with open("/home/user/output.json", "w") as handle:
-    json.dump(result, handle)
-`;
+    if (config.hasOutputSchema) {
+      const structured = await readStructuredOutput(sandbox, stdout);
+      if (!structured.ok) {
+        return {
+          kind: "failed",
+          output: null,
+          stdout,
+          stderr,
+          elapsedMs,
+          error: {
+            phase: "output_validation",
+            stderr_tail: tailBytes(stderr, MAX_STDERR_TAIL_BYTES),
+            detail: structured.error,
+          },
+        };
+      }
 
-    await runSbx.files.write("/home/user/runner.py", wrapper);
-    await runSbx.files.write("/home/user/inputs.json", JSON.stringify(inputs));
+      return {
+        kind: "success",
+        output: structured.value,
+        stdout,
+        stderr,
+        elapsedMs,
+      };
+    }
 
-    await runSbx.commands.run("python3 /home/user/runner.py", {
+    const lastJsonLine = parseJsonLastLine(stdout);
+    if (lastJsonLine.ok) {
+      return {
+        kind: "success",
+        output: lastJsonLine.value,
+        stdout,
+        stderr,
+        elapsedMs,
+      };
+    }
+
+    return {
+      kind: "success",
+      output: {
+        stdout: tailBytes(stdout, MAX_STDOUT_TAIL_BYTES),
+        exit_code: 0,
+      },
+      stdout,
+      stderr,
+      elapsedMs,
+    };
+  } finally {
+    await sandbox?.kill().catch(() => undefined);
+  }
+}
+
+export async function runInSandboxContained(
+  config: RunnerConfig,
+  runner: SandboxRunner = runInSandbox
+): Promise<RunnerResult> {
+  try {
+    return await runner(config);
+  } catch {
+    return {
+      kind: "sandbox_unavailable",
+      retryAfterUnix: Math.floor(Date.now() / 1000) + 60,
+      detail: "sandbox boot failed",
+    };
+  }
+}
+
+async function prepareWorkspace(
+  sandbox: Awaited<ReturnType<typeof Sandbox.create>>,
+  config: RunnerConfig
+) {
+  if (config.bundleKind === "single_file") {
+    const entrypoint = config.legacyEntrypoint?.trim();
+    if (!entrypoint) {
+      throw new Error("legacy entrypoint is required for single-file bundles");
+    }
+
+    await sandbox.files.write(`/home/user/${entrypoint}`, config.bundle.toString("utf8"));
+    if (config.dependencies?.python_requirements) {
+      await sandbox.files.write("/home/user/requirements.txt", config.dependencies.python_requirements);
+    }
+    return;
+  }
+
+  await sandbox.files.write("/home/user/bundle.tar.gz", toArrayBuffer(config.bundle));
+  await sandbox.commands.run("mkdir -p /home/user/app && tar -xzf /home/user/bundle.tar.gz -C /home/user/app", {
+    timeoutMs: COMMAND_TIMEOUT_MS,
+    requestTimeoutMs: REQUEST_TIMEOUT_MS,
+  });
+}
+
+async function installDependenciesIfNeeded(
+  sandbox: Awaited<ReturnType<typeof Sandbox.create>>,
+  config: RunnerConfig
+) {
+  const cwd = config.bundleKind === "single_file" ? "/home/user" : "/home/user/app";
+  const hasRequirements = await fileExists(
+    sandbox,
+    `${cwd}/requirements.txt`
+  );
+  const hasPackageJson = await fileExists(sandbox, `${cwd}/package.json`);
+
+  if (!hasRequirements && !hasPackageJson) {
+    return null;
+  }
+
+  if (hasRequirements) {
+    const pipCommand = config.dependencies?.python_require_hashes
+      ? "python3 -m pip install --disable-pip-version-check --no-input --require-hashes -r requirements.txt"
+      : "python3 -m pip install --disable-pip-version-check --no-input -r requirements.txt";
+    const result = await runCommand(sandbox, pipCommand, undefined, cwd);
+    if (result.kind !== "success") {
+      return {
+        ...result,
+        error: {
+          ...result.error,
+          phase: "install" as const,
+        },
+      };
+    }
+  }
+
+  if (hasPackageJson) {
+    const result = await runCommand(sandbox, "npm install", undefined, cwd);
+    if (result.kind !== "success") {
+      return {
+        ...result,
+        error: {
+          ...result.error,
+          phase: "install" as const,
+        },
+      };
+    }
+  }
+
+  return null;
+}
+
+async function detectCommandInSandbox(sandbox: Awaited<ReturnType<typeof Sandbox.create>>) {
+  const detection = await sandbox.commands.run(
+    [
+      "if [ -f app.py ]; then echo 'python app.py';",
+      "elif [ -f index.js ]; then echo 'node index.js';",
+      "elif [ -f package.json ] && node -e \"const p=require('./package.json'); process.exit(typeof p.scripts?.start==='string'&&p.scripts.start.trim()?0:1)\"; then echo 'npm start';",
+      "else exit 2; fi",
+    ].join(" "),
+    {
       timeoutMs: COMMAND_TIMEOUT_MS,
       requestTimeoutMs: REQUEST_TIMEOUT_MS,
-      envs: secrets,
-    });
-    const outputText = await runSbx.files.read("/home/user/output.json", {
+      cwd: "/home/user/app",
+    }
+  ).catch((error: unknown) => error);
+
+  const stdout = readCommandStdout(detection).trim();
+  if (!stdout) {
+    throw new Error("no command detected");
+  }
+
+  return stdout.split(/\r?\n/).filter(Boolean).at(-1) ?? stdout;
+}
+
+async function readStructuredOutput(
+  sandbox: Awaited<ReturnType<typeof Sandbox.create>>,
+  stdout: string
+): Promise<{ ok: true; value: unknown } | { ok: false; error: string }> {
+  const outputJsonPath = "/home/user/app/output.json";
+  const legacyOutputJsonPath = "/home/user/output.json";
+  const candidatePaths = [outputJsonPath, legacyOutputJsonPath];
+
+  for (const filePath of candidatePaths) {
+    const exists = await fileExists(sandbox, filePath);
+    if (!exists) {
+      continue;
+    }
+
+    const text = await sandbox.files.read(filePath, {
       requestTimeoutMs: REQUEST_TIMEOUT_MS,
     });
-    if (Buffer.byteLength(outputText, "utf8") > MAX_OUTPUT_BYTES) {
-      return { output: {}, error: "App output is too large" };
+    if (Buffer.byteLength(text, "utf8") > MAX_OUTPUT_BYTES) {
+      return { ok: false, error: "structured output exceeds the 1 MB limit" };
     }
-    const output = JSON.parse(outputText);
-    if (!output || typeof output !== "object" || Array.isArray(output)) {
-      return { output: {}, error: "App output must be a JSON object" };
+
+    try {
+      return { ok: true, value: JSON.parse(text) };
+    } catch {
+      return { ok: false, error: `${pathLabel(filePath)} must contain valid JSON` };
     }
-    return { output };
-  } catch {
-    return { output: {}, error: "App execution failed" };
-  } finally {
-    await installSbx?.kill().catch(() => undefined);
-    await runSbx?.kill().catch(() => undefined);
   }
+
+  const parsed = parseJsonLastLine(stdout);
+  if (!parsed.ok) {
+    return { ok: false, error: "stdout final line must be valid JSON or write /home/user/output.json" };
+  }
+
+  return parsed;
+}
+
+async function runCommand(
+  sandbox: Awaited<ReturnType<typeof Sandbox.create>>,
+  command: string,
+  inputs?: unknown,
+  cwd?: string,
+  envs: RuntimeSecrets = {}
+): Promise<
+  | {
+      kind: "success";
+      stdout: string;
+      stderr: string;
+    }
+  | {
+      kind: "failed" | "timed_out";
+      output: null;
+      stdout: string;
+      stderr: string;
+      error: RunnerErrorDetail;
+    }
+> {
+  const inputText = inputs === undefined ? "" : JSON.stringify(inputs);
+  await sandbox.files.write("/home/user/.floom-inputs.json", inputText);
+
+  try {
+    const result = await sandbox.commands.run(
+      `sh -lc ${shellEscape(command)} < /home/user/.floom-inputs.json`,
+      {
+        timeoutMs: COMMAND_TIMEOUT_MS,
+        requestTimeoutMs: REQUEST_TIMEOUT_MS,
+        envs: {
+          FLOOM_INPUTS: inputText,
+          ...envs,
+        },
+        cwd: cwd ?? "/home/user",
+      }
+    );
+
+    return {
+      kind: "success",
+      stdout: result.stdout,
+      stderr: result.stderr,
+    };
+  } catch (error: unknown) {
+    const stdout = readCommandStdout(error);
+    const stderr = readCommandStderr(error);
+    const exitCode = readCommandExitCode(error);
+    const timedOut = looksLikeTimeout(error);
+
+    if (timedOut) {
+      return {
+        kind: "timed_out",
+        output: null,
+        stdout,
+        stderr,
+        error: {
+          phase: "run",
+          stderr_tail: tailBytes(stderr, MAX_STDERR_TAIL_BYTES),
+          elapsed_ms: SANDBOX_TIMEOUT_MS,
+        },
+      };
+    }
+
+    return {
+      kind: "failed",
+      output: null,
+      stdout,
+      stderr,
+      error: {
+        phase: "run",
+        stderr_tail: tailBytes(stderr, MAX_STDERR_TAIL_BYTES),
+        ...(exitCode !== undefined ? { exit_code: exitCode } : {}),
+      },
+    };
+  }
+}
+
+async function fileExists(
+  sandbox: Awaited<ReturnType<typeof Sandbox.create>>,
+  filePath: string
+) {
+  const result = await sandbox.commands.run(
+    `[ -f ${shellEscape(filePath)} ] && echo yes || true`,
+    {
+      timeoutMs: COMMAND_TIMEOUT_MS,
+      requestTimeoutMs: REQUEST_TIMEOUT_MS,
+    }
+  );
+  return result.stdout.trim() === "yes";
+}
+
+function parseJsonLastLine(stdout: string): { ok: true; value: unknown } | { ok: false } {
+  const lastLine = stdout
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .at(-1);
+
+  if (!lastLine) {
+    return { ok: false };
+  }
+
+  try {
+    return { ok: true, value: JSON.parse(lastLine) };
+  } catch {
+    return { ok: false };
+  }
+}
+
+function pathLabel(filePath: string) {
+  return filePath.replace("/home/user/", "");
+}
+
+function shellEscape(value: string) {
+  return `'${value.replace(/'/g, `'\"'\"'`)}'`;
+}
+
+function tailBytes(text: string, maxBytes: number) {
+  const buffer = Buffer.from(text, "utf8");
+  if (buffer.byteLength <= maxBytes) {
+    return text;
+  }
+
+  return buffer.subarray(buffer.byteLength - maxBytes).toString("utf8");
+}
+
+function toArrayBuffer(bytes: Uint8Array) {
+  const buffer = new ArrayBuffer(bytes.byteLength);
+  new Uint8Array(buffer).set(bytes);
+  return buffer;
+}
+
+function readCommandStdout(error: unknown) {
+  if (error && typeof error === "object" && "stdout" in error && typeof error.stdout === "string") {
+    return error.stdout;
+  }
+  return "";
+}
+
+function readCommandStderr(error: unknown) {
+  if (error && typeof error === "object" && "stderr" in error && typeof error.stderr === "string") {
+    return error.stderr;
+  }
+  return "";
+}
+
+function readCommandExitCode(error: unknown) {
+  if (error && typeof error === "object" && "exitCode" in error && typeof error.exitCode === "number") {
+    return error.exitCode;
+  }
+  return undefined;
+}
+
+function looksLikeTimeout(error: unknown) {
+  const message =
+    error instanceof Error ? error.message : typeof error === "string" ? error : "";
+  return /timeout|timed out|sandbox timeout/i.test(message);
+}
+
+function fakeRunnerResult(config: RunnerConfig): RunnerResult {
+  if (config.hasOutputSchema) {
+    return {
+      kind: "success",
+      output: { result: "hello from fake mode", inputs: config.inputs },
+      stdout: JSON.stringify({ result: "hello from fake mode", inputs: config.inputs }),
+      stderr: "",
+      elapsedMs: 1,
+    };
+  }
+
+  return {
+    kind: "success",
+    output: {
+      stdout: "hello from fake mode",
+      exit_code: 0,
+    },
+    stdout: "hello from fake mode",
+    stderr: "",
+    elapsedMs: 1,
+  };
 }
 
 function sandboxOptions({ allowInternetAccess }: { allowInternetAccess: boolean }) {
@@ -146,29 +515,6 @@ function sandboxOptions({ allowInternetAccess }: { allowInternetAccess: boolean 
     requestTimeoutMs: REQUEST_TIMEOUT_MS,
     lifecycle: { onTimeout: "kill" },
   } as const;
-}
-
-function toArrayBuffer(bytes: Uint8Array) {
-  const buffer = new ArrayBuffer(bytes.byteLength);
-  new Uint8Array(buffer).set(bytes);
-  return buffer;
-}
-
-export async function runInSandboxContained(
-  source: string,
-  inputs: Record<string, unknown>,
-  runtime: "python",
-  entrypoint: string,
-  handler: string,
-  dependencies: RuntimeDependencies = {},
-  secrets: RuntimeSecrets = {},
-  runner: SandboxRunner = runInSandbox
-): Promise<RunnerResult> {
-  try {
-    return await runner(source, inputs, runtime, entrypoint, handler, dependencies, secrets);
-  } catch {
-    return { output: {}, error: "App execution failed" };
-  }
 }
 
 function isExplicitFakeMode() {
