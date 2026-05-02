@@ -1,21 +1,8 @@
 // Original has per-slug prefill text for the 3 launch demos.
 
 const LAUNCH_DEMO_EXAMPLES: Record<string, Record<string, string>> = {
-  'competitor-lens': {
-    your_url: 'https://stripe.com',
-    competitor_url: 'https://adyen.com',
-  },
-  'ai-readiness-audit': {
-    url: 'https://floom.dev',
-  },
-  'pitch-coach': {
-    pitch: 'We make AI tools for developers. Fast, cheap, no lock-in.',
-  },
   'meeting-action-items': {
     transcript: 'Action: Sarah sends launch notes by Friday\nMike owns beta checklist tomorrow\nPriya will run demo QA before launch',
-  },
-  'demo-app': {
-    pitch: 'We make AI tools for developers. Fast, cheap, no lock-in.',
   },
 };
 

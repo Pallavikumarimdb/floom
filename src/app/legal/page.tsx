@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { SiteHeader } from "@/components/SiteHeader";
+import { FloomFooter } from "@/components/FloomFooter";
 
 const SITE_URL = "https://floom.dev";
 
@@ -157,6 +158,7 @@ export default function LegalPage() {
           </p>
         </Section>
       </article>
+      <FloomFooter />
     </main>
   );
 }

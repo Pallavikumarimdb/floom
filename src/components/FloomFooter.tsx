@@ -38,6 +38,9 @@ export function FloomFooter() {
         padding: '24px 28px',
         background: 'var(--card)',
         borderTop: '1px solid var(--line)',
+        boxSizing: 'border-box',
+        overflowX: 'clip',
+        width: '100%',
       }}
     >
       <div
@@ -49,9 +52,10 @@ export function FloomFooter() {
           gap: 16,
           maxWidth: 1180,
           margin: '0 auto',
+          minWidth: 0,
         }}
       >
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 12 }}>
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
           <Link
             href="/"
             style={{
@@ -84,7 +88,7 @@ export function FloomFooter() {
           </span>
         </div>
 
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 16 }}>
+        <div style={{ display: 'inline-flex', flexWrap: 'wrap', alignItems: 'center', gap: 16, minWidth: 0 }}>
           <a href="/docs" style={ICON_LINK}>
             Docs
           </a>
