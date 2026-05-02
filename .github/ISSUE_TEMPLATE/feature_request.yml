@@ -1,0 +1,33 @@
+name: Feature request
+description: Suggest a focused Floom improvement.
+title: "feature: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What workflow is blocked or unnecessarily hard?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: Describe the smallest useful change.
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - CLI
+        - MCP
+        - App runtime
+        - Auth and tokens
+        - Docs
+        - UI
+        - Other
+    validations:
+      required: true

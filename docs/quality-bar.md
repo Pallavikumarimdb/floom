@@ -35,7 +35,7 @@ Keep the repo simple and modular:
 - `src/lib/mcp`: MCP tool handlers.
 - `supabase/migrations`: the single source of truth for DB schema, storage buckets, RLS, RPCs, and policies.
 - `fixtures`: example apps used by quality gates.
-- `docs`: quality bar, architecture, runbooks, and verification evidence.
+- `docs`: quality bar, architecture, public runbooks, and capability specs.
 
 No duplicate Supabase model/schema definitions spread across root and `src`.
 

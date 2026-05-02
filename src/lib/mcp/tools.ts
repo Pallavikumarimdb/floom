@@ -966,7 +966,7 @@ const APP_TEMPLATES: Record<string, AppTemplate> = {
           transcript: {
             type: "string",
             title: "Meeting notes",
-            default: "Action: send the launch notes by Friday\nPallavi will review the demo copy\nNeed to schedule QA follow-up tomorrow",
+            default: "Action: send the launch notes by Friday\nJordan will review the demo copy\nNeed to schedule QA follow-up tomorrow",
           },
           default_owner: {
             type: "string",
@@ -999,7 +999,7 @@ const APP_TEMPLATES: Record<string, AppTemplate> = {
       },
     },
     example_inputs: {
-      transcript: "Action: send the launch notes by Friday\nPallavi will review the demo copy\nNeed to schedule QA follow-up tomorrow",
+      transcript: "Action: send the launch notes by Friday\nJordan will review the demo copy\nNeed to schedule QA follow-up tomorrow",
       default_owner: "",
     },
   },

@@ -100,7 +100,7 @@ Verified working:
 - Browser, REST, and MCP run surfaces.
 - E2B-backed execution with `requirements.txt` install.
 - Secret injection into E2B as env vars (no values in source/manifest/logs/output).
-- Supabase app/version/execution/storage evidence in virgin QA runs.
+- Supabase app/version/execution/storage evidence in fresh-agent QA runs.
 - `/api/status` health probe (Supabase + E2B + MCP self-check).
 - Middleware HTTP 307 for `/tokens` when no Supabase session cookie.
 

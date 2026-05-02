@@ -2,35 +2,46 @@
 
 ## Reporting a vulnerability
 
-Email **security@floom.dev** with details. We aim to acknowledge within 24 hours and to triage within 72 hours.
+Email **security@floom.dev** with details. We acknowledge security reports within
+24 hours and triage them within 72 hours.
 
-If the issue is sensitive (RCE, auth bypass, data exposure), please do not file a public GitHub issue. Use the email above.
+If the issue is sensitive, do not file a public GitHub issue. Use the email
+address above.
 
 ## Scope
 
-- `floom.dev` (the canonical launch site)
+- `floom.dev`
 - `@floomhq/cli` on npm
 - Floom API endpoints under `/api/*`
-- The Floom MCP endpoint at `/mcp`
-- Public app pages at `/p/<slug>`
+- the Floom MCP endpoint at `/mcp`
+- public app pages at `/p/<slug>`
 
-Out of scope: third-party services Floom depends on (Supabase, E2B, Vercel) — report those to their respective vendors.
+Out of scope: third-party services Floom depends on, including Supabase, E2B,
+Vercel, Sentry, Resend, and Cloudflare.
 
-## What you can expect
+## Include
 
-- Acknowledgement within 24 hours
-- A clear status update within 72 hours
-- Coordinated disclosure: we will not publish a fix advisory before patching, and we will credit reporters who want credit
-- No bug bounty in v0.1; we may add one later
+Please include:
+
+- affected URL or package version
+- reproduction steps
+- expected and actual impact
+- whether any token, secret, or private app data was exposed
+
+## Do not include
+
+Do not include raw secrets in GitHub issues, pull requests, screenshots, or
+public logs.
 
 ## Floom v0.1 security primitives
 
-- Each app run executes in an **isolated E2B sandbox** — no shared filesystem or process state across runs
-- All traffic over **HTTPS** with CSP, HSTS, X-Frame-Options, and Permissions-Policy headers
-- **Public-run rate limiting** by caller and app (defaults: 20 caller runs / 60s and 100 app runs / 60s)
-- **Agent tokens** are stored only as HMAC-SHA256 hashes with `AGENT_TOKEN_PEPPER`; the raw token is shown once at creation and never persisted
-- Output fields marked `secret` in the app's output schema are **redacted** in API and MCP responses (`[REDACTED]`)
-- Single-file Python apps with **hash-locked dependencies** declared in `requirements.txt` (v0.1) — the install layer pins exact versions + hashes
-- **Encrypted-at-rest secrets** (v0.1): secret names declared in `floom.yaml`, raw values encrypted in Supabase, runtime-decrypted and injected into the E2B sandbox at execution time. Never written to source, manifest, logs, MCP output, API responses, app versions, or bundle storage
+- app runs execute in isolated E2B sandboxes
+- HTTPS, CSP, HSTS, X-Frame-Options, and Permissions-Policy headers are active
+- public runs are rate-limited by caller and app
+- agent tokens are stored only as HMAC-SHA256 hashes with `AGENT_TOKEN_PEPPER`
+- encrypted app secrets are stored at rest and injected only at runtime
+- schema-marked secret outputs and secret-like fields are redacted before
+  persistence and API/MCP responses
+- private apps require owner session or owner agent-token auth
 
-See `/docs` for the public-facing launch contract and security summary.
+See `/docs` for the public launch contract and security summary.

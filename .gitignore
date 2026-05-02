@@ -23,6 +23,14 @@
 # misc
 .DS_Store
 *.pem
+*.key
+*.p12
+*.pfx
+*.sqlite
+*.sqlite3
+*.db
+credentials*
+service-account*.json
 
 # debug
 npm-debug.log*
@@ -32,6 +40,7 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.example
 
 # vercel
 .vercel
@@ -56,6 +65,9 @@ docs/rls-audit.md
 docs/e2e-test-plan.md
 docs/*.png
 docs/ui-screenshots-*/
+/launch-evidence/
+/evidence*/
+/qa-*/
 
 # typescript
 *.tsbuildinfo

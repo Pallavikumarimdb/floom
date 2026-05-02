@@ -1,6 +1,6 @@
 # Floom Skill Flow Test Plan
 
-Use this file for repeated "virgin agent" tests. Each run starts from no prior Floom context except the public URL, the repo path, and a fresh Floom agent token supplied through the environment. Testers must not print tokens, JWTs, Supabase keys, or E2B keys.
+Use this file for repeated fresh-agent tests. Each run starts from no prior Floom context except the public URL, the repo path, and a fresh Floom agent token supplied through the environment. Testers must not print tokens, JWTs, Supabase keys, or E2B keys.
 
 Current launch claim:
 
@@ -68,7 +68,7 @@ Still reject until later: FastAPI/OpenAPI apps, arbitrary HTTP servers,
 TypeScript/Node apps, background workers, multi-service repos, and long-running
 processes.
 
-## Virgin Agent Test Matrix
+## Fresh Agent Test Matrix
 
 Run every item from a fresh shell/session.
 
