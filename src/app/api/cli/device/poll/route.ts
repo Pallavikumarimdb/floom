@@ -69,7 +69,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Failed to decrypt CLI token" }, { status: 500 });
   }
 
-  const { error: consumeError } = await admin
+  const { data: consumedRows, error: consumeError } = await admin
     .from("cli_device_authorizations")
     .update({
       status: "consumed",
@@ -77,10 +77,14 @@ export async function GET(req: NextRequest) {
       consumed_at: new Date().toISOString(),
     })
     .eq("id", data.id)
-    .eq("status", "approved");
+    .eq("status", "approved")
+    .select("id");
 
   if (consumeError) {
     return NextResponse.json({ error: "Failed to consume CLI authorization" }, { status: 500 });
+  }
+  if (!consumedRows || consumedRows.length !== 1) {
+    return NextResponse.json({ error: "Authorization already consumed" }, { status: 409 });
   }
 
   return NextResponse.json({

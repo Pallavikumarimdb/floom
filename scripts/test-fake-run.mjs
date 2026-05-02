@@ -328,6 +328,9 @@ async function test() {
   assert.match(readmeText, /hardcode credential-looking strings/);
   assert.match(readmeText, /MCP does not set or return raw app secret values/);
   assert.doesNotMatch(readmeText, /MCP secret-setting tools/);
+  const cliPollRouteText = readFileSync('src/app/api/cli/device/poll/route.ts', 'utf8');
+  assert.match(cliPollRouteText, /\.select\("id"\)/);
+  assert.match(cliPollRouteText, /Authorization already consumed/);
 
   await testMcpAppTemplates();
 
