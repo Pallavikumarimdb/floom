@@ -110,15 +110,11 @@ const STATE_DURATION: Record<DemoState, number> = {
 /**
  * The Python handler body typed character-by-character during Build. Kept
  * deliberately sparse: 70% whitespace so a newcomer can read it, 20% the
- * actual extraction logic, 10% chrome. Matches the meeting-action-items demo
- * shape so the hero and live CTA point at the same product surface.
+ * actual extraction logic, 10% chrome. Matches the v0.1 contract: one
+ * Python file with one JSON-in/JSON-out handler referenced by floom.yaml.
  */
-const HANDLER_CODE = `from floom import App, action
-
-app = App("meeting-action-items")
-
-@app.action("extract")
-def extract(notes: str):
+const HANDLER_CODE = `def run(inputs: dict) -> dict:
+    notes = inputs.get("transcript", "")
     items = []
     for line in notes.splitlines():
         if "action" in line.lower():
