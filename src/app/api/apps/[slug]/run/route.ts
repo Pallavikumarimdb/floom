@@ -189,7 +189,7 @@ export async function POST(
       version_id: latestVersion.id,
       caller_user_id: caller?.kind === "user" ? caller.userId : null,
       caller_agent_token_id: caller?.kind === "agent_token" ? caller.agentTokenId : null,
-      input: redactedInputs,
+      input: redactedInputs ?? {},
       status: "running",
     })
     .select()
