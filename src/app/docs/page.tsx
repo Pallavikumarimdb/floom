@@ -28,12 +28,13 @@ output_schema: output.schema.json`;
 
 const launchCommand = `npx @floomhq/cli@latest setup
 mkdir my-floom-app && cd my-floom-app
-npx @floomhq/cli@latest init --name "Text Demo" --slug text-demo --description "Echo text and return a length." --type custom
+SLUG="text-demo-$(date +%s)"
+npx @floomhq/cli@latest init --name "Text Demo" --slug "$SLUG" --description "Echo text and return a length." --type custom
 npx @floomhq/cli@latest deploy --dry-run
 npx @floomhq/cli@latest deploy
-npx @floomhq/cli@latest run text-demo '{"text":"Hello from Floom"}' --json`;
+npx @floomhq/cli@latest run "$SLUG" '{"text":"Hello from Floom"}' --json`;
 
-const apiExample = `curl -X POST https://floom.dev/api/apps/text-demo/run \\
+const apiExample = `curl -X POST https://floom.dev/api/apps/YOUR_PUBLIC_SLUG/run \\
   -H 'Content-Type: application/json' \\
   -d '{"inputs":{"text":"Hello from Floom"}}'`;
 
@@ -54,7 +55,7 @@ arguments: { "key": "invoice_calculator" }
 
 POST https://floom.dev/mcp
 tool: run_app
-arguments: { "slug": "text-demo", "inputs": { "text": "Hello from Floom" } }`;
+arguments: { "slug": "YOUR_PUBLIC_SLUG", "inputs": { "text": "Hello from Floom" } }`;
 
 const mcpJsonRpcExample = `curl -sS https://floom.dev/mcp \\
   -H 'Content-Type: application/json' \\

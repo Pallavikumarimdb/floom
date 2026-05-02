@@ -490,7 +490,7 @@ const STEPS = [
     kicker: 'PUBLISH',
     title: 'One CLI command.',
     body: 'Floom hosts the UI, the REST endpoint, and an MCP tool agents can call.',
-    mono: 'floom publish ./my-app',
+    mono: 'floom deploy',
   },
   {
     num: '03',
