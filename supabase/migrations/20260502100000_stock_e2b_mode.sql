@@ -115,11 +115,14 @@ begin
 
   perform pg_advisory_xact_lock(hashtextextended(p_owner_id::text, 0));
 
-  select coalesce(e2b_seconds_consumed, 0)
+  -- Qualify with table name; the function's RETURN TABLE has an
+  -- e2b_seconds_consumed OUT column that otherwise creates an ambiguous
+  -- reference and PostgREST RPC calls fail with SQLSTATE 42702.
+  select coalesce(app_quota_usage.e2b_seconds_consumed, 0)
   into v_app_current
   from public.app_quota_usage
-  where app_id = p_app_id
-    and window_start = p_window_start;
+  where app_quota_usage.app_id = p_app_id
+    and app_quota_usage.window_start = p_window_start;
   v_app_current := coalesce(v_app_current, 0);
 
   select coalesce(sum(app_quota_usage.e2b_seconds_consumed), 0)
