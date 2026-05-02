@@ -18,8 +18,6 @@ type AgentToken = {
   revoked_at: string | null;
 };
 
-const PRODUCTION_FLOOM_URL = "https://floom.dev";
-
 function relative(dateStr: string | null): string {
   if (!dateStr) return "—";
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -47,13 +45,10 @@ export default function TokensPage() {
   const [confirmRevoke, setConfirmRevoke] = useState<string | null>(null);
   const nameInputRef = useRef<HTMLInputElement | null>(null);
 
-  const origin =
-    typeof window === "undefined" ? PRODUCTION_FLOOM_URL : window.location.origin;
-
   const publishCommand = useMemo(
-    () =>
-      `FLOOM_TOKEN=YOUR_FLOOM_AGENT_TOKEN FLOOM_API_URL=${origin} npx @floomhq/cli@latest deploy`,
-    [origin]
+    () => `npx @floomhq/cli@latest setup
+npx @floomhq/cli@latest deploy`,
+    []
   );
 
   const authHeaders = useMemo(
@@ -343,7 +338,7 @@ export default function TokensPage() {
                   }}
                 >
                   <p style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--accent)', margin: '0 0 10px' }}>
-                    Copy this token now — it will not be shown again
+                    Manual token created — copy now if you need it
                   </p>
                   <pre style={{ maxHeight: 120, overflow: 'auto', borderRadius: 8, border: '1px solid var(--accent-border)', background: 'var(--card)', padding: '10px 12px', fontSize: 11.5, margin: '0 0 10px', fontFamily: "'JetBrains Mono', monospace", color: 'var(--ink)', wordBreak: 'break-all', whiteSpace: 'pre-wrap' }}>
                     {newToken}
@@ -362,7 +357,7 @@ export default function TokensPage() {
             <div style={{ marginTop: 24, maxWidth: 640, ...cardStyle }}>
               <h2 style={{ fontSize: 15, fontWeight: 700, margin: '0 0 6px', letterSpacing: '-0.01em' }}>Publish command</h2>
               <p style={{ fontSize: 12.5, color: 'var(--muted)', margin: '0 0 14px', lineHeight: 1.55 }}>
-                Replace <code style={{ fontFamily: "'JetBrains Mono', monospace", background: 'var(--studio)', padding: '1px 5px', borderRadius: 4, fontSize: 11.5 }}>YOUR_FLOOM_AGENT_TOKEN</code> with the token you just copied.
+                Setup opens browser authorization and saves your agent token locally.
               </p>
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, background: 'var(--terminal-bg)', borderRadius: 8, padding: '12px 14px' }}>
                 <pre style={{ flex: 1, fontFamily: "'JetBrains Mono', monospace", fontSize: 11.5, color: 'var(--terminal-ink)', margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-all', lineHeight: 1.7 }}>
@@ -615,7 +610,7 @@ export default function TokensPage() {
               <div style={cardStyle}>
                 <h2 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 6px', letterSpacing: '-0.01em' }}>Publish command</h2>
                 <p style={{ fontSize: 12.5, color: 'var(--muted)', margin: '0 0 12px', lineHeight: 1.55 }}>
-                  Replace <code style={{ fontFamily: "'JetBrains Mono', monospace", background: 'var(--studio)', padding: '1px 5px', borderRadius: 4, fontSize: 11 }}>YOUR_FLOOM_AGENT_TOKEN</code> with the token.
+                  Setup opens browser authorization and saves your agent token locally.
                 </p>
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, background: 'var(--terminal-bg)', borderRadius: 8, padding: '10px 12px' }}>
                   <pre style={{ flex: 1, fontFamily: "'JetBrains Mono', monospace", fontSize: 10.5, color: 'var(--terminal-ink)', margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-all', lineHeight: 1.7 }}>

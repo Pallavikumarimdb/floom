@@ -134,8 +134,8 @@ export default function DocsPage() {
 
         <Section title="Fastest launch path">
           <ol className="list-decimal space-y-3 pl-5">
-            <li>Sign in or create an account at the token page.</li>
-            <li>Create a Floom agent token and copy it once.</li>
+            <li>Run <code>npx @floomhq/cli@latest setup</code>.</li>
+            <li>Approve the terminal code in the browser.</li>
             <li>
               Place <code>app.py</code>, <code>floom.yaml</code>, and JSON
               Schema files in a folder.
@@ -274,9 +274,10 @@ export default function DocsPage() {
             the deploy dry run before publishing:
           </p>
           <CodeBlock>{requirementsWorkflow}</CodeBlock>
-          <CodeBlock>{`printf '%s' "$VALUE" | FLOOM_TOKEN=YOUR_FLOOM_AGENT_TOKEN FLOOM_API_URL=https://floom.dev npx @floomhq/cli@latest secrets set YOUR_PRIVATE_SLUG OPENAI_API_KEY --value-stdin
-FLOOM_TOKEN=YOUR_FLOOM_AGENT_TOKEN FLOOM_API_URL=https://floom.dev npx @floomhq/cli@latest secrets list YOUR_PRIVATE_SLUG
-FLOOM_TOKEN=YOUR_FLOOM_AGENT_TOKEN FLOOM_API_URL=https://floom.dev npx @floomhq/cli@latest secrets delete YOUR_PRIVATE_SLUG OPENAI_API_KEY`}</CodeBlock>
+          <CodeBlock>{`npx @floomhq/cli@latest setup
+printf '%s' "$VALUE" | npx @floomhq/cli@latest secrets set YOUR_PRIVATE_SLUG OPENAI_API_KEY --value-stdin
+npx @floomhq/cli@latest secrets list YOUR_PRIVATE_SLUG
+npx @floomhq/cli@latest secrets delete YOUR_PRIVATE_SLUG OPENAI_API_KEY`}</CodeBlock>
           <p className="text-sm text-neutral-500">
             MCP can publish and run secret-backed apps after the secret names are
             declared in <code>floom.yaml</code>. Replace hardcoded tokens, API
@@ -284,6 +285,12 @@ FLOOM_TOKEN=YOUR_FLOOM_AGENT_TOKEN FLOOM_API_URL=https://floom.dev npx @floomhq/
             declared secret names. Secret values are set through the CLI
             or REST <code>/api/apps/:slug/secrets</code> flow;
             never collect raw values in MCP tool arguments.
+          </p>
+          <p className="text-sm text-neutral-500">
+            Google OAuth provider handoff is fully branded only after Supabase
+            Auth uses the configured custom auth domain. Until that provider
+            setting is live, Google may display the Supabase project callback
+            host before returning to <code>https://floom.dev/auth/callback</code>.
           </p>
           <p className="text-sm text-neutral-500">
             FastAPI/OpenAPI, arbitrary HTTP servers, TypeScript apps, Java apps,
