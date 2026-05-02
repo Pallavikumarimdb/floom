@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { withSentryConfig } from "@sentry/nextjs";
 
 const securityHeaders = [
   {
@@ -12,7 +13,7 @@ const securityHeaders = [
       "font-src 'self' data:",
       "style-src 'self' 'unsafe-inline'",
       "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
-      "connect-src 'self' https://*.supabase.co https://*.vercel.app",
+      "connect-src 'self' https://*.supabase.co https://*.vercel.app https://*.sentry.io https://*.ingest.sentry.io",
       "form-action 'self'",
     ].join("; "),
   },
@@ -52,4 +53,10 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+export default withSentryConfig(nextConfig, {
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+  authToken: process.env.SENTRY_AUTH_TOKEN,
+  silent: !process.env.CI,
+  widenClientFileUpload: Boolean(process.env.SENTRY_AUTH_TOKEN),
+});

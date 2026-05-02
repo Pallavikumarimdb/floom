@@ -17,6 +17,7 @@
     "@rjsf/core": "^6.5.1",
     "@rjsf/utils": "^6.5.1",
     "@rjsf/validator-ajv8": "^6.5.1",
+    "@sentry/nextjs": "^10.51.0",
     "@supabase/ssr": "^0.10.2",
     "@supabase/supabase-js": "^2.105.1",
     "@vercel/analytics": "^2.0.1",
