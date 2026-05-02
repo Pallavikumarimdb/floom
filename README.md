@@ -52,7 +52,29 @@ cli/
 
 ## Getting Started
 
-### 1. Configure environment variables
+### Use hosted Floom
+
+For app authors, no Supabase, Vercel, or E2B credentials are needed. Authorize
+the CLI in a browser, create a v0.1 app folder, then publish to `https://floom.dev`.
+
+```bash
+npx @floomhq/cli@latest setup
+mkdir my-floom-app && cd my-floom-app
+SLUG="text-demo-$(date +%s)"
+npx @floomhq/cli@latest init --name "Text Demo" --slug "$SLUG" --description "Echo text and return a length." --type custom
+npx @floomhq/cli@latest deploy --dry-run
+npx @floomhq/cli@latest deploy
+npx @floomhq/cli@latest run "$SLUG" '{"text":"Hello from Floom"}' --json
+```
+
+Run `setup` again if an older local config points somewhere other than
+`https://floom.dev`.
+
+### Run or self-host locally
+
+Use this path only when developing the Floom service itself.
+
+#### 1. Configure environment variables
 
 Create `.env.local` and fill in your credentials:
 
@@ -74,24 +96,24 @@ E2B_API_KEY=your-e2b-api-key
 
 
 
-### 2. Install dependencies
+#### 2. Install dependencies
 
 ```bash
 npm install
 ```
 
-### 3. Start the dev server
+#### 3. Start the dev server
 
 ```bash
 npm run dev
 ```
 
-### 4. Authorize the Floom CLI
+#### 4. Authorize the Floom CLI
 
 Run setup and approve the terminal from the browser. The CLI creates and saves
 an agent token without showing the raw token in the browser.
 
-### 5. Publish the fixture app
+#### 5. Publish the fixture app
 
 ```bash
 npx @floomhq/cli@latest setup
@@ -106,7 +128,7 @@ Without Supabase env, visit `/p/demo-app` for the local demo. In the hosted v0.1
 
 `setup` must store `api_url` as `https://floom.dev` for launch testing. If an older local config points somewhere else, run setup again or set `FLOOM_API_URL=https://floom.dev` for the publish command.
 
-### 6. Manage app secrets
+#### 6. Manage app secrets
 
 Generate one server-only encryption key and configure it as `FLOOM_SECRET_ENCRYPTION_KEY`:
 

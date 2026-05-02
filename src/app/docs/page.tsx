@@ -79,6 +79,59 @@ python -m pip install --upgrade pip pip-tools
 python -m piptools compile --generate-hashes --output-file requirements.txt requirements.in
 npx @floomhq/cli@latest deploy --dry-run`;
 
+const dependencyBundleExample = `# floom.yaml
+name: Word Count
+slug: word-count-demo
+runtime: python
+entrypoint: app.py
+handler: run
+public: true
+input_schema: input.schema.json
+output_schema: output.schema.json
+dependencies:
+  python: ./requirements.txt
+
+# app.py
+import humanize
+
+def run(inputs):
+    count = len(inputs["text"].split())
+    return {"words": count, "summary": humanize.intword(count)}
+
+# requirements.txt
+humanize==4.9.0 --hash=sha256:ce284a76d5b1377fd8836733b983bfb0b76f1aa1c090de2566fcf008d7f6ab16
+
+# input.schema.json
+{"type":"object","required":["text"],"properties":{"text":{"type":"string"}},"additionalProperties":false}
+
+# output.schema.json
+{"type":"object","required":["words","summary"],"properties":{"words":{"type":"integer"},"summary":{"type":"string"}},"additionalProperties":false}`;
+
+const secretBundleExample = `# floom.yaml
+name: Secret Check
+slug: secret-check-demo
+runtime: python
+entrypoint: app.py
+handler: run
+public: false
+input_schema: input.schema.json
+output_schema: output.schema.json
+secrets:
+  - OPENAI_API_KEY
+
+# app.py
+import os
+
+def run(inputs):
+    key = os.environ["OPENAI_API_KEY"]
+    return {"configured": bool(key), "label": inputs["label"]}
+
+# input.schema.json
+{"type":"object","required":["label"],"properties":{"label":{"type":"string"}},"additionalProperties":false}
+
+# output.schema.json
+{"type":"object","required":["configured","label"],"properties":{"configured":{"type":"boolean"},"label":{"type":"string"}},"additionalProperties":false}`;
+
 function Section({
   title,
   children,
@@ -275,6 +328,17 @@ export default function DocsPage() {
             the deploy dry run before publishing:
           </p>
           <CodeBlock>{requirementsWorkflow}</CodeBlock>
+          <p>
+            A complete dependency-backed app has the same one-file shape plus a
+            declared <code>requirements.txt</code>:
+          </p>
+          <CodeBlock>{dependencyBundleExample}</CodeBlock>
+          <p>
+            A complete secret-backed app declares secret names in{" "}
+            <code>floom.yaml</code> and reads values from runtime environment
+            variables:
+          </p>
+          <CodeBlock>{secretBundleExample}</CodeBlock>
           <CodeBlock>{`npx @floomhq/cli@latest setup
 printf '%s' "$VALUE" | npx @floomhq/cli@latest secrets set YOUR_PRIVATE_SLUG OPENAI_API_KEY --value-stdin
 npx @floomhq/cli@latest secrets list YOUR_PRIVATE_SLUG
