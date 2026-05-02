@@ -1,6 +1,6 @@
-# v0.2+ versioning roadmap — briefing for Codex
+# v0.2+ versioning roadmap
 
-Federico's call (2026-05-01): the current roadmap collapses too many capabilities into "v0.2" and "v0.3". That forces a slowest-ships-last cadence. Each capability below is independent enough to be its own minor version on its own branch, shipped when ready. **Codex owns the official roadmap doc; this brief is the input.**
+The current roadmap splits capabilities into independent minor versions instead of bundling too much into "v0.2" and "v0.3". Each capability below is independent enough to be its own branch and ship when ready.
 
 ## Principle
 
@@ -47,7 +47,7 @@ Federico's call (2026-05-01): the current roadmap collapses too many capabilitie
 ### E. JavaScript runtime
 - **Why**: Pair with TS/Node (A). Some teams run plain JS without TS.
 - **Scope**: same as A but `app.js` instead of `app.ts`. No TS compile step in sandbox.
-- **Branch**: `feat/v0.x-js-runtime` (or fold into A — Codex's call)
+- **Branch**: `feat/v0.x-js-runtime` (or fold into A during implementation planning)
 - **Done**: same shape as A, but JS handler.
 - **Effort**: small if done with A (most of A's work covers this).
 - **Recommendation**: bundle with A as `feat/v0.x-node-runtime` — one branch, both languages.
@@ -129,12 +129,12 @@ ICE penalizes G for being slow, but G makes everything after it shippable. Same 
 ## Suggested ship sequence (force-multiplier-adjusted)
 
 **Week 1 post-launch** (parallel):
-1. **B. Multi-action** — Codex, port from legacy. Fastest ship.
-2. **I. Chromium E2B template** — Codex. Fast path to browser automation.
+1. **B. Multi-action** — fastest ship from existing design work.
+2. **I. Chromium E2B template** — fast path to browser automation.
 3. **J. Vercel Pro upgrade + `FLOOM_SANDBOX_TIMEOUT_MS=300000`** — 5 min, no code work.
 
 **Weeks 2-3** (parallel):
-4. **A+E. Node + JS runtime** — Codex, biggest TAM unlock.
+4. **A+E. Node + JS runtime** — biggest TAM unlock.
 5. **G. Async + poll runtime** — biggest architectural lift; force multiplier.
 
 **Weeks 4-7** (sequential, gated on G):
@@ -155,18 +155,16 @@ ICE penalizes G for being slow, but G makes everything after it shippable. Same 
 
 ## What this brief is not
 
-- Not a commitment on dates. Federico hasn't approved a launch date for any of these.
-- Not a scope freeze. Each capability still needs its own spec doc that Codex writes.
+- Not a commitment on dates.
+- Not a scope freeze. Each capability still needs its own spec doc.
 - Not a replacement for the v0.1 launch readiness work — that ships first.
 
-## Companion doc
+## Legacy branch policy
 
-For "what do we do with the work already done on legacy branches?" → `docs/legacy-migration-strategy.md`. Three-bucket call: don't lift architectural code (re-implement fresh, use legacy as reference), do lift component-level UI / business logic (Forgot Password, AppReviews, email templates) when the corresponding feature becomes priority, archive the rest with the renamed `floom-legacy` repo (read-only, stars preserved). That doc also has the concrete post-launch sequencing — when to fire each Codex agent, in what order, with what constraints (max 3 branches in flight, merge gates).
+Do not lift architectural code directly; re-implement fresh and use older branches only as reference. Component-level UI and business logic can be lifted when the corresponding feature becomes priority. Keep future capability branches isolated with max three branches in flight and merge only after their own launch gates pass.
 
 ## Current sequencing note
 
 v0.1 dependencies/secrets, UI polish, and the real `meeting-action-items` demo are merged into `main`. Future runtime branches stay isolated until the v0.1 launch gate is clean: signup/email provider verification, OAuth callback verification, repeated publish-flow QA, and final checklist evidence.
 
 See "Suggested ship sequence (force-multiplier-adjusted)" above for the canonical post-launch order.
-
-Federico picks the dates. Codex executes.

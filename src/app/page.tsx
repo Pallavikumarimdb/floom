@@ -460,11 +460,9 @@ export default function LandingV17PageMvp() {
             which violates the self-contained rule. The cards return
             in v0.1 once floom-minimal has its own apps table populated. */}
 
-        {/* DISCORD CTA — quiet chip above the footer (#613,
-            v0.1). Invite lives in MEMORY
-            (project_floom_discord): https://discord.gg/8fXGXjxcRz. Not
-            a second hero, just a visible path for visitors who want
-            to talk to the team or other builders. */}
+        {/* DISCORD CTA — quiet chip above the footer. Not a second hero, just
+            a visible path for visitors who want to talk to the team or other
+            builders. */}
         <DiscordCta />
       </main>
 

@@ -40,7 +40,7 @@ yarn-error.log*
 supabase/.branches/
 supabase/.temp/
 
-# launch QA evidence + internal launch deliberation belong in floom-internal, not the public repo
+# launch QA evidence + internal launch deliberation are private artifacts, not public repo content
 docs/qa-runs/
 docs/*session*.md
 docs/*verification*.md

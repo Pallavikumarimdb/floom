@@ -1,10 +1,10 @@
 /**
  * DiscordCta — small "join the Discord" band near the footer.
  *
- * v0.1 (#613): Floom's Discord exists (invite
- * https://discord.gg/8fXGXjxcRz, MEMORY project_floom_discord) but the
- * landing page has no path to it. This adds a small chip-style band
- * right above the footer: one line of copy, one outbound button.
+ * v0.1: Floom's Discord exists (invite
+ * https://discord.gg/8fXGXjxcRz) but the landing page needs a visible
+ * path to it. This adds a small chip-style band right above the footer:
+ * one line of copy, one outbound button.
  *
  * Not a full card, not a second hero — deliberately understated so it
  * doesn't compete with the GitHub / Docs CTAs above it. Discord logo

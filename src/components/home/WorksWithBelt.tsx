@@ -3,7 +3,7 @@
  * ABOVE the H1 as a compatibility eyebrow (per v0.1, "like we
  * had before"). Compact row, real SVG brand marks where they exist.
  *
- * Logo sourcing (priority per /root/.claude/projects/-root/memory/logos.md):
+ * Logo sourcing:
  *   1. SimpleIcons — Claude, Cursor, OpenAI (real brand marks).
  *   2. Codex CLI — no SimpleIcons entry; it's an OpenAI product, we reuse
  *      the OpenAI mark so the mark tells the truth. (Real-but-shared beats
@@ -14,8 +14,7 @@
  *
  * No text-in-circles. No invented monograms.
  *
- * Placement: appears BEFORE the H1 in LandingV17Page (Fed 2026-04-23 moved it
- * above H1 as small eyebrow row, removed from below CTAs).
+ * Placement: appears before the H1 as a compact compatibility eyebrow row.
  */
 import type { CSSProperties, ReactNode } from 'react';
 
