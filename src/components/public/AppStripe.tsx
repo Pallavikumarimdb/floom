@@ -1,7 +1,5 @@
 'use client';
-// TODO(v5-port): AppStripe — minimal port of floom@main/components/public/AppStripe.tsx
 // Original uses AppIcon, DescriptionMarkdown, categoryTint. Stubbed with simple card layout.
-// See docs/v5-port-stubs.md for full stub list.
 import Link from 'next/link';
 import type { CSSProperties } from 'react';
 

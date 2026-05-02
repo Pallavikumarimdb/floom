@@ -1,9 +1,7 @@
 'use client';
-// TODO(v5-port): SkillModal — stub of floom@main/components/share/SkillModal.tsx
 // Original shows the Claude skill install one-liner + example agent prompt.
 // R7.6 (2026-04-28): SkillModal retained for backwards-compat with deep links;
 // primary install affordance moved to InstallPopover.
-// See docs/v5-port-stubs.md for full stub list.
 
 interface SkillModalProps {
   open: boolean;

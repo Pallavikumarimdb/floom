@@ -1,4 +1,3 @@
-// TODO(v5-port): api/client — stub of floom@main/api/client.ts
 // Original wraps the hub API with React Query + auth token injection.
 // AppPermalinkPage v5 port uses direct fetch() calls instead, but ApiError
 // is still referenced for instanceof checks in catch blocks.

@@ -1,7 +1,5 @@
 'use client';
-// TODO(v5-port): ShareModal — stub of floom@main/components/share/ShareModal.tsx
 // Original renders a Notion-style share dialog with copy link, visibility toggle,
-// and embed code. See docs/v5-port-stubs.md for full stub list.
 
 interface ShareModalProps {
   open: boolean;

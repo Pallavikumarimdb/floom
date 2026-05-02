@@ -1,4 +1,3 @@
-// TODO(v5-port): types stub — floom@main/lib/types.ts
 // Original has full AppDetail, RunRecord, ReviewSummary, ActionSpec, etc.
 // This stub defines the minimum shapes used by AppPermalinkPage.
 

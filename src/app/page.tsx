@@ -2,7 +2,6 @@
 /**
  * LandingV17Page — marketing home `/` — MVP variant.
  *
- * TODO(v5-port): Literal port of floom@main/pages/LandingV17Page.tsx
  * (variant="mvp" code paths only — `!isMvp` blocks dropped).
  * Mechanical fixes applied:
  *   1. 'use client' added (uses hooks)
@@ -12,7 +11,6 @@
  *   5. api.getHub() → fetch('/api/hub').then(r=>r.json())
  *   6. HubApp type defined inline
  *   7. publicHubApps → inline no-op (all apps treated as public)
- * See docs/v5-port-stubs.md for full stub list.
  */
 import { useState } from 'react';
 import Link from 'next/link';
@@ -31,7 +29,7 @@ import { useSession } from '@/hooks/useSession';
 
 // MVP hero install — R7.6 (2026-04-28): hero composition cut to 4 elements
 // (eyebrow, H1, sub, npx command). Caption + MCP/CLI popover removed —
-// Federico's "the landing page hero header still looks a bit overwhelming".
+// Design "the landing page hero header still looks a bit overwhelming".
 // Advanced install paths (MCP config, CLI snippet) live on /home and /docs.
 // Drop @latest — npx defaults to it, and the shorter form fits 375px viewport
 // without horizontal scroll inside the install card.
@@ -64,7 +62,7 @@ function MvpHeroInstall() {
   }
 
   // R7.6 (2026-04-28): MCP/CLI snippet popover removed from hero.
-  // Federico's brief: cut hero to 4 elements. Advanced install paths
+  // Design brief: cut hero to 4 elements. Advanced install paths
   // (MCP config, CLI snippet) live on /home and /docs — not in the
   // first viewport.
 
@@ -191,7 +189,7 @@ export default function LandingV17PageMvp() {
 
       {/* v26 §3 option C: resume banner for authenticated users.
           G1 (2026-04-28): slimmed to a 1-line stripe so it doesn't
-          compete with the hero. Federico: "the composition still is
+          compete with the hero. Design: "the composition still is
           a bit overwhelming". */}
       {isAuthenticated && session && (
         <div
@@ -223,7 +221,7 @@ export default function LandingV17PageMvp() {
               gap: 4,
             }}
           >
-            {/* TODO(v5-port): session.active_workspace not available in floom-minimal.
+            {/* TODO: session.active_workspace not available in floom-minimal.
                 Using generic label. Original: session.active_workspace?.name */}
             Resume in your workspace →
           </Link>
@@ -232,7 +230,7 @@ export default function LandingV17PageMvp() {
 
       <main id="main" style={{ display: 'block' }}>
         {/* HERO — wireframe: .hero-shell > .hero
-            Cursor-style layout (Federico 2026-04-23 — "the visual demo
+            Cursor-style layout (v0.1 — "the visual demo
             doesn't have to fit on the hero in full"). Above the fold at
             1440x900: eyebrow + H1 + sub + CTA + top ~120-150px of the
             HeroDemo canvas. The rest of the demo extends below the fold and
@@ -256,7 +254,7 @@ export default function LandingV17PageMvp() {
               textAlign: 'center',
             }}
           >
-            {/* G1 (2026-04-28): hero composition. Federico said the hero
+            {/* G1 (2026-04-28): hero composition. Design call: the hero
                 still felt overwhelming. Solution:
                 - Lift "Backed by Founders Inc" ABOVE H1 as a quiet eyebrow
                   (positions the product, doesn't compete with the H1)
@@ -266,9 +264,9 @@ export default function LandingV17PageMvp() {
             {/* MVP eyebrow: WorksWithBelt above H1 — agent-agnostic
                 positioning ("Works with any MCP client" + 3 logos) is
                 more useful than a Founders Inc credential here. Founders
-                Inc cohort credit stays in footer + WhosBehind. Federico
-                2026-04-28: hero eyebrow should be product positioning,
-                not investor proof. */}
+                Inc cohort credit stays in footer + WhosBehind.
+                Design call (v0.1): hero eyebrow should be product
+                positioning, not investor proof. */}
             <div data-testid="hero-eyebrow-belt" style={{ marginBottom: 32 }}>
               <WorksWithBelt />
             </div>
@@ -310,7 +308,7 @@ export default function LandingV17PageMvp() {
 
             {/* CTA — demo-first button + secondary install card. */}
             <MvpHeroInstall />
-            {/* WorksWithBelt moved to the eyebrow above H1 (Federico
+            {/* WorksWithBelt moved to the eyebrow above H1 (
                 2026-04-28). No longer rendered under the snippet — it
                 was a second hero element competing with H1+snippet. */}
           </div>
@@ -318,7 +316,7 @@ export default function LandingV17PageMvp() {
           {/* R7.6 followup (2026-04-28): HeroDemo lives directly under
               the hero install snippet (above "From idea to shipped app
               in 3 steps"). Earlier R7.6 pushed it BELOW that section
-              to calm the hero, but Federico flagged it as "too low" —
+              to calm the hero, but Flagged: it as "too low" —
               hero box stays clean (no demo INSIDE it) but the demo
               should still anchor near hero so it reads as proof, not
               filler. Full variant kept its placement here. */}
@@ -331,7 +329,7 @@ export default function LandingV17PageMvp() {
           style={{ padding: '72px 28px', maxWidth: 1240, margin: '0 auto' }}
         >
           <SectionEyebrow>How it works</SectionEyebrow>
-          {/* v6 (2026-05-01): "How it works" H2 changed per Federico — was
+          {/* v6 (2026-05-01): "How it works" H2 changed per design — was
               Inter display 800/34. Now lighter sans 600/28 with neutral tracking
               so the section feels narrative, not marketing-loud. */}
           <h2
@@ -457,13 +455,13 @@ export default function LandingV17PageMvp() {
         </section>
 
         {/* v7 (2026-05-01): showcase + directory sections REMOVED.
-            Federico flagged: floom-minimal v0 only has demo-app, and
+            Flagged: floom-minimal v0 only has demo-app, and
             the showcase + directory cards link to floom.dev/p/<slug>
             which violates the self-contained rule. The cards return
             in v0.1 once floom-minimal has its own apps table populated. */}
 
         {/* DISCORD CTA — quiet chip above the footer (#613,
-            Federico 2026-04-23). Invite lives in MEMORY
+            v0.1). Invite lives in MEMORY
             (project_floom_discord): https://discord.gg/8fXGXjxcRz. Not
             a second hero, just a visible path for visitors who want
             to talk to the team or other builders. */}

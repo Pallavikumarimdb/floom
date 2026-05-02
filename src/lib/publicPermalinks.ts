@@ -1,4 +1,3 @@
-// TODO(v5-port): publicPermalinks — stub of floom@main/lib/publicPermalinks.ts
 // Original has classifyPermalinkLoadError, getPermalinkLoadErrorMessage,
 // buildPublicRunPath, PermalinkLoadOutcome type.
 

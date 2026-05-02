@@ -1,6 +1,6 @@
 /**
  * WorksWithBelt — v17 landing · small "Works with" eyebrow row that sits
- * ABOVE the H1 as a compatibility eyebrow (per Federico 2026-04-23, "like we
+ * ABOVE the H1 as a compatibility eyebrow (per v0.1, "like we
  * had before"). Compact row, real SVG brand marks where they exist.
  *
  * Logo sourcing (priority per /root/.claude/projects/-root/memory/logos.md):

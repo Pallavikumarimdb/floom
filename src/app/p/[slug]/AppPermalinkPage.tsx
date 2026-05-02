@@ -1,5 +1,4 @@
 'use client';
-// v5 port of floom@main/pages/AppPermalinkPage.tsx (2196 lines)
 // Mechanical changes only:
 //   - react-router-dom → next/link + next/navigation
 //   - <Link to={x}> → <Link href={x}>
@@ -8,8 +7,7 @@
 //   - getApp/getRun/shareRun → direct fetch() calls
 //   - getAppReviews → stub returning empty summary
 //   - TopBar → SiteHeader, Footer → FloomFooter
-//   - All heavy components → stubs with // TODO(v5-port): comments
-// See docs/v5-port-stubs.md for full stub list.
+//   - All heavy components → stubs with // TODO: comments
 
 import React, { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import Link from 'next/link';
@@ -122,7 +120,7 @@ export default function AppPermalinkPage() { // exported as default so the serve
           return;
         }
         try {
-          // TODO(v5-port): shareRun() stub — just expose current URL as share URL
+          // TODO: shareRun() stub — just expose current URL as share URL
           setShareModalUrl(
             `${window.location.origin}${buildPublicRunPath(currentRunId)}`,
           );
@@ -186,7 +184,7 @@ export default function AppPermalinkPage() { // exported as default so the serve
         if (!a) return;
         // Synthesize manifest from the floom-minimal API shape:
         // /api/apps/[slug] returns { id, slug, name, runtime, entrypoint,
-        // handler, input_schema, output_schema, public }. The v5-ported
+        // handler, input_schema, output_schema, public }. The internal ported
         // page expects floom.dev's shape with manifest.actions[<key>] +
         // manifest.primary_action. Without this normalization, page
         // crashes because Object.keys(app.manifest.actions)[0] hits
@@ -812,7 +810,7 @@ export default function AppPermalinkPage() { // exported as default so the serve
     return JSON.stringify({ inputs: {} });
   })();
   const topBarCompact = Boolean(runIdFromUrl || initialRun);
-  void topBarCompact; // SiteHeader doesn't have compact prop yet — TODO(v5-port)
+  void topBarCompact; // SiteHeader doesn't have compact prop yet — TODO
 
   return (
     <div className="page-root">
@@ -1005,7 +1003,7 @@ export default function AppPermalinkPage() { // exported as default so the serve
             >
               {/* Install button: switches to the Install tab. Replaces the
                   earlier popover (which duplicated the tab content + had an
-                  outside-click bug Federico flagged). The Install tab is
+                  outside-click bug noted). The Install tab is
                   the canonical place for install instructions; one
                   affordance, not two. */}
               <button

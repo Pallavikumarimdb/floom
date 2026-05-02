@@ -1,9 +1,7 @@
 'use client';
-// TODO(v5-port): InstallPopover — stub of floom@main/components/share/InstallPopover.tsx
 // Original renders a popover with MCP / CLI / Skill tabs.
 // R7.6 (2026-04-28): unified install affordance (replaces Install in workspace +
 // Install as Skill separate buttons).
-// See docs/v5-port-stubs.md for full stub list.
 
 interface InstallPopoverProps {
   open: boolean;

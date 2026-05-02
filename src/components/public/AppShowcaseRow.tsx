@@ -1,9 +1,6 @@
 'use client';
-// TODO(v5-port): ShowcaseCard + SHOWCASE_ENTRIES — stub of
-// floom@main/components/public/AppShowcaseRow.tsx
 // Original renders rich banner-card thumbnails + editorial copy.
 // This stub renders the same AppStripe layout for v0 compatibility.
-// See docs/v5-port-stubs.md for full stub list.
 import Link from 'next/link';
 import type { CSSProperties } from 'react';
 

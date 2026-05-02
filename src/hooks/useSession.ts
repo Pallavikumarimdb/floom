@@ -2,7 +2,7 @@
 /**
  * useSession — Supabase-backed session hook for floom-minimal.
  *
- * TODO(v5-port): The original floom.dev hook (hooks/useSession.ts) wraps
+ * TODO: The original floom.dev hook (hooks/useSession.ts) wraps
  * GET /api/session/me and carries workspace/is_local logic. This port wraps
  * Supabase auth.getSession() directly since floom-minimal uses Supabase Auth.
  *

@@ -40,12 +40,20 @@ yarn-error.log*
 supabase/.branches/
 supabase/.temp/
 
-# launch QA evidence belongs in floom-internal, not the public repo
+# launch QA evidence + internal launch deliberation belong in floom-internal, not the public repo
 docs/qa-runs/
 docs/*session*.md
 docs/*verification*.md
 docs/launch-readiness-20*.md
 docs/launch-readiness-gap-audit-*.md
+docs/launch-readiness-checklist.md
+docs/launch-readiness/
+docs/launch-evidence.md
+docs/post-v0-addons-readiness-*.md
+docs/legacy-migration-strategy.md
+docs/v5-port-stubs.md
+docs/rls-audit.md
+docs/e2e-test-plan.md
 docs/*.png
 docs/ui-screenshots-*/
 

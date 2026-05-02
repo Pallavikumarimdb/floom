@@ -1,4 +1,3 @@
-// TODO(v5-port): app-examples — stub of floom@main/lib/app-examples.ts
 // Original has per-slug prefill text for the 3 launch demos.
 
 const LAUNCH_DEMO_EXAMPLES: Record<string, Record<string, string>> = {

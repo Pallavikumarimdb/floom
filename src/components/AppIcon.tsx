@@ -1,5 +1,4 @@
 'use client';
-// TODO(v5-port): AppIcon — stub of floom@main/components/AppIcon.tsx
 // v11: improved stub — renders a tasteful icon glyph instead of a text monogram.
 // For known slugs renders a relevant icon; fallback is a terminal prompt icon.
 

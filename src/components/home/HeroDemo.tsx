@@ -11,16 +11,14 @@
  *   - Background: no more black. The entire canvas, editor surface,
  *     sidebar, terminal, and Deploy chrome run on the cream/paper palette
  *     (`#faf8f3` / `#f8f5ef` / `#ffffff`) — the landing-brand surface, not
- *     the hacker-terminal one. Lineage: Vikas 70b5068.
  *   - Deploy fills the frame: Deploy is no longer a small strip at the
  *     bottom of the shared editor terminal. It gets a dedicated two-pane
  *     layout — a left "publish checklist" column + the completed editor
  *     on the right — so the tab feels as full-bleed as Build and Use.
- *     Lineage: Fede c2703ad WIP snapshot.
  *   - Use tab has room to breathe: card sits in a generous 20/28px padded
  *     surface with a taller result slot, no cramped thumbnail feel.
  *
- * Spec (Federico, 2026-04-23):
+ * Spec (v0.1):
  *   Three states, ONE morphing canvas. Not 3 cards. Build and Deploy share
  *   the same Claude-Code-style editor surface on the original spec (Deploy
  *   is a continuation, not a reset — it appends `/floomit` to the prior
@@ -48,10 +46,10 @@
  *     - Tracker dot animates horizontally between active pills.
  *     - Subtle "just deployed via /floomit" cue inside Use state.
  *
- *   Naming: Federico uses `/floomit` as the canonical slash command. The
+ *   Naming: floom uses `/floomit` as the canonical slash command. The
  *   skill shipped today registers as `/floom-deploy` (see
  *   skills/claude-code/SKILL.md). That naming drift is flagged in PR body;
- *   we show `/floomit` in the demo to match Federico's spec. When the skill
+ *   we show `/floomit` in the demo to match Design spec. When the skill
  *   is renamed, this file doesn't need to change.
  *
  *   `prefers-reduced-motion`: skip all motion, render Use state static with
@@ -67,7 +65,7 @@
  *   </HeroDemo>
  *
  * Previous implementation (v2, pre-2026-04-23): 3 absolute-positioned cards
- * crossfading inside one container, day-mode palette only. Federico's
+ * crossfading inside one container, day-mode palette only. Design
  * critique: "feels static" — no moment, no payoff pause, no continuity
  * between Build and Deploy. See git history for the v2 source.
  */
@@ -224,7 +222,7 @@ function usePrefersReducedMotion(): boolean {
 /**
  * Mobile detection — narrow viewports get a different physical layout (3
  * stacked cards) instead of the desktop synchronized morphing canvas.
- * Federico R20 (2026-04-29): the desktop demo crammed editor + sidebar +
+ * v0.1 R20: the desktop demo crammed editor + sidebar +
  * deploy timeline + run grid into a 580px fixed canvas at 360px wide.
  * Tracker text rendered at 10.5px (sub-12 readable threshold), code panel
  * gutter ate horizontal real estate, deploy timeline + code preview were
@@ -886,7 +884,7 @@ function DeploySurface({
 // NOTE: This is the hero demo's internal RunSurface component (NOT the app
 // runner at src/components/runner/RunSurface.tsx). Renamed to RunSurfaceDemo
 // to avoid naming collision with the imported runner component.
-// TODO(v5-port): Original file names this RunSurface; renamed here to avoid
+// TODO: Original file names this RunSurface; renamed here to avoid
 // collision with src/components/runner/RunSurface.tsx
 // -----------------------------------------------------------------------------
 function RunSurfaceDemo({
@@ -979,7 +977,7 @@ function RunSurfaceDemo({
           <span style={RUN_CONTEXT_URL}>/p/meeting-action-items</span>
         </div>
 
-        {/* 2026-04-28: Federico feedback "the use page looks empty and
+        {/* 2026-04-28: Feedback: "the use page looks empty and
             doesn't resemble our real design, which has input on the left
             and output on the right". The old design was a single centred
             card with a tiny input pill; that read as a thumbnail, not a
@@ -1130,11 +1128,11 @@ function RunSurfaceDemo({
 // "origin: HeroDemo.tsx" block, scoped via [data-testid="hero-demo"].
 
 const WRAP_STYLE: CSSProperties = {
-  // Federico 2026-04-23: "wider and bigger" (previously 720px — felt small
+  // v0.1: "wider and bigger" (previously 720px — felt small
   // vs. the hero text). 1080px gives Cursor-style visual weight while still
   // fitting a 1200px content column on desktop. Mobile collapses via CSS.
   // 2026-04-24: marginTop restored to 36 — the prior 16 was part of the
-  // "fit hero into 820px" attempt that Federico reversed. Give the demo
+  // "fit hero into 820px" attempt that was reversed. Give the demo
   // real air above the proof belt so it reads as a separate beat.
   maxWidth: 1080,
   margin: '36px auto 0',
@@ -1188,7 +1186,7 @@ const TRACKER_DOT: CSSProperties = {
   background: 'var(--accent, #047857)',
 };
 
-// Fixed-height canvas — the morphing surface. 2026-04-24 (Federico
+// Fixed-height canvas — the morphing surface. 2026-04-24 (
 // feedback): the demo was capped at 460 to try to jam the whole hero
 // into ~820px, which made the editor / deploy timeline / run card all
 // feel pinched. The Cursor-style framing is "demo extends below the
@@ -1236,7 +1234,7 @@ function makeSurfaceStyle(active: boolean, reducedMotion: boolean): CSSPropertie
 }
 
 // Cream paper editor — Linear/Raycast/Arc vibe, not a black hacker terminal.
-// Federico 2026-04-23 + feedback_terminal_never_black.md.
+// v0.1 + feedback_terminal_never_black.md.
 const EDITOR_GRID: CSSProperties = {
   display: 'grid',
   gridTemplateColumns: '160px 1fr',
@@ -1580,7 +1578,7 @@ const LIVE_DOT_CORE: CSSProperties = {
 // Run surface ----------------------------------------------------------------
 // 2026-04-28: Switched from single centred card (consumer-ChatGPT style) to
 // a 2-column input-left / output-right layout that matches the real
-// RunSurface on /p/:slug. Federico feedback: the old Use tab "looks empty
+// RunSurface on /p/:slug. Feedback: the old Use tab "looks empty
 // and doesn't resemble our real design, which has input on the left and
 // output on the right". The demo is an honest explainer of the product, so
 // it has to look like the product. Left column carries the app chrome +

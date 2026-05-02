@@ -2,7 +2,6 @@
 // v6 (2026-05-01): functional RunSurface for floom-minimal v0.
 // Replaces the placeholder stub. Renders the app's input fields from
 // input_schema, sends a POST to /api/apps/<slug>/run, displays output.
-// Not feature-parity with floom@main's 3605-line RunSurface (no streaming
 // terminal, no output toolbar, no run history) — but it actually runs
 // the app, which the stub did not.
 
@@ -318,7 +317,7 @@ export function RunSurface({ app, initialRun, initialInputs, examplePrefillInput
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               {/* Required fields shown by default. Optional fields collapsed
                   behind a 'Show optional fields' toggle so the form reads
-                  short on first glance — Federico's note: a multi-input
+                  short on first glance — Design note: a multi-input
                   meeting-action-items form had a 'default owner' field
                   cluttering the surface. */}
               {requiredFields.map((f) => renderField(f))}
@@ -645,7 +644,7 @@ interface PastRunsDisclosureProps {
 export function PastRunsDisclosure({ appSlug }: PastRunsDisclosureProps) {
   return (
     <div style={{ fontSize: 13, color: 'var(--muted)', padding: '8px 0' }}>
-      {/* TODO(v5-port): Wire PastRunsDisclosure — paginated run list. v0
+      {/* TODO: Wire PastRunsDisclosure — paginated run list. v0
           ships without per-user run history; this is fed by /api/apps/<slug>/runs
           which doesn't exist yet on floom-minimal. */}
       Run history for <code style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11 }}>{appSlug}</code> coming in v0.1.

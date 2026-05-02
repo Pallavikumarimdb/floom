@@ -1,7 +1,6 @@
 'use client';
 // Minimal markdown renderer for app descriptions: bold (**…**), inline
 // code (`…`), and plain paragraphs. Not a full Markdown engine — full
-// support lives in the floom@main DescriptionMarkdown port. This handles
 // the patterns used by the description fallback in AppPermalinkPage and
 // real-app descriptions stored in Supabase.
 

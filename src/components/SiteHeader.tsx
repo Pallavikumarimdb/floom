@@ -137,7 +137,7 @@ export function SiteHeader({ compact = false, onStudioMenuOpen }: Props = {}) {
 
   async function handleLogout() {
     try {
-      // TODO(v5-port): floom-minimal uses Supabase sign out, not api.signOut()
+      // TODO: floom-minimal uses Supabase sign out, not api.signOut()
       const { createClient } = await import('@/lib/supabase/client');
       const supabase = createClient();
       await supabase.auth.signOut();
@@ -462,7 +462,7 @@ export function SiteHeader({ compact = false, onStudioMenuOpen }: Props = {}) {
       {/* Mobile MCP pill — hidden on app permalink routes */}
       {!isLoginPage && !showAuthedChrome && !isAppPermalinkRoute && (
         <div className="topbar-mcp-mobile" data-testid="topbar-mcp-mobile">
-          {/* TODO(v5-port): CopyForClaudeButton not ported — placeholder */}
+          {/* TODO: CopyForClaudeButton not ported — placeholder */}
         </div>
       )}
     </>

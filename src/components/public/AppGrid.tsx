@@ -1,8 +1,6 @@
 'use client';
-// TODO(v5-port): AppGrid — stub of floom@main/components/public/AppGrid.tsx
 // Original renders HubApp[] as rich cards with thumbnail previews.
 // This stub renders the same AppStripe layout for v0 compatibility.
-// See docs/v5-port-stubs.md for full stub list.
 import type { CSSProperties } from 'react';
 import { AppStripe } from './AppStripe';
 

@@ -1,4 +1,3 @@
-// TODO(v5-port): onboarding — stub of floom@main/lib/onboarding.ts
 // Original has localStorage-based first-run confetti/celebration state,
 // sample prefill logic, and publish flag consumer.
 
