@@ -31,9 +31,7 @@ import { useSession } from '@/hooks/useSession';
 // (eyebrow, H1, sub, npx command). Caption + MCP/CLI popover removed —
 // Design "the landing page hero header still looks a bit overwhelming".
 // Advanced install paths (MCP config, CLI snippet) live on /home and /docs.
-// Drop @latest — npx defaults to it, and the shorter form fits 375px viewport
-// without horizontal scroll inside the install card.
-const NPX_SETUP_COMMAND = 'npx @floomhq/cli setup';
+const NPX_SETUP_COMMAND = 'npx @floomhq/cli@latest setup';
 
 async function copyText(text: string) {
   try {
@@ -303,7 +301,7 @@ export default function LandingV17PageMvp() {
                 margin: '-4px 0 20px',
               }}
             >
-              Your AI wrote you code. Floom puts it online. Anyone can use it. Agents can call it.
+              Your AI wrote your code. Floom puts it online. Anyone can use it. Agents can call it.
             </p>
 
             {/* CTA — demo-first button + secondary install card. */}

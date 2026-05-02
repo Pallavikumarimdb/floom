@@ -299,7 +299,7 @@ npx @floomhq/cli@latest deploy`,
             <div style={{ marginTop: 24, maxWidth: 460, ...cardStyle }}>
               <h2 style={{ fontSize: 20, fontWeight: 700, margin: '0 0 6px', letterSpacing: '-0.015em' }}>Manual token fallback</h2>
               <p style={{ fontSize: 13, color: 'var(--muted)', margin: '0 0 20px', lineHeight: 1.55 }}>
-                Prefer <code style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11 }}>npx @floomhq/cli setup</code>. Manual raw tokens are shown once.
+                Prefer <code style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11 }}>npx @floomhq/cli@latest setup</code>. Manual raw tokens are shown once.
               </p>
               <label
                 style={{ display: 'block', fontSize: 12.5, fontWeight: 600, color: 'var(--muted)', marginBottom: 6 }}

@@ -218,7 +218,7 @@ export default function DocsPage() {
           </ul>
           <p className="text-sm text-neutral-500">
             TypeScript, Java, FastAPI/OpenAPI, multiple Python files, undeclared or unhashed packages,
-            inline schemas in <code>floom.yaml</code>, <code>visibility</code>, <code>actions</code>, and <code>manifest_version</code> are outside the v0.1 contract. Secret names and declared dependencies are supported; raw secret values and hardcoded credential-looking strings never belong in source, manifest files, MCP prompts, or generated docs.
+            inline schemas in <code>floom.yaml</code>, <code>visibility</code>, <code>actions</code>, and <code>manifest_version</code> are outside the v0.1 contract. Use <code>public: true</code> for public apps; omit <code>public</code> or set it to <code>false</code> for private apps. Secret names and declared dependencies are supported; raw secret values and hardcoded credential-looking strings never belong in source, manifest files, MCP prompts, or generated docs.
           </p>
         </Section>
 

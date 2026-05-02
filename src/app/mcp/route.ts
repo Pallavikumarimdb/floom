@@ -10,8 +10,10 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({
     name: "floom",
+    version: "v0.1",
     endpoint: new URL("/mcp", origin).toString(),
     transport: "json-rpc-over-http",
+    docs: new URL("/docs", origin).toString(),
   });
 }
 
