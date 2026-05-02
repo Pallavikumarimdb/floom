@@ -219,7 +219,7 @@ export async function POST(req: NextRequest) {
           buffer: tarballBuffer,
           kind: "tarball" as const,
           command: validated.command,
-          contentType: "application/gzip",
+          contentType: "application/octet-stream",
           extension: "tar.gz",
           dependencies: dependencyPayload,
         };
