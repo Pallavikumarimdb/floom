@@ -53,6 +53,18 @@ const menuItemStyle: CSSProperties = {
   borderRadius: 6,
 };
 
+const navLinkStyle: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  padding: '7px 8px',
+  borderRadius: 6,
+  fontSize: 13,
+  fontWeight: 500,
+  lineHeight: 1,
+  textDecoration: 'none',
+  color: MUTED,
+};
+
 interface Props {
   onSignIn?: () => void;
   compact?: boolean;
@@ -204,10 +216,26 @@ export function SiteHeader({ compact = false, onStudioMenuOpen }: Props = {}) {
             </button>
           )}
 
-          {/* Centre nav — floom-minimal v0 strips dead links until pages exist.
-              floom.dev's Apps/Docs/Pricing/Changelog routes don't exist here. */}
+          <nav
+            aria-label="Product"
+            className="topbar-links topbar-links-desktop"
+            style={{
+              gap: 4,
+              marginLeft: 8,
+              alignItems: 'center',
+            }}
+          >
+            <Link href="/docs" style={{ ...navLinkStyle, color: pathname === '/docs' ? INK : MUTED }}>
+              Docs
+            </Link>
+            <Link href="/status" style={{ ...navLinkStyle, color: pathname === '/status' ? INK : MUTED }}>
+              Status
+            </Link>
+            <Link href="/legal" style={{ ...navLinkStyle, color: pathname === '/legal' ? INK : MUTED }}>
+              Legal
+            </Link>
+          </nav>
 
-          {/* Right side */}
           <nav
             aria-label="Site navigation"
             className="topbar-links topbar-links-desktop"
@@ -388,8 +416,17 @@ export function SiteHeader({ compact = false, onStudioMenuOpen }: Props = {}) {
               overflowY: 'auto',
             }}
           >
-            {/* v7: floom-minimal v0 mobile menu has no Apps/Docs/Pricing/
-                Changelog routes — strip to prevent dead links. */}
+            <div style={{ display: 'grid', gap: 8, marginBottom: 14 }}>
+              <Link href="/docs" onClick={() => setMenuOpen(false)} style={menuItemStyle}>
+                Docs
+              </Link>
+              <Link href="/status" onClick={() => setMenuOpen(false)} style={menuItemStyle}>
+                Status
+              </Link>
+              <Link href="/legal" onClick={() => setMenuOpen(false)} style={menuItemStyle}>
+                Legal
+              </Link>
+            </div>
             {!isAuthenticated && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 <Link

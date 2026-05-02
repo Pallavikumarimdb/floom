@@ -85,6 +85,15 @@ export function FloomFooter() {
         </div>
 
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 16 }}>
+          <a href="/docs" style={ICON_LINK}>
+            Docs
+          </a>
+          <a href="/status" style={ICON_LINK}>
+            Status
+          </a>
+          <a href="/legal" style={ICON_LINK}>
+            Legal
+          </a>
           <a
             href="https://github.com/floomhq/floom-minimal"
             target="_blank"

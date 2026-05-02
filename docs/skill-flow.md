@@ -29,7 +29,7 @@ Accept:
 - One handler function, usually `run(inputs: dict) -> dict`.
 - `floom.yaml`, `input.schema.json`, and `output.schema.json`.
 - `public: true` for public apps; omitted or `false` for private apps.
-- Secret names only, never raw secret values, via `secrets: ["OPENAI_API_KEY"]`.
+- Secret names only, never raw secret values or hardcoded credential-looking strings, via `secrets: ["OPENAI_API_KEY"]`.
 
 Reject:
 
@@ -49,14 +49,20 @@ Add in v0.1:
 - `floom.yaml` secret names only, never raw secret values.
 - Owner-scoped encrypted secret storage and E2B runtime injection.
 
-Self-serve secret values are set through `GET`/`PUT`/`DELETE /api/apps/:slug/secrets`
-or the public CLI. Responses contain metadata only.
+Self-serve secret values are set through `GET`/`PUT`/`DELETE /api/apps/:slug/secrets`,
+the public CLI, or MCP secret-setting tools when available. Responses contain metadata only.
 
 ```bash
 printf '%s' "$VALUE" | FLOOM_TOKEN="$FLOOM_TOKEN" FLOOM_API_URL="$FLOOM_API_URL" npx @floomhq/cli@latest secrets set <app-slug> OPENAI_API_KEY --value-stdin
 FLOOM_TOKEN="$FLOOM_TOKEN" FLOOM_API_URL="$FLOOM_API_URL" npx @floomhq/cli@latest secrets list <app-slug>
 FLOOM_TOKEN="$FLOOM_TOKEN" FLOOM_API_URL="$FLOOM_API_URL" npx @floomhq/cli@latest secrets delete <app-slug> OPENAI_API_KEY
 ```
+
+If source, docs, or generated files contain a token, API key, password, private
+key, or credential-looking string, do not copy the raw value into MCP calls or
+reports. Replace it with a declared secret name such as `OPENAI_API_KEY`, read
+that name from the runtime environment, and set the raw value only through the
+CLI/API/MCP secret-setting path.
 
 Still reject until later: FastAPI/OpenAPI apps, arbitrary HTTP servers,
 TypeScript/Node apps, background workers, multi-service repos, and long-running

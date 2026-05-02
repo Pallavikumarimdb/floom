@@ -226,11 +226,11 @@ Launch tools:
 
 MCP cannot create or return raw agent tokens. Create agent tokens from the signed-in `/tokens` page, where the raw token is shown once. The publish/run tools accept a Floom agent token when the token has the required scope.
 
-MCP can publish and run apps that declare secret names in `floom.yaml`, including public secret-backed apps. Raw secret values are set through the CLI, UI/API secrets flow, or REST route until MCP secret tools exist. MCP does not return raw app secret values; list responses contain metadata only.
+MCP can publish and run apps that declare secret names in `floom.yaml`, including public secret-backed apps. Do not hardcode credential-looking strings in source, manifests, docs, MCP prompts, or reports. Declare names such as `OPENAI_API_KEY` in `floom.yaml`, read them from environment variables at runtime, and set values through the CLI, UI/API secrets flow, REST route, or MCP secret-setting tools when available. MCP does not return raw app secret values; list responses contain metadata only.
 
 `get_app_contract` returns the current v0.1 manifest, `app.py`, input/output schema examples, dependency/secret fields, and explicit unsupported cases. Agents use it before generating app files so they do not create FastAPI/OpenAPI, TypeScript, multi-file, server, or multi-action apps for this function runtime.
 
-`validate_manifest` is manifest/schema-only. It validates `floom.yaml` and optional JSON Schemas, but it does not inspect source, install requirements, check declared requirements content, or publish. `publish_app` is the full MCP publish check for manifest, source, required schemas, and declared hash-locked requirements.
+`validate_manifest` validates `floom.yaml` and optional JSON Schemas. Optional `source` and `files` hints return v0.1 runtime coaching for unsupported shapes, but they do not install requirements, check declared requirements content, run source, or publish. `publish_app` is the full MCP publish check for manifest, source, required schemas, and declared hash-locked requirements.
 
 `list_app_templates` and `get_app_template` return useful copy-paste v0.1-safe app bundles. Current templates:
 
@@ -253,6 +253,8 @@ v0.1 includes these capabilities without turning Floom into broad web hosting:
 v0.1 does not claim arbitrary HTTP servers, FastAPI/OpenAPI apps, TypeScript apps, background workers, or full repo hosting. Those stay post-v0.1 until the runtime, auth, limits, and UI contracts are verified end to end.
 
 Secret values are encrypted at rest in `app_secrets` with `FLOOM_SECRET_ENCRYPTION_KEY`. API, CLI, MCP, execution rows, app versions, docs, and bundle storage expose only secret names or metadata.
+
+If an agent sees a hardcoded token, API key, password, private key, or credential-looking string while preparing an app, replace it with a declared secret name and set the value out of band. Use `printf '%s' "$VALUE" | FLOOM_TOKEN=<agent-token> FLOOM_API_URL=https://floom.dev npx @floomhq/cli@latest secrets set <app-slug> <SECRET_NAME> --value-stdin` or an MCP secret-setting flow when available; never collect raw secret values in MCP tool arguments or generated docs.
 
 ## Fake Mode
 

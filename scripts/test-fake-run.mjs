@@ -184,6 +184,57 @@ async function test() {
   assert.equal(validManifest.isError, undefined);
   assert.equal(parseToolResult(validManifest).valid, true);
 
+  const typescriptManifest = await callFloomTool(
+    'validate_manifest',
+    {
+      manifest: [
+        'name: TypeScript Demo',
+        'slug: typescript-demo',
+        'runtime: typescript',
+        'entrypoint: app.ts',
+        'handler: run',
+      ].join('\n'),
+      source: 'export async function run(inputs: Record<string, string>) { return inputs; }\n',
+    },
+    { baseUrl: 'http://localhost:3000' }
+  );
+  const typescriptManifestResult = parseToolResult(typescriptManifest);
+  assert.equal(typescriptManifest.isError, true);
+  assert.match(typescriptManifestResult.error, /runtime: python/);
+  assert.match(typescriptManifestResult.runtime_coaching.join('\n'), /TypeScript\/Node/);
+
+  const coachedManifest = await callFloomTool(
+    'validate_manifest',
+    {
+      manifest: manifestText,
+      source: [
+        'from fastapi import FastAPI',
+        'app = FastAPI()',
+        'API_KEY = "sk-test000000000000000000"',
+      ].join('\n'),
+      files: {
+        'api/app.py': 'from fastapi import FastAPI\napp = FastAPI()\n',
+        'api/helper.py': 'VALUE = 1\n',
+        'node/package.json': '{"type":"module"}',
+        'java/Main.java': 'public class Main { public static void main(String[] args) {} }\n',
+        'java/pom.xml': '<project />\n',
+        'openapi/openapi.json': '{"openapi":"3.1.0"}',
+      },
+    },
+    { baseUrl: 'http://localhost:3000' }
+  );
+  const coachedManifestResult = parseToolResult(coachedManifest);
+  assert.equal(coachedManifest.isError, undefined);
+  assert.equal(coachedManifestResult.valid, true);
+  const runtimeCoaching = coachedManifestResult.runtime_coaching.join('\n');
+  assert.match(runtimeCoaching, /FastAPI\/OpenAPI/);
+  assert.match(runtimeCoaching, /TypeScript\/Node/);
+  assert.match(runtimeCoaching, /Java/);
+  assert.match(runtimeCoaching, /Multiple Python files/);
+  assert.match(runtimeCoaching, /Credential-looking string/);
+  assert.match(runtimeCoaching, /secrets set/);
+  assert.doesNotMatch(runtimeCoaching, /sk-test000000000000000000/);
+
   const invalidSchema = await callFloomTool(
     'validate_manifest',
     {
@@ -238,6 +289,8 @@ async function test() {
   assert.match(contract.limits.public_run_rate_limit, /20 runs per caller/);
   assert.match(contract.auth_and_access.public_apps, /including secret-backed runs/);
   assert.match(contract.auth_and_access.secrets, /schema secret fields are redacted from output/);
+  assert.match(contract.auth_and_access.hardcoded_credentials, /Credential-looking string/);
+  assert.match(contract.auth_and_access.hardcoded_credentials, /secrets set/);
   assert.deepEqual(Object.keys(contract.response_shapes.run_app), [
     'execution_id',
     'status',
@@ -255,10 +308,15 @@ async function test() {
     'meeting_action_items',
   ]);
   const docsPageText = readFileSync('src/app/docs/page.tsx', 'utf8');
+  const readmeText = readFileSync('README.md', 'utf8');
   assert.match(docsPageText, /Section title="What 'secure' means"/);
   assert.match(docsPageText, /Public apps with declared secrets still run anonymously in v0\.1/);
   assert.match(docsPageText, /Java apps/);
   assert.match(docsPageText, /undeclared or unhashed packages/);
+  assert.match(docsPageText, /hardcoded credential-looking strings/);
+  assert.match(docsPageText, /MCP secret-setting tools/);
+  assert.match(readmeText, /hardcode credential-looking strings/);
+  assert.match(readmeText, /MCP secret-setting tools/);
 
   await testMcpAppTemplates();
 
@@ -276,6 +334,33 @@ async function test() {
   );
   assert.equal(candidates.isError, undefined);
   assert.equal(parseToolResult(candidates).candidates[0].valid, true);
+  const mixedCandidates = await callFloomTool(
+    'find_candidate_apps',
+    {
+      files: {
+        'fixtures/python-simple/floom.yaml': manifestText,
+        'fixtures/python-simple/input.schema.json': inputSchemaText,
+        'fixtures/python-simple/output.schema.json': outputSchemaText,
+        'fixtures/python-simple/app.py': sourceText,
+        'frontend/package.json': '{"scripts":{"build":"tsc"}}',
+        'frontend/src/index.ts': 'export function run(input: string) { return input; }\n',
+        'service/openapi.json': '{"openapi":"3.1.0"}',
+        'service/server.py': 'from fastapi import FastAPI\napp = FastAPI()\n',
+        'java/Main.java': 'public class Main { public static void main(String[] args) {} }\n',
+      },
+    },
+    { baseUrl: 'http://localhost:3000' }
+  );
+  const mixedCandidateList = parseToolResult(mixedCandidates).candidates;
+  assert.equal(mixedCandidateList.some((candidate) => candidate.valid === true), true);
+  const mixedUnsupportedReasons = mixedCandidateList
+    .map((candidate) => candidate.unsupported_reason)
+    .join('\n');
+  assert.match(mixedUnsupportedReasons, /TypeScript\/Node/);
+  assert.match(mixedUnsupportedReasons, /FastAPI\/OpenAPI/);
+  assert.match(mixedUnsupportedReasons, /Java apps/);
+  assert.equal(mixedCandidateList.find((candidate) => candidate.app_dir === 'frontend').runtime, 'typescript');
+
   const unsupportedCandidates = await callFloomTool(
     'find_candidate_apps',
     {

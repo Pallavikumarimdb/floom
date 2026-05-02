@@ -164,7 +164,7 @@ export default function DocsPage() {
           </ul>
           <p className="text-sm text-neutral-500">
             TypeScript, Java, FastAPI/OpenAPI, multiple Python files, undeclared or unhashed packages,
-            inline schemas in <code>floom.yaml</code>, <code>visibility</code>, <code>actions</code>, and <code>manifest_version</code> are outside the v0.1 contract. Secret names and declared dependencies are supported; raw secret values never belong in source or manifest files.
+            inline schemas in <code>floom.yaml</code>, <code>visibility</code>, <code>actions</code>, and <code>manifest_version</code> are outside the v0.1 contract. Secret names and declared dependencies are supported; raw secret values and hardcoded credential-looking strings never belong in source, manifest files, MCP prompts, or generated docs.
           </p>
         </Section>
 
@@ -214,9 +214,11 @@ export default function DocsPage() {
             schema.
           </p>
           <p className="text-sm text-neutral-500">
-            <code>validate_manifest</code> checks only the manifest and optional
-            JSON Schemas. <code>publish_app</code> performs the full publish
-            check with source, required schemas, and declared requirements.
+            <code>validate_manifest</code> checks the manifest and optional
+            JSON Schemas. Optional source/file hints return v0.1 runtime
+            coaching for unsupported shapes. <code>publish_app</code> performs
+            the full publish check with source, required schemas, and declared
+            requirements.
           </p>
         </Section>
 
@@ -277,9 +279,11 @@ FLOOM_TOKEN=YOUR_FLOOM_AGENT_TOKEN FLOOM_API_URL=https://floom.dev npx @floomhq/
 FLOOM_TOKEN=YOUR_FLOOM_AGENT_TOKEN FLOOM_API_URL=https://floom.dev npx @floomhq/cli@latest secrets delete YOUR_PRIVATE_SLUG OPENAI_API_KEY`}</CodeBlock>
           <p className="text-sm text-neutral-500">
             MCP can publish and run secret-backed apps after the secret names are
-            declared in <code>floom.yaml</code>. Secret values are set through
-            the CLI or UI/API secrets flow until MCP secret management tools
-            exist.
+            declared in <code>floom.yaml</code>. Replace hardcoded tokens, API
+            keys, passwords, private keys, and credential-looking strings with
+            declared secret names. Secret values are set through the CLI,
+            UI/API secrets flow, or MCP secret-setting tools when available;
+            never collect raw values in MCP tool arguments.
           </p>
           <p className="text-sm text-neutral-500">
             FastAPI/OpenAPI, arbitrary HTTP servers, TypeScript apps, Java apps,

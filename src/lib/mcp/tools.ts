@@ -104,7 +104,7 @@ export const floomTools: McpToolDefinition[] = [
   },
   {
     name: "validate_manifest",
-    description: "Validate only a floom.yaml manifest and optional JSON schemas. This does not inspect source, requirements text, secret values, or publish.",
+    description: "Validate a floom.yaml manifest and optional JSON schemas. Optional source/files hints return v0.1 runtime coaching, but this does not publish.",
     inputSchema: {
       type: "object",
       properties: {
@@ -119,6 +119,15 @@ export const floomTools: McpToolDefinition[] = [
         output_schema: {
           oneOf: [{ type: "string" }, { type: "object", additionalProperties: true }],
           description: "Optional output JSON Schema as JSON text or an object.",
+        },
+        source: {
+          type: "string",
+          description: "Optional entrypoint source hint for runtime coaching only. Do not include raw secret values.",
+        },
+        files: {
+          type: "object",
+          description: "Optional repository file map hint for runtime coaching only. Do not include raw secret values.",
+          additionalProperties: { type: "string" },
         },
       },
       required: ["manifest"],
@@ -406,7 +415,7 @@ function getAppContract(): McpToolResult {
       "Python standard library, plus exact-pinned hash-locked requirements.txt when declared",
       "one handler function that accepts a JSON object and returns a JSON object",
       "floom.yaml plus input.schema.json and output.schema.json",
-      "manifest-declared secret names with owner-managed encrypted secret values",
+      "manifest-declared secret names with owner-managed encrypted secret values; never hardcode credential-looking strings in source, manifests, docs, MCP prompts, or reports",
       "public apps with public: true; private apps when public is omitted or false",
     ],
     unsupported: [
@@ -549,7 +558,9 @@ function getAppContract(): McpToolResult {
       header: "Authorization: Bearer <agent-token>",
       public_apps: "public: true apps allow anonymous metadata and runs, including secret-backed runs, with per-caller and per-app rate limits.",
       private_apps: "public omitted or false apps require the owner session or owner agent token for get_app and run_app.",
-      secrets: "MCP can publish and run apps that declare secret names in floom.yaml, but raw secret values are set through CLI, UI/API secrets flow, or REST until MCP secret tools exist. Runtime injects them as env vars, schema secret fields are redacted from output, and MCP never returns raw secret values.",
+      secrets: "MCP can publish and run apps that declare secret names in floom.yaml, but raw secret values are set through CLI, UI/API secrets flow, REST, or MCP secret-setting tools when available. Runtime injects them as env vars, schema secret fields are redacted from output, and MCP never returns raw secret values.",
+      hardcoded_credentials:
+        "Credential-looking string guidance: if source or docs contain a hardcoded token, key, password, private key, or similar value, replace it with a declared secret name such as OPENAI_API_KEY and read os.environ['OPENAI_API_KEY'] at runtime. Set the value with `npx @floomhq/cli@latest secrets set <app-slug> OPENAI_API_KEY --value-stdin` or an MCP secret-setting flow when available. Do not paste raw secret values into MCP tool arguments.",
     },
     setup_commands: [
       "npx @floomhq/cli@latest setup",
@@ -1020,9 +1031,28 @@ function getAppTemplate(args: JsonObject): McpToolResult {
 }
 
 function validateManifest(args: JsonObject): McpToolResult {
+  const sourceHintResult = parseSourceHint(args.source);
+  if (!sourceHintResult.ok) {
+    return errorResult(sourceHintResult.error);
+  }
+
+  const filesHintResult = args.files === undefined ? null : parseFileMap(args.files);
+  if (filesHintResult && !filesHintResult.ok) {
+    return errorResult(filesHintResult.error);
+  }
+
+  const rawManifest = parseRawManifestHint(args.manifest);
+  const runtimeCoaching = runtimeCoachingFromHints({
+    manifest: rawManifest,
+    source: sourceHintResult.source,
+    files: filesHintResult?.files,
+  });
+
   const manifestResult = parseManifestArgument(args.manifest);
   if (!manifestResult.ok) {
-    return errorResult(manifestResult.error);
+    return errorResultWithData(manifestResult.error, runtimeCoaching.length > 0 ? {
+      runtime_coaching: runtimeCoaching,
+    } : undefined);
   }
 
   const inputSchemaResult = parseOptionalSchemaArgument(args.input_schema, "input_schema");
@@ -1039,6 +1069,7 @@ function validateManifest(args: JsonObject): McpToolResult {
     valid: true,
     scope: "manifest_and_optional_json_schemas_only",
     full_check: "Use publish_app to validate source, required schemas, declared requirements, auth, and the publish API path.",
+    ...(runtimeCoaching.length > 0 ? { runtime_coaching: runtimeCoaching } : {}),
     manifest: manifestResult.manifest,
     schemas: {
       input_schema: inputSchemaResult.provided ? "valid" : "not_provided",
@@ -1130,8 +1161,10 @@ function findCandidateApps(args: JsonObject): McpToolResult {
       ? args.max_results
       : 20;
 
-  const manifestCandidates = Object.entries(files)
-    .filter(([filePath]) => basename(filePath) === "floom.yaml")
+  const manifestEntries = Object.entries(files).filter(([filePath]) => basename(filePath) === "floom.yaml");
+  const manifestDirs = new Set(manifestEntries.map(([manifestPath]) => dirname(manifestPath)));
+
+  const manifestCandidates = manifestEntries
     .slice(0, maxResults)
     .map(([manifestPath, manifestText]) => {
       const appDir = dirname(manifestPath);
@@ -1207,7 +1240,7 @@ function findCandidateApps(args: JsonObject): McpToolResult {
 
   const candidates = [
     ...manifestCandidates,
-    ...unsupportedRepositoryCandidates(files).slice(0, Math.max(0, maxResults - manifestCandidates.length)),
+    ...unsupportedRepositoryCandidates(files, manifestDirs).slice(0, Math.max(0, maxResults - manifestCandidates.length)),
   ];
 
   return okResult({
@@ -1279,59 +1312,79 @@ function pythonFilesInAppDir(appDir: string, files: Record<string, string>) {
     .sort();
 }
 
-function unsupportedRepositoryCandidates(files: Record<string, string>) {
-  if (Object.keys(files).some((filePath) => basename(filePath) === "floom.yaml")) {
-    return [];
+function filesByDirectory(files: Record<string, string>) {
+  const directories = new Map<string, string[]>();
+  for (const filePath of Object.keys(files).sort()) {
+    const appDir = dirname(filePath);
+    directories.set(appDir, [...(directories.get(appDir) ?? []), filePath]);
   }
+  return directories;
+}
 
-  const fileNames = new Set(Object.keys(files).map((filePath) => basename(filePath)));
-  const fileText = Object.values(files).join("\n");
-  const pythonFiles = Object.keys(files).filter((filePath) => basename(filePath).endsWith(".py"));
-  const javaFiles = Object.keys(files).filter((filePath) => basename(filePath).endsWith(".java"));
-  const mainJavaPath = javaFiles.find((filePath) => basename(filePath) === "Main.java") ?? null;
+function unsupportedRepositoryCandidates(files: Record<string, string>, manifestDirs = new Set<string>()) {
   const candidates = [];
 
-  if (fileNames.has("openapi.json") || /FastAPI\s*\(/.test(fileText)) {
-    candidates.push(unsupportedCandidate("FastAPI/OpenAPI apps require the post-v0.1 HTTP app runner"));
-  }
-
-  if (fileNames.has("requirements.txt") || fileNames.has("pyproject.toml")) {
-    candidates.push(unsupportedCandidate("Python dependencies require a floom.yaml manifest with dependencies.python: ./requirements.txt"));
-  }
-
-  if (fileNames.has("package.json")) {
-    candidates.push(unsupportedCandidate("TypeScript/Node apps require the post-v0.1 TypeScript runner"));
-  }
-
-  if (javaFiles.length > 0 || fileNames.has("pom.xml") || fileNames.has("build.gradle")) {
-    const reasons = ["Java apps require the post-v0.1 Java runner"];
-    if (javaFiles.length > 0) {
-      reasons.push(`Java source files are not supported in v0.1: ${javaFiles.sort().join(", ")}`);
+  for (const [appDir, dirFiles] of filesByDirectory(files)) {
+    if (manifestDirs.has(appDir)) {
+      continue;
     }
-    if (fileNames.has("pom.xml")) {
-      reasons.push("pom.xml is not supported in v0.1");
-    }
-    if (fileNames.has("build.gradle")) {
-      reasons.push("build.gradle is not supported in v0.1");
-    }
-    candidates.push(unsupportedCandidate(reasons.join("; "), "java", mainJavaPath));
-  }
 
-  if (pythonFiles.length > 1) {
-    candidates.push(
-      unsupportedCandidate(
-        `Multi-file Python apps require the post-v0.1 multi-file bundle path: ${pythonFiles.sort().join(", ")}`
-      )
-    );
+    const fileNames = new Set(dirFiles.map((filePath) => basename(filePath)));
+    const fileText = dirFiles.map((filePath) => files[filePath]).join("\n");
+    const pythonFiles = dirFiles.filter((filePath) => basename(filePath).endsWith(".py"));
+    const javaFiles = dirFiles.filter((filePath) => basename(filePath).endsWith(".java"));
+    const mainJavaPath = javaFiles.find((filePath) => basename(filePath) === "Main.java") ?? null;
+
+    if (fileNames.has("openapi.json") || hasFastApiSource(fileText)) {
+      candidates.push(unsupportedCandidate("FastAPI/OpenAPI apps require the post-v0.1 HTTP app runner", null, null, appDir));
+    }
+
+    if (fileNames.has("requirements.txt") || fileNames.has("pyproject.toml")) {
+      candidates.push(unsupportedCandidate("Python dependencies require a floom.yaml manifest with dependencies.python: ./requirements.txt", null, null, appDir));
+    }
+
+    if (fileNames.has("package.json")) {
+      candidates.push(unsupportedCandidate("TypeScript/Node apps require the post-v0.1 TypeScript runner", "typescript", null, appDir));
+    }
+
+    if (javaFiles.length > 0 || fileNames.has("pom.xml") || fileNames.has("build.gradle")) {
+      const reasons = ["Java apps require the post-v0.1 Java runner"];
+      if (javaFiles.length > 0) {
+        reasons.push(`Java source files are not supported in v0.1: ${javaFiles.sort().join(", ")}`);
+      }
+      if (fileNames.has("pom.xml")) {
+        reasons.push("pom.xml is not supported in v0.1");
+      }
+      if (fileNames.has("build.gradle")) {
+        reasons.push("build.gradle is not supported in v0.1");
+      }
+      candidates.push(unsupportedCandidate(reasons.join("; "), "java", mainJavaPath, appDir));
+    }
+
+    if (pythonFiles.length > 1) {
+      candidates.push(
+        unsupportedCandidate(
+          `Multi-file Python apps require the post-v0.1 multi-file bundle path: ${pythonFiles.sort().join(", ")}`,
+          null,
+          null,
+          appDir
+        )
+      );
+    }
   }
 
   return candidates;
 }
 
-function unsupportedCandidate(reason: string, runtime: string | null = null, entrypoint: string | null = null) {
+function unsupportedCandidate(
+  reason: string,
+  runtime: string | null = null,
+  entrypoint: string | null = null,
+  appDir = "."
+) {
   return {
     manifest_path: null,
-    app_dir: ".",
+    app_dir: appDir || ".",
     slug: null,
     name: null,
     runtime,
@@ -1340,6 +1393,134 @@ function unsupportedCandidate(reason: string, runtime: string | null = null, ent
     errors: [reason],
     unsupported_reason: reason,
   };
+}
+
+function parseSourceHint(value: unknown): { ok: true; source?: string } | { ok: false; error: string } {
+  if (value === undefined) {
+    return { ok: true };
+  }
+  if (typeof value !== "string") {
+    return { ok: false, error: "source must be a string" };
+  }
+  if (Buffer.byteLength(value, "utf8") > MAX_SOURCE_BYTES) {
+    return { ok: false, error: "source is too large" };
+  }
+  return { ok: true, source: value };
+}
+
+function parseRawManifestHint(value: unknown): JsonObject | null {
+  try {
+    const parsed = typeof value === "string" ? yaml.load(value) : value;
+    return asObject(parsed);
+  } catch {
+    return null;
+  }
+}
+
+function runtimeCoachingFromHints({
+  manifest,
+  source,
+  files,
+}: {
+  manifest: JsonObject | null;
+  source?: string;
+  files?: Record<string, string>;
+}) {
+  const coaching = new Set<string>();
+  const addTypeScript = () =>
+    coaching.add(
+      "TypeScript/Node detected from manifest or source hints. Floom v0.1 only publishes runtime: python single-file function apps; use app.py with one handler or wait for the post-v0.1 TypeScript runner."
+    );
+  const addJava = () =>
+    coaching.add(
+      "Java detected from manifest or source hints. Floom v0.1 only publishes runtime: python single-file function apps; use app.py with one handler or wait for the post-v0.1 Java runner."
+    );
+  const addHttp = () =>
+    coaching.add(
+      "FastAPI/OpenAPI or HTTP server shape detected. Floom v0.1 exposes one JSON Schema form and one Python handler, not an HTTP server; convert the request body into handler inputs or wait for the post-v0.1 HTTP runner."
+    );
+  const addMultiFile = () =>
+    coaching.add(
+      "Multiple Python files detected. Floom v0.1 packages one top-level Python entrypoint file; inline small helpers into app.py or wait for post-v0.1 multi-file bundles."
+    );
+  const addHardcodedCredential = () =>
+    coaching.add(
+      "Credential-looking string detected in source/file hints. Do not hardcode raw secrets or paste them into MCP; declare names in floom.yaml secrets, read them from environment variables, and set values with `npx @floomhq/cli@latest secrets set <app-slug> <SECRET_NAME> --value-stdin` or an MCP secret-setting flow when available."
+    );
+
+  if (manifest) {
+    const runtime = typeof manifest.runtime === "string" ? manifest.runtime.toLowerCase() : "";
+    const entrypoint = typeof manifest.entrypoint === "string" ? manifest.entrypoint.toLowerCase() : "";
+    if (["typescript", "node", "javascript", "js", "ts"].includes(runtime) || /\.(ts|tsx|js|mjs|cjs)$/.test(entrypoint)) {
+      addTypeScript();
+    }
+    if (runtime === "java" || entrypoint.endsWith(".java")) {
+      addJava();
+    }
+    if (manifest.openapi_spec_url !== undefined) {
+      addHttp();
+    }
+    if (manifest.actions !== undefined) {
+      coaching.add("Multiple actions detected. Floom v0.1 supports one handler function; split separate actions into separate apps or wait for post-v0.1 multi-action support.");
+    }
+  }
+
+  if (source) {
+    if (hasFastApiSource(source)) {
+      addHttp();
+    }
+    if (looksLikeTypeScriptSource(source)) {
+      addTypeScript();
+    }
+    if (looksLikeJavaSource(source)) {
+      addJava();
+    }
+    if (hasCredentialLookingString(source)) {
+      addHardcodedCredential();
+    }
+  }
+
+  if (files) {
+    const unsupportedReasons = unsupportedRepositoryCandidates(files)
+      .map((candidate) => candidate.unsupported_reason)
+      .join("\n");
+    if (/TypeScript\/Node/.test(unsupportedReasons)) {
+      addTypeScript();
+    }
+    if (/Java apps/.test(unsupportedReasons)) {
+      addJava();
+    }
+    if (/FastAPI\/OpenAPI/.test(unsupportedReasons)) {
+      addHttp();
+    }
+    if (/Multi-file Python/.test(unsupportedReasons)) {
+      addMultiFile();
+    }
+    if (Object.values(files).some((text) => hasCredentialLookingString(text))) {
+      addHardcodedCredential();
+    }
+  }
+
+  return [...coaching];
+}
+
+function hasFastApiSource(source: string) {
+  return /FastAPI\s*\(|from\s+fastapi\s+import|import\s+fastapi\b|openapi\.json/i.test(source);
+}
+
+function looksLikeTypeScriptSource(source: string) {
+  return /\bexport\s+(async\s+)?function\b|\binterface\s+[A-Za-z_][A-Za-z0-9_]*\b|\btype\s+[A-Za-z_][A-Za-z0-9_]*\s*=|:\s*(string|number|boolean)\b/.test(source);
+}
+
+function looksLikeJavaSource(source: string) {
+  return /\bpublic\s+class\s+[A-Za-z_][A-Za-z0-9_]*\b|\bstatic\s+void\s+main\s*\(|System\.out\.println\s*\(/.test(source);
+}
+
+function hasCredentialLookingString(source: string) {
+  return (
+    /\b(api[_-]?key|secret|token|password|private[_-]?key|credential|authorization)\b\s*[:=]\s*["'][^"'\n]{8,}["']/i.test(source) ||
+    /["'](?:sk|pk|ghp|glpat|xox[baprs]?|AKIA)[A-Za-z0-9_-]{12,}["']/.test(source)
+  );
 }
 
 async function proxyJson(url: string, init: RequestInit): Promise<McpToolResult> {
@@ -1575,11 +1756,15 @@ function okResult(data: unknown): McpToolResult {
 }
 
 function errorResult(message: string): McpToolResult {
+  return errorResultWithData(message);
+}
+
+function errorResultWithData(message: string, data?: JsonObject): McpToolResult {
   return {
     content: [
       {
         type: "text",
-        text: JSON.stringify({ error: message }, null, 2),
+        text: JSON.stringify({ error: message, ...(data ?? {}) }, null, 2),
       },
     ],
     isError: true,

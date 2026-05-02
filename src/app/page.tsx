@@ -481,7 +481,7 @@ const STEPS = [
   {
     num: '01',
     kicker: 'WRITE',
-    title: 'A Python function. Yours or your AI&rsquo;s.',
+    title: "A Python function. Yours or your AI's.",
     body: 'A floom.yaml + app.py + JSON Schema for inputs. Or copy a template from MCP.',
     mono: 'floom init',
   },
