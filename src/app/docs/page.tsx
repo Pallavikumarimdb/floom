@@ -182,7 +182,7 @@ export default function DocsPage() {
 
         <Section title="Manifest">
           <p>
-            The preferred manifest is small. If <code>command</code> is omitted, publish tries stock-E2B command detection in this order: <code>app.py</code>, <code>index.js</code>, then <code>package.json</code> with a <code>start</code> script.
+            The preferred manifest is small. If <code>command</code> is omitted, publish can detect exactly one stock-E2B command from <code>app.py</code>, <code>index.js</code>, or <code>package.json</code> with a <code>start</code> script. Multiple matches are rejected as ambiguous.
           </p>
           <CodeBlock>{manifestExample}</CodeBlock>
           <p className="text-sm text-neutral-500">

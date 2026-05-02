@@ -417,7 +417,7 @@ export async function detectCommand(rootDir: string, manifest: FloomManifest): P
   if (await exists(path.join(rootDir, "index.js"))) {
     candidates.push("node index.js");
   }
-  if (candidates.length === 0 && await hasPackageJsonStartScript(path.join(rootDir, "package.json"))) {
+  if (await hasPackageJsonStartScript(path.join(rootDir, "package.json"))) {
     candidates.push("npm start");
   }
   if (STOCK_E2B_BASE_HAS_GO && await exists(path.join(rootDir, "main.go"))) {

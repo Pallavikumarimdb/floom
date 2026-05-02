@@ -1201,6 +1201,23 @@ function validateManifest(args: JsonObject): McpToolResult {
     return errorResult(outputSchemaResult.error);
   }
 
+  const commandDetectionError = detectManifestCommandError(manifestResult.manifest, filesHintResult?.files);
+  if (commandDetectionError) {
+    return okResult({
+      valid: false,
+      scope: "manifest_and_optional_json_schemas_only",
+      full_check: "Use publish_app to validate source, required schemas, declared requirements, auth, and the publish API path.",
+      errors: [commandDetectionError],
+      unsupported_reason: commandDetectionError,
+      ...(runtimeCoaching.length > 0 ? { runtime_coaching: runtimeCoaching } : {}),
+      manifest: manifestResult.manifest,
+      schemas: {
+        input_schema: inputSchemaResult.provided ? "valid" : "not_provided",
+        output_schema: outputSchemaResult.provided ? "valid" : "not_provided",
+      },
+    });
+  }
+
   return okResult({
     valid: true,
     scope: "manifest_and_optional_json_schemas_only",
@@ -1356,6 +1373,8 @@ function findCandidateApps(args: JsonObject): McpToolResult {
           const detectedCommand = detectCommandFromFileMap(appDir, files);
           if (!detectedCommand) {
             errors.push("No command detected. Add command: to floom.yaml or include app.py, index.js, or package.json with a start script.");
+          } else if (!detectedCommand.ok) {
+            errors.push(detectedCommand.error);
           }
         }
       }
@@ -1423,26 +1442,28 @@ function manifestRuntimeLabel(
   }
 
   const detected = detectCommandFromFileMap(appDir, files);
-  if (!detected) {
+  if (!detected || !detected.ok) {
     return manifest.command ? "stock-e2b" : null;
   }
 
-  if (detected.startsWith("python ")) return "python";
-  if (detected.startsWith("node ") || detected.startsWith("npm ")) return "node";
-  if (detected.startsWith("bun ")) return "bun";
-  if (detected.startsWith("go ")) return "go";
+  if (detected.command.startsWith("python ")) return "python";
+  if (detected.command.startsWith("node ") || detected.command.startsWith("npm ")) return "node";
+  if (detected.command.startsWith("bun ")) return "bun";
+  if (detected.command.startsWith("go ")) return "go";
   return "stock-e2b";
 }
 
 function detectCommandFromFileMap(appDir: string, files: Record<string, string>) {
+  const candidates: string[] = [];
+
   const appPy = joinPath(appDir, "app.py");
   if (appPy in files) {
-    return "python app.py";
+    candidates.push("python app.py");
   }
 
   const indexJs = joinPath(appDir, "index.js");
   if (indexJs in files) {
-    return "node index.js";
+    candidates.push("node index.js");
   }
 
   const packageJsonPath = joinPath(appDir, "package.json");
@@ -1450,11 +1471,40 @@ function detectCommandFromFileMap(appDir: string, files: Record<string, string>)
     try {
       const packageJson = JSON.parse(files[packageJsonPath]) as { scripts?: Record<string, string> };
       if (typeof packageJson.scripts?.start === "string" && packageJson.scripts.start.trim() !== "") {
-        return "npm start";
+        candidates.push("npm start");
       }
     } catch {
-      return null;
+      // Match publish-time detection: an unreadable start script is not an npm candidate.
     }
+  }
+
+  if (candidates.length > 1) {
+    return {
+      ok: false,
+      error: `ambiguous command auto-detection (${candidates.join(", ")}), please specify command: in floom.yaml`,
+    } as const;
+  }
+
+  if (candidates.length === 1) {
+    return { ok: true, command: candidates[0]! } as const;
+  }
+
+  return null;
+}
+
+function detectManifestCommandError(
+  manifest: FloomManifest,
+  files: Record<string, string> | undefined
+) {
+  if (!files || isLegacyPythonManifest(manifest) || manifest.command) {
+    return null;
+  }
+
+  const manifestPath = Object.keys(files).find((filePath) => basename(filePath) === "floom.yaml");
+  const appDir = manifestPath ? dirname(manifestPath) : "";
+  const detectedCommand = detectCommandFromFileMap(appDir, files);
+  if (detectedCommand && !detectedCommand.ok) {
+    return detectedCommand.error;
   }
 
   return null;

@@ -195,6 +195,16 @@ async function testBundleValidation() {
     () => validateUploadedTarball(ambiguousBundle.buffer),
     /ambiguous command auto-detection/
   );
+
+  const ambiguousPackageBundle = await createBundleFromFileMap({
+    'floom.yaml': 'slug: ambiguous-package-command\n',
+    'app.py': 'print("python")\n',
+    'package.json': JSON.stringify({ scripts: { start: 'node index.js' } }),
+  });
+  await assert.rejects(
+    () => validateUploadedTarball(ambiguousPackageBundle.buffer),
+    /ambiguous command auto-detection/
+  );
 }
 
 async function testMalformedTarballRejection() {
@@ -416,7 +426,6 @@ async function testMcpContract() {
       files: {
         'floom.yaml': 'slug: node-fetch\npublic: true\n',
         'package.json': JSON.stringify({ scripts: { start: 'node index.js' } }),
-        'index.js': 'console.log(JSON.stringify({ ok: true }))\n',
       },
     },
     { baseUrl: 'http://localhost:3000' }
@@ -424,6 +433,23 @@ async function testMcpContract() {
   assert.equal(validManifest.isError, undefined);
   const manifestResult = parseToolResult(validManifest);
   assert.equal(manifestResult.valid, true);
+
+  const ambiguousManifest = await callFloomTool(
+    'validate_manifest',
+    {
+      manifest: 'slug: ambiguous-command\npublic: true\n',
+      files: {
+        'floom.yaml': 'slug: ambiguous-command\npublic: true\n',
+        'app.py': 'print("python")\n',
+        'package.json': JSON.stringify({ scripts: { start: 'node index.js' } }),
+      },
+    },
+    { baseUrl: 'http://localhost:3000' }
+  );
+  assert.equal(ambiguousManifest.isError, undefined);
+  const ambiguousManifestResult = parseToolResult(ambiguousManifest);
+  assert.equal(ambiguousManifestResult.valid, false);
+  assert.match(ambiguousManifestResult.unsupported_reason, /ambiguous command auto-detection/);
 
   const runTool = floomTools.find((tool) => tool.name === 'run_app');
   assert.ok(runTool);

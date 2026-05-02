@@ -83,7 +83,10 @@ export async function runInSandbox(config: RunnerConfig): Promise<RunnerResult> 
   const startedAt = Date.now();
   const deadlineAt = config.deadlineAt ?? startedAt + SANDBOX_TIMEOUT_MS;
   try {
-    sandbox = await Sandbox.create("base", sandboxOptions({ allowInternetAccess: true }));
+    sandbox = await Sandbox.create("base", sandboxOptions({
+      allowInternetAccess: true,
+      deadlineAt,
+    }));
   } catch {
     return {
       kind: "sandbox_unavailable",
@@ -579,8 +582,16 @@ async function fileExists(
 }
 
 function commandTimeoutOptions(deadlineAt: number) {
+  return deadlineTimeoutOptions(deadlineAt, COMMAND_TIMEOUT_MS);
+}
+
+function sandboxTimeoutOptions(deadlineAt: number) {
+  return deadlineTimeoutOptions(deadlineAt, SANDBOX_TIMEOUT_MS);
+}
+
+function deadlineTimeoutOptions(deadlineAt: number, maxTimeoutMs: number) {
   const remainingMs = deadlineAt - Date.now();
-  const timeoutMs = Math.max(1, Math.min(COMMAND_TIMEOUT_MS, remainingMs));
+  const timeoutMs = Math.max(1, Math.min(maxTimeoutMs, remainingMs));
   return {
     timeoutMs,
     requestTimeoutMs: Math.max(1, Math.min(REQUEST_TIMEOUT_MS, timeoutMs)),
@@ -678,13 +689,18 @@ function fakeRunnerResult(config: RunnerConfig): RunnerResult {
   };
 }
 
-function sandboxOptions({ allowInternetAccess }: { allowInternetAccess: boolean }) {
+function sandboxOptions({
+  allowInternetAccess,
+  deadlineAt,
+}: {
+  allowInternetAccess: boolean;
+  deadlineAt: number;
+}) {
   return {
     apiKey: process.env.E2B_API_KEY,
     allowInternetAccess,
     secure: true,
-    timeoutMs: SANDBOX_TIMEOUT_MS,
-    requestTimeoutMs: REQUEST_TIMEOUT_MS,
+    ...sandboxTimeoutOptions(deadlineAt),
     lifecycle: { onTimeout: "kill" },
   } as const;
 }

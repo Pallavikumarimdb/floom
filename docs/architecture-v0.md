@@ -74,10 +74,11 @@ Optional manifest fields:
 
 Command detection when `command:` is omitted:
 
-1. `app.py` exists → `python app.py`
-2. `index.js` exists → `node index.js`
-3. `package.json` has `scripts.start` → `npm start`
-4. otherwise publish fails with `no command detected, please specify command: in floom.yaml`
+- `app.py` exists -> `python app.py`
+- `index.js` exists -> `node index.js`
+- `package.json` has `scripts.start` -> `npm start`
+- multiple matches fail with `ambiguous command auto-detection`
+- zero matches fail with `no command detected, please specify command: in floom.yaml`
 
 Run-time behavior:
 
