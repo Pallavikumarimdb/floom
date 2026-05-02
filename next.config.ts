@@ -58,5 +58,12 @@ export default withSentryConfig(nextConfig, {
   project: process.env.SENTRY_PROJECT,
   authToken: process.env.SENTRY_AUTH_TOKEN,
   silent: !process.env.CI,
+  telemetry: false,
+  release: {
+    create: Boolean(process.env.SENTRY_AUTH_TOKEN),
+  },
+  sourcemaps: {
+    disable: !process.env.SENTRY_AUTH_TOKEN,
+  },
   widenClientFileUpload: Boolean(process.env.SENTRY_AUTH_TOKEN),
 });
