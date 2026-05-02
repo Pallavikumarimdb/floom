@@ -24,6 +24,10 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  serverExternalPackages: ["tar", "js-yaml"],
+  outputFileTracingIncludes: {
+    "/*": ["./.next/server/package.json"],
+  },
   async headers() {
     return [
       {
