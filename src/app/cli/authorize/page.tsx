@@ -56,9 +56,9 @@ function CliAuthorizeContent() {
   }
 
   return (
-    <main className="min-h-screen bg-[var(--bg)] text-[var(--ink)]">
+    <main className="flex min-h-screen flex-col overflow-x-hidden bg-[var(--bg)] text-[var(--ink)]">
       <SiteHeader />
-      <section className="mx-auto flex max-w-xl flex-col items-center px-6 py-20 text-center">
+      <section className="mx-auto flex w-full max-w-xl flex-1 flex-col items-center justify-center px-6 py-16 text-center">
         <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-2xl border border-[var(--line)] bg-[var(--card)] shadow-[var(--shadow-2)]">
           {authorized ? <CheckCircle2 size={24} /> : <Terminal size={24} />}
         </div>
