@@ -19,6 +19,50 @@ import { validatePythonRequirementsText } from "@/lib/floom/requirements";
 import { parseAndValidateJsonSchemaText } from "@/lib/floom/schema";
 import { resolveMcpForwardOrigin } from "@/lib/mcp/origin";
 
+export async function GET(req: NextRequest) {
+  if (!hasSupabaseConfig()) {
+    return NextResponse.json(
+      { error: "Supabase is not configured. Set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY." },
+      { status: 503 }
+    );
+  }
+
+  const admin = createAdminClient();
+  const caller = await resolveAuthCaller(req, admin);
+
+  if (!caller) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  if (!callerHasScope(caller, "read")) {
+    return NextResponse.json({ error: "Missing read scope" }, { status: 403 });
+  }
+
+  const { data, error } = await admin
+    .from("apps")
+    .select("id, slug, name, runtime, public, created_at, updated_at")
+    .eq("owner_id", caller.userId)
+    .order("updated_at", { ascending: false });
+
+  if (error) {
+    return NextResponse.json({ error: "Failed to list apps" }, { status: 500 });
+  }
+
+  return NextResponse.json({
+    apps: (data ?? []).map((app) => ({
+      id: app.id,
+      slug: app.slug,
+      name: app.name,
+      runtime: app.runtime,
+      public: app.public,
+      visibility: app.public ? "public" : "private",
+      created_at: app.created_at,
+      updated_at: app.updated_at,
+      url: new URL(`/p/${app.slug}`, resolveMcpForwardOrigin(req.url) || req.url).toString(),
+    })),
+  });
+}
+
 export async function POST(req: NextRequest) {
   if (!hasSupabaseConfig()) {
     return NextResponse.json(
