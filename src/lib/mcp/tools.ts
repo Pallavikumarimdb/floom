@@ -423,6 +423,10 @@ function getAppContract(): McpToolResult {
         reason: "TypeScript/Node runtime parity is post-v0.1. v0.1 runtime is runtime: python.",
       },
       {
+        case: "Main.java, pom.xml, build.gradle, or Java apps",
+        reason: "Java runtime parity is post-v0.1. v0.1 runtime is runtime: python.",
+      },
+      {
         case: "multiple Python files",
         reason: "Multi-file bundles are post-v0.1. v0.1 packaging accepts one top-level Python entrypoint file.",
       },
@@ -1283,6 +1287,8 @@ function unsupportedRepositoryCandidates(files: Record<string, string>) {
   const fileNames = new Set(Object.keys(files).map((filePath) => basename(filePath)));
   const fileText = Object.values(files).join("\n");
   const pythonFiles = Object.keys(files).filter((filePath) => basename(filePath).endsWith(".py"));
+  const javaFiles = Object.keys(files).filter((filePath) => basename(filePath).endsWith(".java"));
+  const mainJavaPath = javaFiles.find((filePath) => basename(filePath) === "Main.java") ?? null;
   const candidates = [];
 
   if (fileNames.has("openapi.json") || /FastAPI\s*\(/.test(fileText)) {
@@ -1297,6 +1303,20 @@ function unsupportedRepositoryCandidates(files: Record<string, string>) {
     candidates.push(unsupportedCandidate("TypeScript/Node apps require the post-v0.1 TypeScript runner"));
   }
 
+  if (javaFiles.length > 0 || fileNames.has("pom.xml") || fileNames.has("build.gradle")) {
+    const reasons = ["Java apps require the post-v0.1 Java runner"];
+    if (javaFiles.length > 0) {
+      reasons.push(`Java source files are not supported in v0.1: ${javaFiles.sort().join(", ")}`);
+    }
+    if (fileNames.has("pom.xml")) {
+      reasons.push("pom.xml is not supported in v0.1");
+    }
+    if (fileNames.has("build.gradle")) {
+      reasons.push("build.gradle is not supported in v0.1");
+    }
+    candidates.push(unsupportedCandidate(reasons.join("; "), "java", mainJavaPath));
+  }
+
   if (pythonFiles.length > 1) {
     candidates.push(
       unsupportedCandidate(
@@ -1308,14 +1328,14 @@ function unsupportedRepositoryCandidates(files: Record<string, string>) {
   return candidates;
 }
 
-function unsupportedCandidate(reason: string) {
+function unsupportedCandidate(reason: string, runtime: string | null = null, entrypoint: string | null = null) {
   return {
     manifest_path: null,
     app_dir: ".",
     slug: null,
     name: null,
-    runtime: null,
-    entrypoint: null,
+    runtime,
+    entrypoint,
     valid: false,
     errors: [reason],
     unsupported_reason: reason,

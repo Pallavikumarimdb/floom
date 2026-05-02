@@ -224,6 +224,8 @@ async function test() {
   assert.equal(contract.files['output.schema.json'].type, 'object');
   assert.match(JSON.stringify(contract.unsupported), /OpenBlog/);
   assert.match(JSON.stringify(contract.unsupported), /requirements\.txt/);
+  assert.match(JSON.stringify(contract.unsupported), /Java/);
+  assert.match(JSON.stringify(contract.unsupported), /Main\.java/);
   assert.match(contract.files['floom.yaml'], /dependencies:/);
   assert.match(contract.files['floom.yaml'], /secrets:/);
   assert.ok(contract.accepted_manifest_keys.includes('dependencies'));
@@ -255,6 +257,8 @@ async function test() {
   const docsPageText = readFileSync('src/app/docs/page.tsx', 'utf8');
   assert.match(docsPageText, /Section title="What 'secure' means"/);
   assert.match(docsPageText, /Public apps with declared secrets still run anonymously in v0\.1/);
+  assert.match(docsPageText, /Java apps/);
+  assert.match(docsPageText, /undeclared or unhashed packages/);
 
   await testMcpAppTemplates();
 
@@ -293,6 +297,27 @@ async function test() {
   assert.match(unsupportedReasons, /dependencies/);
   assert.match(unsupportedReasons, /TypeScript\/Node/);
   assert.match(unsupportedReasons, /Multi-file Python/);
+
+  const javaUnsupportedCandidates = await callFloomTool(
+    'find_candidate_apps',
+    {
+      files: {
+        'Main.java': 'public class Main { public static void main(String[] args) {} }\n',
+        'pom.xml': '<project />\n',
+        'build.gradle': 'plugins { id "java" }\n',
+      },
+    },
+    { baseUrl: 'http://localhost:3000' }
+  );
+  const javaCandidates = parseToolResult(javaUnsupportedCandidates).candidates;
+  assert.equal(javaCandidates.length, 1);
+  assert.equal(javaCandidates[0].valid, false);
+  assert.equal(javaCandidates[0].runtime, 'java');
+  assert.equal(javaCandidates[0].entrypoint, 'Main.java');
+  assert.match(javaCandidates[0].unsupported_reason, /Java apps/);
+  assert.match(javaCandidates[0].unsupported_reason, /Main\.java/);
+  assert.match(javaCandidates[0].unsupported_reason, /pom\.xml/);
+  assert.match(javaCandidates[0].unsupported_reason, /build\.gradle/);
 
   const manifestUnsupportedCandidates = await callFloomTool(
     'find_candidate_apps',

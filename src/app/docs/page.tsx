@@ -162,7 +162,7 @@ export default function DocsPage() {
             <li>Config: only the keys shown in the manifest example are active in v0.1.</li>
           </ul>
           <p className="text-sm text-neutral-500">
-            TypeScript, FastAPI/OpenAPI, multiple Python files, custom packages,
+            TypeScript, Java, FastAPI/OpenAPI, multiple Python files, undeclared or unhashed packages,
             inline schemas in <code>floom.yaml</code>, <code>visibility</code>, <code>actions</code>, and <code>manifest_version</code> are outside the v0.1 contract. Secret names and declared dependencies are supported; raw secret values never belong in source or manifest files.
           </p>
         </Section>
@@ -281,7 +281,7 @@ FLOOM_TOKEN=YOUR_FLOOM_AGENT_TOKEN FLOOM_API_URL=https://floom.dev npx @floomhq/
             exist.
           </p>
           <p className="text-sm text-neutral-500">
-            FastAPI/OpenAPI, arbitrary HTTP servers, TypeScript apps,
+            FastAPI/OpenAPI, arbitrary HTTP servers, TypeScript apps, Java apps,
             background workers, and full repo hosting remain later milestones.
           </p>
         </Section>
