@@ -554,7 +554,7 @@ function getAppContract(): McpToolResult {
       "npx @floomhq/cli@latest deploy --dry-run",
     ],
     auth_and_access: {
-      token_source: "Create agent tokens from https://floom.dev/tokens. MCP cannot mint or reveal raw tokens.",
+      token_source: "Run `npx @floomhq/cli@latest setup` for browser-authorized token setup. MCP cannot mint or reveal raw tokens. Manual token management is available at https://floom.dev/tokens.",
       header: "Authorization: Bearer <agent-token>",
       public_apps: "public: true apps allow anonymous metadata and runs, including secret-backed runs, with per-caller and per-app rate limits.",
       private_apps: "public omitted or false apps require the owner session or owner agent token for get_app and run_app.",

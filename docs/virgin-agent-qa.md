@@ -87,18 +87,20 @@ Pass criteria:
 - Confirmation never lands on `localhost`.
 - Session becomes usable on production.
 
-### 3. Token Create, Copy, List, Revoke
+### 3. Browser-Authorized CLI Setup And Manual Token Management
 
-- Sign in at `/login`.
+- Run `npx @floomhq/cli@latest setup` with a temporary config path.
+- Confirm setup opens or prints `/cli/authorize?code=...`.
+- Approve from a signed-in browser and verify the CLI saves a token without printing it.
 - Open `/tokens`.
-- Create a new agent token.
-- Confirm the raw token appears exactly once.
+- Create one manual agent token for management UI coverage.
+- Confirm the manual raw token appears exactly once.
 - Click copy and confirm copied state.
 - Refresh the page.
-- Confirm token list shows prefix/metadata but not the raw token.
-- Revoke the token.
+- Confirm token list shows prefix/metadata but not raw tokens.
+- Revoke the manual token.
 - Confirm revoked token is no longer usable.
-- Confirm token creation happens through `/tokens`; MCP must not expose a token-creation tool.
+- Confirm MCP must not expose a token-creation tool.
 
 Pass criteria:
 

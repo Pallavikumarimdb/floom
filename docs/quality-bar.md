@@ -71,7 +71,7 @@ Required:
 - Agent token is stored hashed in Supabase.
 - Agent token scopes are explicit: `read`, `run`, `publish`.
 - Agent tokens expire by default.
-- Token prefix is stored for display; raw token is shown once.
+- Token prefix is stored for display; browser-authorized setup never prints the raw token, and manually created raw tokens are shown once.
 - Token hashing uses a server-only pepper outside the database.
 - Raw access tokens are never committed, printed, or stored in app source.
 - Public users can run public apps without a builder token.
@@ -111,7 +111,7 @@ Required tools:
 - `run_app`
 - `get_app`
 
-MCP must not mint or return raw agent tokens. Token creation happens only through the signed-in `/tokens` page, where the raw token is shown once. The MCP must be tested by another agent from a `/tokens`-created token through publish and live run.
+MCP must not mint or return raw agent tokens. Token creation happens through browser-authorized CLI setup or the signed-in `/tokens` page, where manually created raw tokens are shown once. The MCP must be tested by another agent from a valid agent token through publish and live run.
 
 MCP safety requirements:
 

@@ -261,8 +261,8 @@ export default function TokensPage() {
                   }}
                 >
                   {[
-                    { n: 1, text: 'Mint a token below.' },
-                    { n: 2, text: <>Run <code style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, background: 'rgba(0,0,0,0.06)', padding: '1px 5px', borderRadius: 4 }}>npx @floomhq/cli setup</code> and paste it.</> },
+                    { n: 1, text: 'Run setup in your terminal.' },
+                    { n: 2, text: <>Approve the browser code from <code style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, background: 'rgba(0,0,0,0.06)', padding: '1px 5px', borderRadius: 4 }}>/cli/authorize</code>.</> },
                     { n: 3, text: 'Drop a Python file in. Floom does the rest.' },
                   ].map(({ n, text }) => (
                     <div
@@ -302,9 +302,9 @@ export default function TokensPage() {
             )}
 
             <div style={{ marginTop: 24, maxWidth: 460, ...cardStyle }}>
-              <h2 style={{ fontSize: 20, fontWeight: 700, margin: '0 0 6px', letterSpacing: '-0.015em' }}>Create your first token</h2>
+              <h2 style={{ fontSize: 20, fontWeight: 700, margin: '0 0 6px', letterSpacing: '-0.015em' }}>Manual token fallback</h2>
               <p style={{ fontSize: 13, color: 'var(--muted)', margin: '0 0 20px', lineHeight: 1.55 }}>
-                The raw token is shown once. Store it in your local secret manager.
+                Prefer <code style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11 }}>npx @floomhq/cli setup</code>. Manual raw tokens are shown once.
               </p>
               <label
                 style={{ display: 'block', fontSize: 12.5, fontWeight: 600, color: 'var(--muted)', marginBottom: 6 }}
@@ -556,9 +556,9 @@ export default function TokensPage() {
             {/* Demoted create form */}
             <div style={{ marginTop: 24, display: 'grid', gap: 20, gridTemplateColumns: 'minmax(0,1fr) minmax(0,1.1fr)' }}>
               <div style={cardStyle}>
-                <h2 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 6px', letterSpacing: '-0.01em' }}>Create token</h2>
+                <h2 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 6px', letterSpacing: '-0.01em' }}>Create token manually</h2>
                 <p style={{ fontSize: 12.5, color: 'var(--muted)', margin: '0 0 16px', lineHeight: 1.55 }}>
-                  The raw token is shown once. Store it in your local secret manager.
+                  Browser-authorized setup is the main path. Use this only for manual token management.
                 </p>
                 <label
                   style={{ display: 'block', fontSize: 12.5, fontWeight: 600, color: 'var(--muted)', marginBottom: 6 }}

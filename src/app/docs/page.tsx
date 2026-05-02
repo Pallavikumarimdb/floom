@@ -302,7 +302,7 @@ FLOOM_TOKEN=YOUR_FLOOM_AGENT_TOKEN FLOOM_API_URL=https://floom.dev npx @floomhq/
             <li>v0.1 is optimized for short function-style apps.</li>
             <li>Public runs are rate-limited.</li>
             <li>Output fields marked as secret in output schema are redacted.</li>
-            <li>Raw agent tokens are shown once and are stored only as hashes.</li>
+            <li><code>npx @floomhq/cli@latest setup</code> creates a token through browser authorization; manually created raw agent tokens are shown once and stored only as hashes.</li>
             <li>No teams, orgs, per-user share links, app-owned OAuth providers, or billing in v0.1.</li>
           </ul>
         </Section>

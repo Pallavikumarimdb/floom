@@ -86,11 +86,10 @@ npm install
 npm run dev
 ```
 
-### 4. Create a Floom agent token
+### 4. Authorize the Floom CLI
 
-Open `/login`, sign up or sign in, then open `/tokens`.
-
-Create a token and copy it. The raw token is shown once.
+Run setup and approve the terminal from the browser. The CLI creates and saves
+an agent token without showing the raw token in the browser.
 
 ### 5. Publish the fixture app
 
@@ -224,7 +223,7 @@ Launch tools:
 - `run_app`
 - `get_app`
 
-MCP cannot create or return raw agent tokens. Create agent tokens from the signed-in `/tokens` page, where the raw token is shown once. The publish/run tools accept a Floom agent token when the token has the required scope.
+MCP cannot create or return raw agent tokens. Use `npx @floomhq/cli@latest setup` for browser-authorized token setup, or use the signed-in `/tokens` page for manual token management. The publish/run tools accept a Floom agent token when the token has the required scope.
 
 MCP can publish and run apps that declare secret names in `floom.yaml`, including public secret-backed apps. Do not hardcode credential-looking strings in source, manifests, docs, MCP prompts, or reports. Declare names such as `OPENAI_API_KEY` in `floom.yaml`, read them from environment variables at runtime, and set values through the CLI or REST `/api/apps/:slug/secrets` route. MCP does not set or return raw app secret values; list responses contain metadata only.
 

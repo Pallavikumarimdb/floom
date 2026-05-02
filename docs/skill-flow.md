@@ -19,7 +19,7 @@ Agents can ask the Floom MCP tool `get_app_contract` for the current v0.1 contra
 and `list_app_templates` / `get_app_template` for useful copy-paste app bundles
 before generating an app.
 
-MCP cannot create or return raw agent tokens. Create tokens only from the signed-in `/tokens` page, where the raw token is shown once.
+MCP cannot create or return raw agent tokens. Run `npx @floomhq/cli@latest setup` for browser-authorized token setup. Manual token management stays on the signed-in `/tokens` page, where manually created raw tokens are shown once.
 
 Accept:
 
@@ -122,7 +122,7 @@ FLOOM_API_URL="https://floom.dev" npx @floomhq/cli@latest deploy
    - Confirm the browser/API output redacts that field.
    - Run inputs with fields named like `token`, `secret`, `password`, `api_key`, `private_key`, `credential`, or `authorization`; confirm persisted execution input is redacted.
    - Confirm public runs consume both a caller-derived and per-app rate-limit key before E2B execution.
-   - Confirm MCP does not offer token creation; create tokens through `/tokens`.
+   - Confirm MCP does not offer token creation; create tokens through browser-authorized CLI setup or `/tokens`.
    - Confirm test logs do not include raw Floom tokens, JWTs, Supabase keys, or E2B keys.
    - Confirm revoked tokens fail for publish and private run.
 
