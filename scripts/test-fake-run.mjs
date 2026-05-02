@@ -102,6 +102,15 @@ async function test() {
   assert.match(appPageText, /owner_id, public/);
   assert.match(appPageText, /auth\.getUser\(\)/);
   assert.doesNotMatch(appPageText, /github\.com\/floomhq\/floom"/);
+  const runLookupRouteText = readFileSync('src/app/api/runs/[id]/route.ts', 'utf8');
+  assert.match(runLookupRouteText, /\.from\("executions"\)/);
+  assert.match(runLookupRouteText, /\.from\("apps"\)/);
+  assert.match(runLookupRouteText, /getBearerToken/);
+  assert.match(runLookupRouteText, /callerHasScope\(caller, "read"\)/);
+  assert.match(runLookupRouteText, /!app\.public && !canReadPrivateRun/);
+  const runRedirectPageText = readFileSync('src/app/runs/[id]/page.tsx', 'utf8');
+  assert.ok(runRedirectPageText.includes('redirect(`/p/${app.slug}?run=${id}`)'));
+  assert.match(runRedirectPageText, /!app\?\.public/);
 
   if (isSafePythonEntrypoint('my-app.py')) {
     throw new Error('hyphenated Python entrypoint accepted');
