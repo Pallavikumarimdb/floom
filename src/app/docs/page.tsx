@@ -7,34 +7,49 @@ const SITE_URL = "https://floom.dev";
 
 export const metadata: Metadata = {
   title: "Docs",
-  description: "Build, publish, and run Floom v0.1 apps with CLI, MCP, API, secrets, and hash-locked Python dependencies.",
+  description: "Build, publish, and run stock-E2B Floom apps with tarball bundles, optional schemas, secrets, API, CLI, and MCP.",
   alternates: { canonical: `${SITE_URL}/docs` },
   openGraph: {
     title: "Floom Docs",
-    description: "The exact v0.1 contract for localhost to live and secure apps.",
+    description: "The stock-E2B Floom contract: thin wrapper, full app bundle, one run surface.",
     url: `${SITE_URL}/docs`,
     images: [{ url: `${SITE_URL}/opengraph-image`, width: 1200, height: 630 }],
   },
 };
 
-const manifestExample = `name: Meeting Action Items
+const manifestExample = `slug: my-app
+input_schema: ./input.schema.json
+output_schema: ./output.schema.json
+secrets:
+  - GEMINI_API_KEY
+public: true
+# optional:
+# command: python app.py
+# dependencies:
+#   python: ./requirements.txt --require-hashes
+# bundle_exclude:
+#   - fixtures/
+#   - samples/`;
+
+const legacyManifestExample = `name: Meeting Action Items
 slug: meeting-action-items
 runtime: python
 entrypoint: app.py
 handler: run
 public: true
-input_schema: input.schema.json
-output_schema: output.schema.json`;
+input_schema: ./input.schema.json
+output_schema: ./output.schema.json
+dependencies:
+  python: ./requirements.txt`;
 
 const launchCommand = `npx @floomhq/cli@latest setup
 mkdir my-floom-app && cd my-floom-app
-SLUG="text-demo-$(date +%s)"
-npx @floomhq/cli@latest init --name "Text Demo" --slug "$SLUG" --description "Echo text and return a length." --type custom
+SLUG="stock-e2b-demo-$(date +%s)"
+npx @floomhq/cli@latest init --name "Stock E2B Demo" --slug "$SLUG" --type custom
 npx @floomhq/cli@latest deploy --dry-run
-npx @floomhq/cli@latest deploy
-npx @floomhq/cli@latest run "$SLUG" '{"text":"Hello from Floom"}' --json`;
+npx @floomhq/cli@latest deploy`;
 
-const apiExample = `curl -X POST https://floom.dev/api/apps/YOUR_PUBLIC_SLUG/run \\
+const apiExample = `curl -X POST https://floom.dev/api/apps/YOUR_SLUG/run \\
   -H 'Content-Type: application/json' \\
   -d '{"inputs":{"text":"Hello from Floom"}}'`;
 
@@ -51,32 +66,36 @@ tool: list_app_templates
 
 POST https://floom.dev/mcp
 tool: get_app_template
-arguments: { "key": "invoice_calculator" }
+arguments: { "key": "multi_file_python" }
 
 POST https://floom.dev/mcp
 tool: run_app
 arguments: { "slug": "YOUR_PUBLIC_SLUG", "inputs": { "text": "Hello from Floom" } }`;
 
-const mcpJsonRpcExample = `curl -sS https://floom.dev/mcp \\
-  -H 'Content-Type: application/json' \\
-  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'
+const outputModes = `output_schema declared:
+- app prints JSON on stdout final line, or writes /home/user/output.json
+- Floom validates it and returns the parsed JSON as output
 
-curl -sS https://floom.dev/mcp \\
-  -H 'Authorization: Bearer YOUR_FLOOM_AGENT_TOKEN' \\
-  -H 'Content-Type: application/json' \\
-  -d '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"auth_status","arguments":{}}}'`;
+no output_schema + stdout final line is valid JSON:
+- Floom returns the parsed JSON directly as output
 
-const requirementsExample = `# requirements.txt
-humanize==4.9.0 --hash=sha256:ce284a76d5b1377fd8836733b983bfb0b76f1aa1c090de2566fcf008d7f6ab16
+no output_schema + plain stdout:
+- Floom returns { "stdout": "<last 4 KB tail>", "exit_code": 0 }`;
 
-# floom.yaml
-dependencies:
-  python: ./requirements.txt`;
-
-const requirementsWorkflow = `printf 'humanize==4.9.0\\n' > requirements.in
-python -m pip install --upgrade pip pip-tools
-python -m piptools compile --generate-hashes --output-file requirements.txt requirements.in
-npx @floomhq/cli@latest deploy --dry-run`;
+const autoExcludes = `node_modules/
+.git/
+.next/
+__pycache__/
+*.pyc
+dist/
+build/
+.venv/
+venv/
+.DS_Store
+*.log
+.env
+.env.local
+.env.*.local`;
 
 function Section({
   title,
@@ -108,13 +127,13 @@ export default function DocsPage() {
 
       <article className="mx-auto max-w-4xl px-5 py-14">
         <p className="mb-3 text-sm font-semibold text-emerald-700">
-          Floom v0.1 docs
+          Floom stock-E2B docs
         </p>
         <h1 className="text-4xl font-black tracking-tight sm:text-5xl">
-          Local Python function to live app.
+          Thin wrapper on top of E2B.
         </h1>
-        <p className="mt-4 max-w-2xl text-lg text-neutral-600">
-          Floom v0.1 publishes a narrow app shape: one Python function, optional exact-pinned hash-locked dependencies, encrypted owner-managed secrets, JSON Schema inputs, a browser page, API run, and MCP run.
+        <p className="mt-4 max-w-3xl text-lg text-neutral-600">
+          Floom no longer forces a single-file Python handler shape for new apps. Publish the whole app directory as a tarball, let stock E2B run it, and keep Floom focused on sharing, secrets, rate limits, redaction, API, browser UI, and MCP.
         </p>
 
         <div className="mt-8 flex flex-wrap gap-3">
@@ -132,196 +151,105 @@ export default function DocsPage() {
           </Link>
         </div>
 
-        <Section title="Fastest launch path">
+        <Section title="Fastest path">
           <ol className="list-decimal space-y-3 pl-5">
             <li>Run <code>npx @floomhq/cli@latest setup</code>.</li>
-            <li>Approve the terminal code in the browser.</li>
-            <li>
-              Place <code>app.py</code>, <code>floom.yaml</code>, and JSON
-              Schema files in a folder.
-            </li>
-            <li>Publish with the CLI commands below.</li>
-            <li>
-              Open the returned <code>/p/:slug</code> URL and run the app.
-            </li>
+            <li>Put <code>floom.yaml</code> at the app root.</li>
+            <li>Add any files the app needs: Python modules, package.json, helpers, fixtures, sample data.</li>
+            <li>Publish the app directory through the CLI, MCP, or publish API.</li>
+            <li>Run it through <code>/p/:slug</code>, REST, or MCP.</li>
           </ol>
           <CodeBlock>{launchCommand}</CodeBlock>
-          <p className="text-sm text-neutral-500">
-            The launch origin is <code>https://floom.dev</code>. Run setup
-            again if an older local CLI config points somewhere else.
-          </p>
         </Section>
 
-        <Section title="v0.1 app contract">
+        <Section title="Contract">
           <ul className="list-disc space-y-3 pl-5">
-            <li>Runtime: Python.</li>
-            <li>Entrypoint: one top-level `.py` file.</li>
-            <li>Handler: one function that receives a JSON object and returns JSON.</li>
-            <li>Inputs: JSON Schema rendered into a browser form.</li>
-            <li>Outputs: JSON object displayed in the app page.</li>
-            <li>Dependencies: Python standard library plus exact-pinned, hash-locked <code>requirements.txt</code> when declared.</li>
-            <li>Config: only the keys shown in the manifest example are active in v0.1.</li>
+            <li>Bundle format: one <code>.tar.gz</code> app bundle in Supabase Storage.</li>
+            <li>Bundle root: <code>floom.yaml</code> is required at the tarball root.</li>
+            <li>Run surface: one command per app run, not arbitrary HTTP route proxying.</li>
+            <li>Inputs: optional schema; same JSON goes to stdin and <code>FLOOM_INPUTS</code>.</li>
+            <li>Outputs: optional schema; validated JSON when declared, parsed JSON or stdout tail when not declared.</li>
+            <li>Dependencies: <code>requirements.txt</code> auto-installs when present; <code>npm install</code> runs when <code>package.json</code> is present.</li>
+            <li>Secrets: declare names only in <code>floom.yaml</code>; values stay owner-managed and encrypted at rest.</li>
+            <li>Legacy support: the v0.1 Python handler manifest still publishes and runs unchanged.</li>
           </ul>
           <p className="text-sm text-neutral-500">
-            TypeScript, Java, FastAPI/OpenAPI, multiple Python files, undeclared or unhashed packages,
-            inline schemas in <code>floom.yaml</code>, <code>visibility</code>, <code>actions</code>, and <code>manifest_version</code> are outside the v0.1 contract. Secret names and declared dependencies are supported; raw secret values and hardcoded credential-looking strings never belong in source, manifest files, MCP prompts, or generated docs.
+            Stock-E2B mode widens the runtime, not the product contract. Floom still gives you one browser surface, one REST run endpoint, one MCP run tool, redaction, quotas, and sharing. For preinstalled runtime details, system packages, browsers, or GPUs, use the official E2B docs:{" "}
+            <a className="underline" href="https://e2b.dev/docs" target="_blank" rel="noreferrer">e2b.dev/docs</a>.
           </p>
         </Section>
 
         <Section title="Manifest">
           <p>
-            <code>public: true</code> makes an app visible and runnable without
-            a token. <code>public: false</code> or an omitted{" "}
-            <code>public</code> field keeps the app private to the owner
-            token/account.
+            The preferred manifest is small. If <code>command</code> is omitted, publish tries stock-E2B command detection in this order: <code>app.py</code>, <code>index.js</code>, then <code>package.json</code> with a <code>start</code> script.
           </p>
           <CodeBlock>{manifestExample}</CodeBlock>
+          <p className="text-sm text-neutral-500">
+            Legacy manifests still work:
+          </p>
+          <CodeBlock>{legacyManifestExample}</CodeBlock>
+        </Section>
+
+        <Section title="Bundle rules">
+          <p>
+            Publish creates a tarball from the app directory. Floom auto-excludes the common junk and dependency folders below before size checks run.
+          </p>
+          <CodeBlock>{autoExcludes}</CodeBlock>
+          <ul className="list-disc space-y-3 pl-5">
+            <li>Compressed limit: <code>5 MB</code>.</li>
+            <li>Unpacked limit: <code>25 MB</code>.</li>
+            <li>Single file limit: <code>10 MB</code>.</li>
+            <li>File count limit: <code>500</code>.</li>
+            <li>Zip-bomb defense: decompressed-to-compressed ratio capped at <code>100x</code>.</li>
+          </ul>
+        </Section>
+
+        <Section title="Inputs and outputs">
+          <p>
+            Apps can be fully structured, partially structured, or run-only.
+          </p>
+          <CodeBlock>{outputModes}</CodeBlock>
+          <p className="text-sm text-neutral-500">
+            Input rules:
+          </p>
+          <ul className="list-disc space-y-3 pl-5">
+            <li>If <code>input_schema</code> exists, Floom validates <code>inputs</code> before the run.</li>
+            <li>If no schema exists and no <code>inputs</code> are sent, Floom just runs the command.</li>
+            <li>If no schema exists and <code>inputs</code> are sent, Floom passes the raw JSON through without validation.</li>
+          </ul>
         </Section>
 
         <Section title="Run through API">
           <p>
-            Public apps can be run without auth. Private apps need the owner
-            session or an agent token with run access.
+            Public apps can be run without auth. Private apps need the owner session or an agent token with run access.
           </p>
           <CodeBlock>{apiExample}</CodeBlock>
-          <p>
-            The same endpoint works from curl, n8n, Zapier, or any HTTP client.
-            For private apps, add the bearer token header.
-          </p>
           <CodeBlock>{privateApiExample}</CodeBlock>
+          <p className="text-sm text-neutral-500">
+            Failure envelopes are structured. Install errors, non-zero exits, and timeouts return HTTP 200 with <code>status: failed</code> or <code>timed_out</code>. Sandbox boot failures return HTTP 502 with <code>error: sandbox_unavailable</code>.
+          </p>
         </Section>
 
         <Section title="Run through MCP">
           <p>
-            MCP clients can discover Floom at <code>/mcp</code>, call{" "}
-            <code>get_app_contract</code> before generating files, fetch useful
-            starters with <code>list_app_templates</code> and{" "}
-            <code>get_app_template</code>, publish with{" "}
-            <code>publish_app</code>, and use <code>run_app</code> for the same
-            app execution path as the browser and API.
+            MCP clients use the same publish and run path as the browser and REST API.
           </p>
           <CodeBlock>{mcpExample}</CodeBlock>
-          <p>
-            Raw JSON-RPC clients use <code>tools/list</code> and{" "}
-            <code>tools/call</code>. Publish and private run calls include the
-            agent token as a bearer token.
-          </p>
-          <CodeBlock>{mcpJsonRpcExample}</CodeBlock>
           <p className="text-sm text-neutral-500">
-            <code>run_app</code> returns an envelope:{" "}
-            <code>{`{ execution_id, status, output, error }`}</code>. Read{" "}
-            <code>output</code> for the object that matches the app output
-            schema.
-          </p>
-          <p className="text-sm text-neutral-500">
-            <code>validate_manifest</code> checks the manifest and optional
-            JSON Schemas. Optional source/file hints return v0.1 runtime
-            coaching for unsupported shapes. <code>publish_app</code> performs
-            the full publish check with source, required schemas, and declared
-            requirements.
+            <code>publish_app</code> now prefers a file map for the full app directory. The old single-file Python shortcut still exists for legacy manifests.
           </p>
         </Section>
 
-        <Section title="MCP app templates">
-          <p>
-            Floom serves copy-paste v0.1-safe bundles for agents that need a fast,
-            useful starting point instead of a blank function.
-          </p>
+        <Section title="Quotas and limits">
           <ul className="list-disc space-y-3 pl-5">
-            <li>
-              <code>invoice_calculator</code>: line items, discount, tax, and
-              total.
-            </li>
-            <li>
-              <code>utm_url_builder</code>: campaign links with clean UTM
-              parameters.
-            </li>
-            <li>
-              <code>csv_stats</code>: row count, columns, and numeric stats from
-              pasted CSV text.
-            </li>
-            <li>
-              <code>meeting_action_items</code>: deterministic action item
-              extraction from pasted notes.
-            </li>
+            <li>Sync run cap: <code>60s</code>.</li>
+            <li>Anonymous public rate limit: <code>20</code> runs per caller per <code>60s</code>.</li>
+            <li>Per-app public rate limit: <code>100</code> runs per <code>60s</code>.</li>
+            <li>Per-app E2B quota: <code>30 minutes</code> per day.</li>
+            <li>Per-owner E2B quota: <code>2 hours</code> per day across all apps.</li>
           </ul>
           <p className="text-sm text-neutral-500">
-            Every template uses one Python file and includes
-            <code> floom.yaml</code>, <code>app.py</code>,{" "}
-            <code>input.schema.json</code>, and{" "}
-            <code>output.schema.json</code>. Before publishing a template, change
-            the slug to a unique value.
-          </p>
-        </Section>
-
-        <Section title="Dependencies and secrets">
-          <p>
-            v0.1 includes exact-pinned, hash-locked dependencies and owner-managed encrypted app secrets without changing Floom into broad app hosting.
-          </p>
-          <ul className="list-disc space-y-3 pl-5">
-            <li>
-              Exact-pinned, hash-locked Python dependency installation from{" "}
-              <code>requirements.txt</code>.
-            </li>
-            <li>
-              Secret names in <code>floom.yaml</code>, never raw secret values.
-            </li>
-            <li>Owner-scoped encrypted storage and E2B runtime injection.</li>
-          </ul>
-          <CodeBlock>{requirementsExample}</CodeBlock>
-          <p>
-            Generate hash-locked requirements from a small input file, then run
-            the deploy dry run before publishing:
-          </p>
-          <CodeBlock>{requirementsWorkflow}</CodeBlock>
-          <CodeBlock>{`npx @floomhq/cli@latest setup
-printf '%s' "$VALUE" | npx @floomhq/cli@latest secrets set YOUR_PRIVATE_SLUG OPENAI_API_KEY --value-stdin
-npx @floomhq/cli@latest secrets list YOUR_PRIVATE_SLUG
-npx @floomhq/cli@latest secrets delete YOUR_PRIVATE_SLUG OPENAI_API_KEY`}</CodeBlock>
-          <p className="text-sm text-neutral-500">
-            MCP can publish and run secret-backed apps after the secret names are
-            declared in <code>floom.yaml</code>. Replace hardcoded tokens, API
-            keys, passwords, private keys, and credential-looking strings with
-            declared secret names. Secret values are set through the CLI
-            or REST <code>/api/apps/:slug/secrets</code> flow;
-            never collect raw values in MCP tool arguments.
-          </p>
-          <p className="text-sm text-neutral-500">
-            Google OAuth provider handoff is fully branded only after Supabase
-            Auth uses the configured custom auth domain. Until that provider
-            setting is live, Google may display the Supabase project callback
-            host before returning to <code>https://floom.dev/auth/callback</code>.
-          </p>
-          <p className="text-sm text-neutral-500">
-            FastAPI/OpenAPI, arbitrary HTTP servers, TypeScript apps, Java apps,
-            background workers, and full repo hosting remain later milestones.
-          </p>
-        </Section>
-
-        <Section title="What 'secure' means">
-          <p>
-            Public apps with declared secrets still run anonymously in v0.1. Secret values are injected only as runtime environment variables and never appear in source, manifest files, logs, MCP output, or <code>app_versions</code>; output redaction applies to schema fields marked <code>secret: true</code>, and the same per-caller public run rate limits still apply.
-          </p>
-        </Section>
-
-        <Section title="Limits and exclusions">
-          <ul className="list-disc space-y-3 pl-5">
-            <li>v0.1 is optimized for short function-style apps.</li>
-            <li>Public runs are rate-limited.</li>
-            <li>Output fields marked as secret in output schema are redacted.</li>
-            <li><code>npx @floomhq/cli@latest setup</code> creates a token through browser authorization; manually created raw agent tokens are shown once and stored only as hashes.</li>
-            <li>No teams, orgs, per-user share links, app-owned OAuth providers, or billing in v0.1.</li>
-          </ul>
-        </Section>
-
-        <Section title="Auth and email redirect">
-          <p>
-            Signup emails are sent by Supabase Auth. The confirmation link must
-            return to `https://floom.dev/auth/callback?next=/tokens`.
-          </p>
-          <p>
-            If an email sends you to localhost, update the Supabase Auth Site URL
-            to `https://floom.dev` and add `https://floom.dev/auth/callback` to redirect URLs.
+            Long-running jobs remain outside this branch. Use the async + poll capability for runs that cannot fit inside the current 60-second synchronous envelope.
           </p>
         </Section>
       </article>

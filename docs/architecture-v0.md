@@ -1,8 +1,13 @@
-# Floom v0.1 Architecture
+# Floom Architecture
 
 Production URL: `https://floom.dev`
 
-Current shipped scope (v0.1): single-file Python function apps with JSON Schema input/output, `requirements.txt` with hash-locked pins, encrypted-at-rest secrets injected as env vars at runtime, published with a Floom agent token.
+This document now describes two layers:
+
+1. **Preferred post-launch contract:** stock-E2B mode.
+2. **Legacy compatibility contract:** the v0.1 single-file Python handler shape, still supported.
+
+Floom is not a parallel runtime. E2B owns runtime depth. Floom owns the wrapper: app URL, form UI, one agent-callable contract, secret brokerage, redaction, quotas, and rate limits.
 
 ```mermaid
 flowchart TD
@@ -13,10 +18,10 @@ flowchart TD
   Web --> Auth["Supabase Auth"]
   Web --> Tokens["agent_tokens"]
 
-  CLI -->|floom.yaml + app.py + schemas + requirements.txt| Publish["POST /api/apps"]
+  CLI -->|floom.yaml + app directory| Publish["POST /api/apps"]
   MCP -->|publish_app| Publish
 
-  Publish --> ManifestVal["validate manifest + secret names"]
+  Publish --> ManifestVal["validate manifest + bundle + secret coverage"]
   ManifestVal --> Apps["apps table"]
   ManifestVal --> Versions["app_versions table"]
   ManifestVal --> Bundles["Supabase Storage app-bundles"]
@@ -28,95 +33,134 @@ flowchart TD
   REST["REST caller"] --> Run
   MCP -->|run_app| Run
 
-  Run --> Access["API auth + public/private visibility + rate limit"]
+  Run --> Access["auth + public/private visibility + rate limit + daily quota"]
   Access --> Bundles
   Access --> Secrets
-  Run --> E2B["E2B sandbox"]
+  Run --> E2B["E2B base sandbox"]
   Secrets -->|server decrypt + inject as env vars| E2B
-  Bundles -->|extract + pip install -r requirements.txt --require-hashes| E2B
-  E2B --> Handler["call run inputs"]
-  Handler --> Output["JSON output"]
-  Output --> Redaction["secret-field redaction"]
+  Bundles -->|extract + pip install / npm install + command| E2B
+  E2B --> Output["validated JSON or stdout tail"]
+  Output --> Redaction["secret redaction"]
   Redaction --> Executions["executions table"]
   Redaction --> Browser
   Redaction --> REST
   Redaction --> MCP
-
-  Status["/api/status"] --> Auth
-  Status --> E2B
-  Status --> MCP
 ```
 
-## v0.1 Contract
+## Preferred Contract: Stock-E2B
 
-Required app files:
+Required at publish:
 
-- `floom.yaml` (manifest)
-- one Python file, usually `app.py` with `def run(inputs: dict) -> dict`
-- `input.schema.json`
-- `output.schema.json`
-- `requirements.txt` (optional, hash-pinned)
+- `floom.yaml` at the bundle root
+- a `.tar.gz` bundle of the app directory
 
-v0.1 accepts:
+Preferred minimal manifest:
 
-- `runtime: python` (Python 3.11+)
-- one handler function per app
-- third-party Python packages via exact-pinned, hash-locked `requirements.txt` declared as `dependencies.python: ./requirements.txt`
-- `secrets: [NAME, ...]` in `floom.yaml` — names only, never values
-- public apps via `public: true`, gated by RLS on `apps.public = true`
-- private apps (default) — owner-only via Supabase Auth or matching agent token
-- size limits: bundle 10 MB, single file 5 MB, output 1 MB, runtime 60 s, memory 512 MB
-- rate limit: 60 s window per caller
+```yaml
+slug: my-app
+input_schema: ./input.schema.json
+output_schema: ./output.schema.json
+secrets:
+  - GEMINI_API_KEY
+public: true
+```
 
-v0.1 rejects:
+Optional manifest fields:
 
-- raw secret values anywhere (manifest, source, logs, MCP output, API responses, app versions, executions, bundle storage, docs)
-- FastAPI/OpenAPI servers
-- TypeScript/Node apps
-- multi-file Python projects (one entrypoint module)
-- multiple manifest actions
-- streaming responses
-- long-running processes
+- `command: <shell>` if auto-detection is not enough
+- `dependencies.python: ./requirements.txt --require-hashes` for opt-in hash enforcement
+- `bundle_exclude: [...]` additive exclusions on top of Floom defaults
+- `name`, `description`
 
-## Secret storage
+Command detection when `command:` is omitted:
 
-`FLOOM_SECRET_ENCRYPTION_KEY` is a server-only base64-encoded 32-byte key. App owners manage values via `GET/PUT/DELETE /api/apps/:slug/secrets` or `npx @floomhq/cli@latest secrets`. List responses contain only `name`, `created_at`, and `updated_at` metadata. Values decrypt server-side at run time and are injected as E2B environment variables — never round-tripped to the client.
+1. `app.py` exists → `python app.py`
+2. `index.js` exists → `node index.js`
+3. `package.json` has `scripts.start` → `npm start`
+4. otherwise publish fails with `no command detected, please specify command: in floom.yaml`
 
-## v0.1 Launch Verification
+Run-time behavior:
 
-Public self-serve sign-up has current production evidence:
+- extract bundle into `/home/user/app`
+- if `requirements.txt` exists, run `pip install -r requirements.txt`
+- if `package.json` exists, run `npm install`
+- inject declared secrets as environment variables
+- inject inputs both as stdin and `FLOOM_INPUTS`
+- run the command
 
-- The app-side redirect is fixed for `https://floom.dev/auth/callback?next=/tokens`.
-- A fresh disposable-inbox signup on 2026-05-01 received mail from `noreply@auth.floom.dev`, confirmed without exposing the URL, and landed on `https://floom.dev/tokens`.
-- Google OAuth still remains in the launch checklist for repeated browser regression coverage.
+Output behavior:
 
-Verified working:
+- if `output_schema` exists, read JSON from stdout final line or `/home/user/output.json`, validate it, return parsed JSON
+- if `output_schema` is absent and stdout final line is valid JSON, return parsed JSON
+- otherwise return `{ stdout, exit_code }` with the last 4 KB of stdout
 
-- Agent token creation in authenticated browser sessions.
-- CLI publish with `FLOOM_TOKEN`.
-- Public app metadata and run.
-- Private anonymous metadata/run blocked through API non-disclosure and owner-only RLS.
-- Private owner token metadata/run.
-- Browser, REST, and MCP run surfaces.
-- E2B-backed execution with `requirements.txt` install.
-- Secret injection into E2B as env vars (no values in source/manifest/logs/output).
-- Supabase app/version/execution/storage evidence in fresh-agent QA runs.
-- `/api/status` health probe (Supabase + E2B + MCP self-check).
-- Middleware HTTP 307 for `/tokens` when no Supabase session cookie.
+Bundle validation:
 
-## Versioning Roadmap (post-launch)
+- compressed max: `5 MB`
+- unpacked max: `25 MB`
+- file count max: `500`
+- single file max: `10 MB`
+- decompression ratio max: `100x`
+- reject path traversal, absolute paths, symlinks, hardlinks, device files, FIFOs
 
-See `docs/runtime-versioning-roadmap-brief.md` for the canonical brief.
+Daily quota model:
 
-Model: one capability per minor version, one branch per capability. Version number is assigned at merge time (first to merge becomes v0.2, next v0.3, and so on). Each branch must ship together: real template using the capability, `get_app_contract` updated, `/docs` section, `CHANGELOG.md` entry.
+- per app: `30` E2B minutes per 24h
+- per owner: `2` E2B hours per 24h across all apps
+- failures count against quota too
 
-Capabilities in flight:
+Known limits:
 
-- TypeScript / Node runtime
-- Multi-action manifests (more than one endpoint per app)
-- Streaming responses (SSE)
-- FastAPI / OpenAPI app mode
-- JavaScript runtime
-- Multi-file Python bundles
+- synchronous only for now
+- current cap remains `60s`
+- arbitrary HTTP route proxying is still out of scope
 
-Constraint: no more than three capability branches in flight at once. Sequencing decided post-launch (`docs/runtime-versioning-roadmap-brief.md`).
+## Legacy Compatibility: v0.1
+
+Still accepted:
+
+```yaml
+name: Meeting Action Items
+slug: meeting-action-items
+runtime: python
+entrypoint: app.py
+handler: run
+public: true
+input_schema: ./input.schema.json
+output_schema: ./output.schema.json
+dependencies:
+  python: ./requirements.txt
+```
+
+Legacy apps remain valid and keep running. New publishes of that shape are wrapped into tarballs and executed through the same stock-E2B path, but the manifest contract remains unchanged for the app author.
+
+Legacy guarantees preserved:
+
+- one Python entrypoint module
+- one handler function
+- optional secret declarations
+- optional `requirements.txt`
+- public/private sharing model unchanged
+
+## Design Decision
+
+The rule for keeping a Floom constraint is:
+
+> If E2B would accept it, Floom accepts it unless the constraint is needed for sharing, secrets, rate limiting, redaction, or the one-run agent contract.
+
+That is why this branch removes:
+
+- Python-only runtime gating
+- single-file bundle enforcement
+- required handler wrapper for new apps
+- required schemas for all apps
+- hash-pinned requirements as the default
+
+And keeps:
+
+- app URL + run endpoint shape
+- secrets as declared names only
+- redaction
+- public/private access control
+- rate limits and quotas
+- bundle size and safety checks

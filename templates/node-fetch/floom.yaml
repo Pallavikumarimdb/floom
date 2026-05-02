@@ -1,0 +1,5 @@
+name: Node Fetch
+slug: node-fetch
+public: true
+input_schema: ./input.schema.json
+output_schema: ./output.schema.json

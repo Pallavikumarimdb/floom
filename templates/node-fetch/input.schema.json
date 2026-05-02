@@ -1,0 +1,12 @@
+{
+  "type": "object",
+  "required": ["url"],
+  "additionalProperties": false,
+  "properties": {
+    "url": {
+      "type": "string",
+      "title": "URL",
+      "default": "https://example.com"
+    }
+  }
+}
