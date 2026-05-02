@@ -1,7 +1,8 @@
 import { promises as fs } from "node:fs";
+import { createRequire } from "node:module";
 import os from "node:os";
 import path from "node:path";
-import * as tar from "tar";
+import type * as Tar from "tar";
 import yaml from "js-yaml";
 import {
   MAX_BUNDLE_BYTES,
@@ -23,6 +24,9 @@ import {
   type JsonObject,
 } from "./schema";
 import { validatePythonRequirementsText } from "./requirements";
+
+const require = createRequire(import.meta.url);
+const tar = require("tar") as typeof Tar;
 
 export const DEFAULT_BUNDLE_EXCLUDES = [
   "node_modules/",
@@ -285,7 +289,7 @@ async function inspectTarball(tarballPath: string, compressedBytes: number) {
   await tar.list({
     file: tarballPath,
     strict: true,
-    onReadEntry: (entry: tar.ReadEntry) => {
+    onReadEntry: (entry: Tar.ReadEntry) => {
       if (validationError) {
         return;
       }
