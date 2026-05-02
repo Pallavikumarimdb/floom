@@ -13,7 +13,10 @@ def run(inputs):
             continue
 
         owner = default_owner
-        words = line.replace(":", " ").split()
+        owner_line = line
+        if ":" in owner_line and owner_line.split(":", 1)[0].strip().lower() in {"action", "todo"}:
+            owner_line = owner_line.split(":", 1)[1].strip()
+        words = owner_line.replace(":", " ").split()
         if words and words[0].istitle():
             owner = words[0]
 
