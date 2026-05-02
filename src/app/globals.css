@@ -81,7 +81,16 @@ body {
   to { opacity: 1; }
 }
 
-a { color: inherit; text-decoration: none; }
+/*
+  Default link color = inherit, but DON'T override Tailwind text-* utilities.
+  Without :not(), the bare `a` selector and `text-white` end up at the same
+  specificity (0,0,1) and the later cascade wins. In Tailwind v4 the utility
+  layer can lose to user CSS, producing invisible buttons (e.g. `bg-black
+  text-white` rendered as black-on-near-black). The :not() guard skips the
+  override whenever a Tailwind text utility is present on the link.
+*/
+a:not([class*="text-"]) { color: inherit; }
+a { text-decoration: none; }
 button { cursor: pointer; font-family: inherit; }
 input { font-family: inherit; }
 
