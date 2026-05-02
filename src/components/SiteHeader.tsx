@@ -399,64 +399,65 @@ export function SiteHeader({ compact = false, onStudioMenuOpen }: Props = {}) {
           )}
         </div>
 
-        {/* Mobile drawer */}
-        {menuOpen && (
-          <div
-            data-testid="mobile-menu"
-            style={{
-              position: 'fixed',
-              top: compact ? 40 : 56,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              background: BG,
-              zIndex: 200,
-              padding: '16px 24px 32px',
-              borderTop: '1px solid var(--line)',
-              overflowY: 'auto',
-            }}
-          >
-            <div style={{ display: 'grid', gap: 8, marginBottom: 14 }}>
-              <Link href="/docs" onClick={() => setMenuOpen(false)} style={menuItemStyle}>
-                Docs
+      </header>
+
+      {/* Mobile drawer */}
+      {menuOpen && (
+        <div
+          data-testid="mobile-menu"
+          style={{
+            position: 'fixed',
+            top: compact ? 40 : 56,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: BG,
+            zIndex: 1000,
+            padding: '16px 24px 32px',
+            borderTop: '1px solid var(--line)',
+            overflowY: 'auto',
+          }}
+        >
+          <div style={{ display: 'grid', gap: 8, marginBottom: 14 }}>
+            <Link href="/docs" onClick={() => setMenuOpen(false)} style={menuItemStyle}>
+              Docs
+            </Link>
+            <Link href="/status" onClick={() => setMenuOpen(false)} style={menuItemStyle}>
+              Status
+            </Link>
+            <Link href="/legal" onClick={() => setMenuOpen(false)} style={menuItemStyle}>
+              Legal
+            </Link>
+          </div>
+          {!isAuthenticated && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <Link
+                href="/login"
+                onClick={() => setMenuOpen(false)}
+                style={{ ...signInStyle, justifyContent: 'center', width: '100%' }}
+              >
+                Sign in
               </Link>
-              <Link href="/status" onClick={() => setMenuOpen(false)} style={menuItemStyle}>
-                Status
-              </Link>
-              <Link href="/legal" onClick={() => setMenuOpen(false)} style={menuItemStyle}>
-                Legal
+              <Link
+                href="/login?mode=signup"
+                onClick={() => setMenuOpen(false)}
+                style={{ ...signUpStyle, justifyContent: 'center', width: '100%' }}
+              >
+                Sign up
               </Link>
             </div>
-            {!isAuthenticated && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                <Link
-                  href="/login"
-                  onClick={() => setMenuOpen(false)}
-                  style={{ ...signInStyle, justifyContent: 'center', width: '100%' }}
-                >
-                  Sign in
-                </Link>
-                <Link
-                  href="/login?mode=signup"
-                  onClick={() => setMenuOpen(false)}
-                  style={{ ...signUpStyle, justifyContent: 'center', width: '100%' }}
-                >
-                  Sign up
-                </Link>
-              </div>
-            )}
-            {isAuthenticated && (
-              <button
-                type="button"
-                onClick={() => { void handleLogout(); setMenuOpen(false); }}
-                style={{ ...signInStyle, justifyContent: 'center', width: '100%', cursor: 'pointer' }}
-              >
-                Sign out
-              </button>
-            )}
-          </div>
-        )}
-      </header>
+          )}
+          {isAuthenticated && (
+            <button
+              type="button"
+              onClick={() => { void handleLogout(); setMenuOpen(false); }}
+              style={{ ...signInStyle, justifyContent: 'center', width: '100%', cursor: 'pointer' }}
+            >
+              Sign out
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Mobile MCP pill — hidden on app permalink routes */}
       {!isLoginPage && !showAuthedChrome && !isAppPermalinkRoute && (
