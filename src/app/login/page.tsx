@@ -12,8 +12,8 @@ type Mode = "signin" | "signup";
 function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const initialMode: Mode = searchParams.get("mode") === "signup" ? "signup" : "signin";
-  const [mode, setMode] = useState<Mode>(initialMode);
+  const modeParam = searchParams.get("mode");
+  const mode: Mode = modeParam === "signup" ? "signup" : "signin";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -351,7 +351,8 @@ function LoginContent() {
         <button
           type="button"
           onClick={() => {
-            setMode(mode === "signin" ? "signup" : "signin");
+            const nextMode = mode === "signin" ? "signup" : "signin";
+            router.replace(nextMode === "signup" ? "/login?mode=signup" : "/login", { scroll: false });
             setError(null);
             setMessage(null);
           }}
