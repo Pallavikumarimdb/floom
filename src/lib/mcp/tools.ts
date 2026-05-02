@@ -558,9 +558,9 @@ function getAppContract(): McpToolResult {
       header: "Authorization: Bearer <agent-token>",
       public_apps: "public: true apps allow anonymous metadata and runs, including secret-backed runs, with per-caller and per-app rate limits.",
       private_apps: "public omitted or false apps require the owner session or owner agent token for get_app and run_app.",
-      secrets: "MCP can publish and run apps that declare secret names in floom.yaml, but raw secret values are set through CLI, UI/API secrets flow, REST, or MCP secret-setting tools when available. Runtime injects them as env vars, schema secret fields are redacted from output, and MCP never returns raw secret values.",
+      secrets: "MCP can publish and run apps that declare secret names in floom.yaml, but it does not set raw secret values today. Set values through the CLI or REST /api/apps/:slug/secrets route. Runtime injects them as env vars, schema secret fields are redacted from output, and MCP never returns raw secret values.",
       hardcoded_credentials:
-        "Credential-looking string guidance: if source or docs contain a hardcoded token, key, password, private key, or similar value, replace it with a declared secret name such as OPENAI_API_KEY and read os.environ['OPENAI_API_KEY'] at runtime. Set the value with `npx @floomhq/cli@latest secrets set <app-slug> OPENAI_API_KEY --value-stdin` or an MCP secret-setting flow when available. Do not paste raw secret values into MCP tool arguments.",
+        "Credential-looking string guidance: if source or docs contain a hardcoded token, key, password, private key, or similar value, replace it with a declared secret name such as OPENAI_API_KEY and read os.environ['OPENAI_API_KEY'] at runtime. Set the value with `npx @floomhq/cli@latest secrets set <app-slug> OPENAI_API_KEY --value-stdin` or the REST /api/apps/:slug/secrets route. Do not paste raw secret values into MCP tool arguments.",
     },
     setup_commands: [
       "npx @floomhq/cli@latest setup",
@@ -1445,7 +1445,7 @@ function runtimeCoachingFromHints({
     );
   const addHardcodedCredential = () =>
     coaching.add(
-      "Credential-looking string detected in source/file hints. Do not hardcode raw secrets or paste them into MCP; declare names in floom.yaml secrets, read them from environment variables, and set values with `npx @floomhq/cli@latest secrets set <app-slug> <SECRET_NAME> --value-stdin` or an MCP secret-setting flow when available."
+      "Credential-looking string detected in source/file hints. Do not hardcode raw secrets or paste them into MCP; declare names in floom.yaml secrets, read them from environment variables, and set values with `npx @floomhq/cli@latest secrets set <app-slug> <SECRET_NAME> --value-stdin` or the REST /api/apps/:slug/secrets route."
     );
 
   if (manifest) {

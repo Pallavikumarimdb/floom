@@ -43,6 +43,10 @@ export function hasAgentTokenConfig() {
   );
 }
 
+export function hasCliDeviceAuthConfig() {
+  return Boolean(hasAgentTokenConfig() && process.env.FLOOM_SECRET_ENCRYPTION_KEY);
+}
+
 export function runDemoApp(inputs: Record<string, unknown>) {
   const pitch = typeof inputs.pitch === "string" ? inputs.pitch : "";
   return {

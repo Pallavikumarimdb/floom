@@ -323,9 +323,11 @@ async function test() {
   assert.match(docsPageText, /Java apps/);
   assert.match(docsPageText, /undeclared or unhashed packages/);
   assert.match(docsPageText, /hardcoded credential-looking strings/);
-  assert.match(docsPageText, /MCP secret-setting tools/);
+  assert.match(docsPageText, /MCP can publish and run secret-backed apps/);
+  assert.doesNotMatch(docsPageText, /MCP secret-setting tools/);
   assert.match(readmeText, /hardcode credential-looking strings/);
-  assert.match(readmeText, /MCP secret-setting tools/);
+  assert.match(readmeText, /MCP does not set or return raw app secret values/);
+  assert.doesNotMatch(readmeText, /MCP secret-setting tools/);
 
   await testMcpAppTemplates();
 

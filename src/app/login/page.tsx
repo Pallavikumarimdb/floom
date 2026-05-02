@@ -14,6 +14,10 @@ function LoginContent() {
   const searchParams = useSearchParams();
   const modeParam = searchParams.get("mode");
   const mode: Mode = modeParam === "signup" ? "signup" : "signin";
+  const nextParam = searchParams.get("next");
+  const safeNext = nextParam && nextParam.startsWith("/") && !nextParam.startsWith("//")
+    ? nextParam
+    : "/tokens";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -32,7 +36,7 @@ function LoginContent() {
     setError(null);
     setMessage(null);
     const supabase = createClient();
-    const redirectTo = `${window.location.origin}/auth/callback?next=/tokens`;
+    const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(safeNext)}`;
     const { error: resetError } = await supabase.auth.resetPasswordForEmail(
       email.trim(),
       { redirectTo },
@@ -51,10 +55,10 @@ function LoginContent() {
     const supabase = createClient();
     supabase.auth.getSession().then(({ data }) => {
       if (data.session) {
-        router.replace("/tokens");
+        router.replace(safeNext);
       }
     });
-  }, [router]);
+  }, [router, safeNext]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -63,7 +67,7 @@ function LoginContent() {
     setMessage(null);
 
     const supabase = createClient();
-    const emailRedirectTo = `${window.location.origin}/auth/callback?next=/tokens`;
+    const emailRedirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(safeNext)}`;
     const result =
       mode === "signin"
         ? await supabase.auth.signInWithPassword({ email, password })
@@ -83,7 +87,7 @@ function LoginContent() {
     }
 
     if (result.data.session) {
-      router.replace("/tokens");
+      router.replace(safeNext);
       return;
     }
 
@@ -98,7 +102,7 @@ function LoginContent() {
     setMessage(null);
 
     const supabase = createClient();
-    const redirectTo = `${window.location.origin}/auth/callback?next=/tokens`;
+    const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(safeNext)}`;
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {

@@ -221,8 +221,8 @@ Pass criteria:
 
 - MCP endpoint is reachable.
 - MCP does not list or execute `create_agent_token`.
-- `get_app_contract` returns the v0 manifest, app.py, input/output schemas, and unsupported cases.
-- `list_app_templates` returns useful v0-safe templates.
+- `get_app_contract` returns the v0.1 manifest, app.py, input/output schemas, and unsupported cases.
+- `list_app_templates` returns useful v0.1-safe templates.
 - `get_app_template` returns copy-paste bundles for invoice calculator, UTM URL builder, CSV stats, and meeting action item extraction.
 - Tool errors return structured MCP errors.
 - MCP publish/run matches CLI/API behavior.

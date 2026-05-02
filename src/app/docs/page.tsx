@@ -281,8 +281,8 @@ FLOOM_TOKEN=YOUR_FLOOM_AGENT_TOKEN FLOOM_API_URL=https://floom.dev npx @floomhq/
             MCP can publish and run secret-backed apps after the secret names are
             declared in <code>floom.yaml</code>. Replace hardcoded tokens, API
             keys, passwords, private keys, and credential-looking strings with
-            declared secret names. Secret values are set through the CLI,
-            UI/API secrets flow, or MCP secret-setting tools when available;
+            declared secret names. Secret values are set through the CLI
+            or REST <code>/api/apps/:slug/secrets</code> flow;
             never collect raw values in MCP tool arguments.
           </p>
           <p className="text-sm text-neutral-500">

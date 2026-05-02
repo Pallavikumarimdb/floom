@@ -455,10 +455,10 @@ export default function LandingV17PageMvp() {
         </section>
 
         {/* v7 (2026-05-01): showcase + directory sections REMOVED.
-            Flagged: floom-minimal v0 only has demo-app, and
+            Flagged: floom-minimal originally only had demo-app, and
             the showcase + directory cards link to floom.dev/p/<slug>
             which violates the self-contained rule. The cards return
-            in v0.1 once floom-minimal has its own apps table populated. */}
+            once floom-minimal has its own apps table populated. */}
 
         {/* DISCORD CTA — quiet chip above the footer. Not a second hero, just
             a visible path for visitors who want to talk to the team or other

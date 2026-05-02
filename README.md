@@ -226,7 +226,7 @@ Launch tools:
 
 MCP cannot create or return raw agent tokens. Create agent tokens from the signed-in `/tokens` page, where the raw token is shown once. The publish/run tools accept a Floom agent token when the token has the required scope.
 
-MCP can publish and run apps that declare secret names in `floom.yaml`, including public secret-backed apps. Do not hardcode credential-looking strings in source, manifests, docs, MCP prompts, or reports. Declare names such as `OPENAI_API_KEY` in `floom.yaml`, read them from environment variables at runtime, and set values through the CLI, UI/API secrets flow, REST route, or MCP secret-setting tools when available. MCP does not return raw app secret values; list responses contain metadata only.
+MCP can publish and run apps that declare secret names in `floom.yaml`, including public secret-backed apps. Do not hardcode credential-looking strings in source, manifests, docs, MCP prompts, or reports. Declare names such as `OPENAI_API_KEY` in `floom.yaml`, read them from environment variables at runtime, and set values through the CLI or REST `/api/apps/:slug/secrets` route. MCP does not set or return raw app secret values; list responses contain metadata only.
 
 `get_app_contract` returns the current v0.1 manifest, `app.py`, input/output schema examples, dependency/secret fields, and explicit unsupported cases. Agents use it before generating app files so they do not create FastAPI/OpenAPI, TypeScript, multi-file, server, or multi-action apps for this function runtime.
 
@@ -254,7 +254,7 @@ v0.1 does not claim arbitrary HTTP servers, FastAPI/OpenAPI apps, TypeScript app
 
 Secret values are encrypted at rest in `app_secrets` with `FLOOM_SECRET_ENCRYPTION_KEY`. API, CLI, MCP, execution rows, app versions, docs, and bundle storage expose only secret names or metadata.
 
-If an agent sees a hardcoded token, API key, password, private key, or credential-looking string while preparing an app, replace it with a declared secret name and set the value out of band. Use `printf '%s' "$VALUE" | FLOOM_TOKEN=<agent-token> FLOOM_API_URL=https://floom.dev npx @floomhq/cli@latest secrets set <app-slug> <SECRET_NAME> --value-stdin` or an MCP secret-setting flow when available; never collect raw secret values in MCP tool arguments or generated docs.
+If an agent sees a hardcoded token, API key, password, private key, or credential-looking string while preparing an app, replace it with a declared secret name and set the value out of band. Use `printf '%s' "$VALUE" | FLOOM_TOKEN=<agent-token> FLOOM_API_URL=https://floom.dev npx @floomhq/cli@latest secrets set <app-slug> <SECRET_NAME> --value-stdin` or REST `/api/apps/:slug/secrets`; never collect raw secret values in MCP tool arguments or generated docs.
 
 ## Fake Mode
 

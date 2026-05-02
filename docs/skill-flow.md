@@ -49,8 +49,8 @@ Add in v0.1:
 - `floom.yaml` secret names only, never raw secret values.
 - Owner-scoped encrypted secret storage and E2B runtime injection.
 
-Self-serve secret values are set through `GET`/`PUT`/`DELETE /api/apps/:slug/secrets`,
-the public CLI, or MCP secret-setting tools when available. Responses contain metadata only.
+Self-serve secret values are set through `GET`/`PUT`/`DELETE /api/apps/:slug/secrets`
+or the public CLI. MCP can publish and run secret-backed apps, but it does not set raw secret values today. Responses contain metadata only.
 
 ```bash
 printf '%s' "$VALUE" | FLOOM_TOKEN="$FLOOM_TOKEN" FLOOM_API_URL="$FLOOM_API_URL" npx @floomhq/cli@latest secrets set <app-slug> OPENAI_API_KEY --value-stdin
@@ -62,7 +62,7 @@ If source, docs, or generated files contain a token, API key, password, private
 key, or credential-looking string, do not copy the raw value into MCP calls or
 reports. Replace it with a declared secret name such as `OPENAI_API_KEY`, read
 that name from the runtime environment, and set the raw value only through the
-CLI/API/MCP secret-setting path.
+CLI/API secret-setting path.
 
 Still reject until later: FastAPI/OpenAPI apps, arbitrary HTTP servers,
 TypeScript/Node apps, background workers, multi-service repos, and long-running
@@ -74,7 +74,7 @@ Run every item from a fresh shell/session.
 
 1. Candidate discovery
    - Inspect a repo or fixture directory.
-   - Call MCP `get_app_contract` and confirm it returns the v0 manifest, `app.py`, input schema, output schema, and unsupported cases.
+   - Call MCP `get_app_contract` and confirm it returns the v0.1 manifest, `app.py`, input schema, output schema, and unsupported cases.
    - Call MCP `list_app_templates` and confirm it lists `invoice_calculator`, `utm_url_builder`, `csv_stats`, and `meeting_action_items`.
    - Call MCP `get_app_template` for at least one template and confirm it returns `floom.yaml`, `app.py`, `input.schema.json`, and `output.schema.json`.
    - Identify one valid single-file Python function candidate.
