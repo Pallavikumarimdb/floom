@@ -126,7 +126,7 @@ export async function runInSandbox(config: RunnerConfig): Promise<RunnerResult> 
     }
 
     const command = config.command?.trim() || await detectCommandInSandbox(sandbox, deadlineAt);
-    const runResult = await runCommand(sandbox, command, config.inputs, undefined, config.secrets, deadlineAt);
+    const runResult = await runCommand(sandbox, command, config.inputs, "/home/user/app", config.secrets, deadlineAt);
     const elapsedMs = Date.now() - startedAt;
 
     if (runResult.kind !== "success") {
