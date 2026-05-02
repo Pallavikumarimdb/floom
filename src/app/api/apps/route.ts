@@ -1,3 +1,5 @@
+import { promises as fs } from "node:fs";
+import path from "node:path";
 import { NextRequest, NextResponse } from "next/server";
 import yaml from "js-yaml";
 import { v4 as uuidv4 } from "uuid";
@@ -192,10 +194,40 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const bundlePath = `${ownerId}/${validated.manifest.slug}/${uuidv4()}.tar.gz`;
+    const legacyManifest = isLegacyPythonManifest(validated.manifest) ? validated.manifest : null;
+    const dependencyPayload = validated.dependencyConfig
+      ? { python_require_hashes: validated.dependencyConfig.requireHashes }
+      : {};
+    const storedBundle = legacyManifest
+      ? {
+          buffer: await fs.readFile(path.join(validated.extractedDir, legacyManifest.entrypoint)),
+          kind: "single_file" as const,
+          command: null,
+          contentType: "text/x-python",
+          extension: "py",
+          dependencies: validated.dependencyConfig
+            ? {
+                ...dependencyPayload,
+                python_requirements: await fs.readFile(
+                  path.join(validated.extractedDir, validated.dependencyConfig.path),
+                  "utf8"
+                ),
+              }
+            : {},
+        }
+      : {
+          buffer: tarballBuffer,
+          kind: "tarball" as const,
+          command: validated.command,
+          contentType: "application/gzip",
+          extension: "tar.gz",
+          dependencies: dependencyPayload,
+        };
+
+    const bundlePath = `${ownerId}/${validated.manifest.slug}/${uuidv4()}.${storedBundle.extension}`;
     const { error: uploadError } = await admin.storage
       .from("app-bundles")
-      .upload(bundlePath, tarballBuffer, { contentType: "application/gzip" });
+      .upload(bundlePath, storedBundle.buffer, { contentType: storedBundle.contentType });
 
     if (uploadError) {
       return NextResponse.json({ error: "Upload failed" }, { status: 500 });
@@ -249,12 +281,11 @@ export async function POST(req: NextRequest) {
       app_id: app.id,
       version,
       bundle_path: bundlePath,
-      bundle_kind: "tarball",
+      bundle_kind: storedBundle.kind,
+      command: storedBundle.command,
       input_schema: validated.inputSchema,
       output_schema: validated.outputSchema,
-      dependencies: validated.dependencyConfig
-        ? { python_require_hashes: validated.dependencyConfig.requireHashes }
-        : {},
+      dependencies: storedBundle.dependencies,
       secrets: validated.manifest.secrets ?? [],
     };
 

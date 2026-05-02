@@ -8,8 +8,9 @@ import {
   MAX_INPUT_BYTES,
   MAX_OUTPUT_BYTES,
   MAX_REQUEST_BYTES,
+  SANDBOX_TIMEOUT_MS,
 } from "@/lib/floom/limits";
-import { checkDailyQuota, recordQuotaUsage } from "@/lib/floom/quota";
+import { reconcileQuotaReservation, reserveDailyQuota } from "@/lib/floom/quota";
 import {
   getPublicRunAppRateLimitKey,
   getPublicRunRateLimitKey,
@@ -38,12 +39,14 @@ type LatestVersion = {
   output_schema: Record<string, unknown> | null;
   dependencies: Record<string, unknown> | null;
   secrets: string[] | null;
+  command: string | null;
 };
 
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ slug: string }> }
 ) {
+  const routeStartedAt = Date.now();
   const { slug } = await params;
   const contentLength = Number(req.headers.get("content-length") ?? 0);
   if (contentLength > MAX_REQUEST_BYTES) {
@@ -131,21 +134,6 @@ export async function POST(
     );
   }
 
-  const quota = await checkDailyQuota(admin, app.id, app.owner_id);
-  if (!quota.allowed) {
-    if (quota.reason === "unavailable") {
-      return NextResponse.json(
-        { error: "quota_check_unavailable", retry_after: quota.retryAfterUnix },
-        { status: 503 }
-      );
-    }
-
-    return NextResponse.json(
-      { error: "app_quota_exhausted", retry_after: quota.retryAfterUnix },
-      { status: 429 }
-    );
-  }
-
   if (!isOwner) {
     const rateLimit = await checkPublicRunRateLimit(
       admin,
@@ -211,18 +199,77 @@ export async function POST(
     return NextResponse.json({ error: "Failed to create execution" }, { status: 500 });
   }
 
+  const quota = await reserveDailyQuota(
+    admin,
+    app.id,
+    app.owner_id,
+    Math.ceil(SANDBOX_TIMEOUT_MS / 1000)
+  );
+  if (!quota.allowed) {
+    await admin
+      .from("executions")
+      .update({
+        status: "error",
+        error: quota.reason === "unavailable" ? "quota_check_unavailable" : "app_quota_exhausted",
+        error_detail: null,
+        completed_at: new Date().toISOString(),
+      })
+      .eq("id", execution.id);
+
+    if (quota.reason === "unavailable") {
+      return NextResponse.json(
+        { error: "quota_check_unavailable", retry_after: quota.retryAfterUnix },
+        { status: 503 }
+      );
+    }
+
+    return NextResponse.json(
+      { error: "app_quota_exhausted", retry_after: quota.retryAfterUnix },
+      { status: 429 }
+    );
+  }
+
   const bundleBuffer = Buffer.from(await bundleData.arrayBuffer());
   const outputSchema = latestVersion.output_schema ?? null;
+  const runnerStartedAt = Date.now();
   const runnerResult = await runInSandboxContained({
     bundle: bundleBuffer,
     bundleKind: latestVersion.bundle_kind ?? "single_file",
-    command: latestVersion.bundle_kind === "single_file" ? legacyCommand(app.entrypoint) : undefined,
+    command: latestVersion.bundle_kind === "tarball" ? latestVersion.command ?? undefined : undefined,
     legacyEntrypoint: app.entrypoint,
+    legacyHandler: app.handler,
     inputs,
     hasOutputSchema: Boolean(outputSchema),
     dependencies: readRuntimeDependencies(latestVersion.dependencies),
     secrets: runtimeSecrets.envs,
+    deadlineAt: routeStartedAt + SANDBOX_TIMEOUT_MS,
   });
+
+  const actualQuotaSeconds = runnerResult.kind === "sandbox_unavailable"
+    ? Math.max(1, Math.ceil((Date.now() - runnerStartedAt) / 1000))
+    : Math.max(1, Math.ceil(runnerResult.elapsedMs / 1000));
+  const quotaReconcile = await reconcileQuotaReservation(
+    admin,
+    app.id,
+    quota.reservedSeconds,
+    actualQuotaSeconds
+  );
+  if (!quotaReconcile.ok) {
+    await admin
+      .from("executions")
+      .update({
+        status: "error",
+        error: "quota_record_unavailable",
+        error_detail: null,
+        completed_at: new Date().toISOString(),
+      })
+      .eq("id", execution.id);
+
+    return NextResponse.json(
+      { error: "quota_record_unavailable", retry_after: Math.floor(Date.now() / 1000) + 60 },
+      { status: 503 }
+    );
+  }
 
   if (runnerResult.kind === "sandbox_unavailable") {
     await admin
@@ -240,8 +287,6 @@ export async function POST(
       { status: 502 }
     );
   }
-
-  await recordQuotaUsage(admin, app.id, runnerResult.elapsedMs / 1000);
 
   if (runnerResult.kind === "failed" || runnerResult.kind === "timed_out") {
     await admin
@@ -393,10 +438,6 @@ function validateOutputPayload(
   }
 
   return { ok: true as const };
-}
-
-function legacyCommand(entrypoint: string | null) {
-  return entrypoint ? `python ${entrypoint}` : undefined;
 }
 
 function tailRunnerText(text: string) {

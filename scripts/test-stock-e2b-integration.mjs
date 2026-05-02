@@ -3,6 +3,7 @@ import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:f
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
+import FormData from 'form-data';
 import fetch from 'node-fetch';
 
 const apiUrl = process.env.FLOOM_API_URL;
@@ -48,6 +49,22 @@ async function main() {
         assert.match(output.stdout, /cron tick/);
       },
     },
+    {
+      dir: 'templates/meeting-action-items',
+      slugPrefix: 'meeting-action-items',
+      inputs: {
+        transcript: [
+          'Action: Sarah sends launch notes by Friday',
+          'Marcus owns beta checklist tomorrow',
+          'Anna will run demo QA before launch',
+        ].join('\n'),
+        default_owner: '',
+      },
+      assertOutput(output) {
+        assert.equal(output.count, 3);
+        assert.deepEqual(output.items.map((item) => item.owner), ['Sarah', 'Marcus', 'Anna']);
+      },
+    },
   ];
 
   for (const testCase of templates) {
@@ -87,6 +104,42 @@ async function main() {
   } finally {
     rmSync(e2eDir, { recursive: true, force: true });
   }
+
+  const explicitCommandDir = createExplicitCommandProject();
+  try {
+    execFileSync('node_modules/.bin/tsx', ['cli/deploy.ts', explicitCommandDir, apiUrl, token], {
+      cwd: process.cwd(),
+      stdio: 'pipe',
+      env: process.env,
+    });
+
+    const slug = readSlug(join(explicitCommandDir, 'floom.yaml'));
+    const rest = await runRest(slug, { text: 'explicit command survives publish' });
+    assert.equal(rest.status, 'success');
+    assert.equal(rest.output.text, 'explicit command survives publish');
+    assert.equal(rest.output.worker, true);
+  } finally {
+    rmSync(explicitCommandDir, { recursive: true, force: true });
+  }
+
+  const legacyEntrypointDir = createLegacyEntrypointProject();
+  try {
+    execFileSync('node_modules/.bin/tsx', ['cli/deploy.ts', legacyEntrypointDir, apiUrl, token], {
+      cwd: process.cwd(),
+      stdio: 'pipe',
+      env: process.env,
+    });
+
+    const slug = readSlug(join(legacyEntrypointDir, 'floom.yaml'));
+    const rest = await runRest(slug, { text: 'legacy handler.py path' });
+    assert.equal(rest.status, 'success');
+    assert.equal(rest.output.text, 'legacy handler.py path');
+    assert.equal(rest.output.legacy, true);
+  } finally {
+    rmSync(legacyEntrypointDir, { recursive: true, force: true });
+  }
+
+  await assertMalformedTraversalTarballRejected();
 
   console.log('Stock-E2B integration suite passed.');
 }
@@ -137,6 +190,151 @@ function createAdHocProject() {
     properties: { word_count: { type: 'integer' } },
   }, null, 2));
   return tempDir;
+}
+
+function createExplicitCommandProject() {
+  const tempDir = mkdtempSync(join(tmpdir(), 'stock-e2b-explicit-command-'));
+  const slug = `explicit-command-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+  writeFileSync(join(tempDir, 'floom.yaml'), [
+    'name: Explicit Command Project',
+    `slug: ${slug}`,
+    'public: true',
+    'command: python worker.py',
+    'input_schema: ./input.schema.json',
+    'output_schema: ./output.schema.json',
+  ].join('\n'));
+  writeFileSync(join(tempDir, 'worker.py'), [
+    'import json',
+    'import os',
+    'import sys',
+    '',
+    'raw = os.environ.get("FLOOM_INPUTS") or sys.stdin.read() or "{}"',
+    'inputs = json.loads(raw)',
+    'print(json.dumps({"text": inputs.get("text"), "worker": True}))',
+  ].join('\n'));
+  writeFileSync(join(tempDir, 'input.schema.json'), JSON.stringify({
+    type: 'object',
+    required: ['text'],
+    additionalProperties: false,
+    properties: { text: { type: 'string' } },
+  }, null, 2));
+  writeFileSync(join(tempDir, 'output.schema.json'), JSON.stringify({
+    type: 'object',
+    required: ['text', 'worker'],
+    additionalProperties: false,
+    properties: {
+      text: { type: 'string' },
+      worker: { type: 'boolean' },
+    },
+  }, null, 2));
+  return tempDir;
+}
+
+function createLegacyEntrypointProject() {
+  const tempDir = mkdtempSync(join(tmpdir(), 'stock-e2b-legacy-entrypoint-'));
+  const slug = `legacy-entrypoint-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+  writeFileSync(join(tempDir, 'floom.yaml'), [
+    'name: Legacy Entrypoint Project',
+    `slug: ${slug}`,
+    'runtime: python',
+    'entrypoint: handler.py',
+    'handler: run',
+    'public: true',
+    'input_schema: ./input.schema.json',
+    'output_schema: ./output.schema.json',
+  ].join('\n'));
+  writeFileSync(join(tempDir, 'handler.py'), [
+    'def run(inputs):',
+    '    return {"text": inputs.get("text"), "legacy": True}',
+  ].join('\n'));
+  writeFileSync(join(tempDir, 'input.schema.json'), JSON.stringify({
+    type: 'object',
+    required: ['text'],
+    additionalProperties: false,
+    properties: { text: { type: 'string' } },
+  }, null, 2));
+  writeFileSync(join(tempDir, 'output.schema.json'), JSON.stringify({
+    type: 'object',
+    required: ['text', 'legacy'],
+    additionalProperties: false,
+    properties: {
+      text: { type: 'string' },
+      legacy: { type: 'boolean' },
+    },
+  }, null, 2));
+  return tempDir;
+}
+
+async function assertMalformedTraversalTarballRejected() {
+  for (const probe of [
+    {
+      name: 'traversal',
+      pattern: /invalid_manifest|invalid bundle path/,
+      build(tempDir, tarballPath) {
+        execFileSync('tar', [
+          '-czf',
+          tarballPath,
+          '-C',
+          tempDir,
+          '--transform=s#app.py#../evil.py#',
+          'app.py',
+          'floom.yaml',
+        ]);
+      },
+    },
+    {
+      name: 'hardlink',
+      pattern: /unsupported link entry/,
+      build(tempDir, tarballPath) {
+        execFileSync('ln', [join(tempDir, 'app.py'), join(tempDir, 'hardlink.py')]);
+        execFileSync('tar', ['-czf', tarballPath, '-C', tempDir, 'app.py', 'hardlink.py', 'floom.yaml']);
+      },
+    },
+    {
+      name: 'oversize',
+      pattern: /per-file limit/,
+      build(tempDir, tarballPath) {
+        execFileSync('truncate', ['-s', '11M', join(tempDir, 'huge.bin')]);
+        execFileSync('tar', ['-czf', tarballPath, '-C', tempDir, 'app.py', 'huge.bin', 'floom.yaml']);
+      },
+    },
+  ]) {
+    const tempDir = mkdtempSync(join(tmpdir(), `stock-e2b-bad-tar-${probe.name}-`));
+    try {
+      const manifestText = [
+        `slug: bad-tar-${probe.name}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        'command: python app.py',
+      ].join('\n');
+      writeFileSync(join(tempDir, 'floom.yaml'), manifestText);
+      writeFileSync(join(tempDir, 'app.py'), 'print("bad")\n');
+      const tarballPath = join(tempDir, 'bad.tar.gz');
+      probe.build(tempDir, tarballPath);
+
+      const form = new FormData();
+      form.append('manifest', Buffer.from(manifestText, 'utf8'), {
+        filename: 'floom.yaml',
+        contentType: 'application/x-yaml',
+      });
+      form.append('bundle', readFileSync(tarballPath), {
+        filename: 'bundle.tar.gz',
+        contentType: 'application/gzip',
+      });
+
+      const response = await fetch(`${apiUrl}/api/apps`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          ...form.getHeaders(),
+        },
+        body: form,
+      });
+      const data = await response.json();
+      assert.equal(response.status, 400);
+      assert.match(`${data.error} ${data.detail}`, probe.pattern);
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
 }
 
 function rewriteSlug(manifestPath, slug) {

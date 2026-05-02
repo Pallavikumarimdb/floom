@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createBundleFromDirectory, createBundleFromFileMap, validateUploadedTarball } from '../src/lib/floom/bundle.ts';
 import { runInSandboxContained } from '../src/lib/e2b/runner.ts';
+import { reconcileQuotaReservation, recordQuotaUsage, reserveDailyQuota } from '../src/lib/floom/quota.ts';
 import {
   isLegacyPythonManifest,
   parseManifest,
@@ -22,11 +24,49 @@ async function test() {
   testManifestModes();
   testRequirementsValidation();
   await testBundleValidation();
+  await testMalformedTarballRejection();
   await testTemplateBundles();
+  testMeetingActionItemsLegacyWrapper();
   await testFakeRunner();
+  await testQuotaRpcContract();
   await testMcpContract();
   testDocsAndSpecs();
   testMigration();
+}
+
+function testMeetingActionItemsLegacyWrapper() {
+  const tmp = mkdtempSync(join(tmpdir(), 'floom-meeting-legacy-'));
+  try {
+    const source = readFileSync('templates/meeting-action-items/app.py', 'utf8');
+    writeFileSync(join(tmp, 'app.py'), source);
+    writeFileSync(join(tmp, 'inputs.json'), JSON.stringify({
+      transcript: [
+        'Action: Sarah sends launch notes by Friday',
+        'Marcus owns beta checklist tomorrow',
+        'Anna will run demo QA before launch',
+      ].join('\n'),
+      default_owner: '',
+    }));
+    writeFileSync(join(tmp, 'runner.py'), [
+      'import json',
+      'import sys',
+      `sys.path.insert(0, ${JSON.stringify(tmp)})`,
+      'from app import run',
+      '',
+      `with open(${JSON.stringify(join(tmp, 'inputs.json'))}) as handle:`,
+      '    inputs = json.load(handle)',
+      'result = run(inputs)',
+      `with open(${JSON.stringify(join(tmp, 'output.json'))}, "w") as handle:`,
+      '    json.dump(result, handle)',
+      '',
+    ].join('\n'));
+    execFileSync('python3', [join(tmp, 'runner.py')], { stdio: 'pipe' });
+    const output = JSON.parse(readFileSync(join(tmp, 'output.json'), 'utf8'));
+    assert.equal(output.count, 3);
+    assert.deepEqual(output.items.map((item) => item.owner), ['Sarah', 'Marcus', 'Anna']);
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+  }
 }
 
 function testManifestModes() {
@@ -135,6 +175,84 @@ async function testBundleValidation() {
   const warningValidated = await validateUploadedTarball(warningBundle.buffer);
   assert.match(warningValidated.warnings.join('\n'), /MISSING_SECRET/);
   await warningValidated.cleanup();
+
+  const commandBundle = await createBundleFromFileMap({
+    'floom.yaml': ['slug: explicit-command', 'command: python worker.py'].join('\n'),
+    'worker.py': 'print({"ok": True})\n',
+  });
+  const commandValidated = await validateUploadedTarball(commandBundle.buffer);
+  assert.equal(commandValidated.command, 'python worker.py');
+  assert.equal(commandValidated.runtimeLabel, 'python');
+  await commandValidated.cleanup();
+
+  const ambiguousBundle = await createBundleFromFileMap({
+    'floom.yaml': 'slug: ambiguous-command\n',
+    'app.py': 'print("python")\n',
+    'index.js': 'console.log("node")\n',
+    'package.json': JSON.stringify({ scripts: { start: 'node index.js' } }),
+  });
+  await assert.rejects(
+    () => validateUploadedTarball(ambiguousBundle.buffer),
+    /ambiguous command auto-detection/
+  );
+}
+
+async function testMalformedTarballRejection() {
+  for (const probe of [
+    {
+      name: 'traversal',
+      pattern: /invalid bundle path/,
+      build(tmp, tarballPath) {
+        execFileSync('tar', [
+          '-czf',
+          tarballPath,
+          '-C',
+          tmp,
+          '--transform=s#app.py#../evil.py#',
+          'app.py',
+          'floom.yaml',
+        ]);
+      },
+    },
+    {
+      name: 'hardlink',
+      pattern: /unsupported link entry/,
+      build(tmp, tarballPath) {
+        execFileSync('ln', [join(tmp, 'app.py'), join(tmp, 'hardlink.py')]);
+        execFileSync('tar', ['-czf', tarballPath, '-C', tmp, 'app.py', 'hardlink.py', 'floom.yaml']);
+      },
+    },
+    {
+      name: 'oversize',
+      pattern: /per-file limit/,
+      build(tmp, tarballPath) {
+        execFileSync('truncate', ['-s', '11M', join(tmp, 'huge.bin')]);
+        execFileSync('tar', ['-czf', tarballPath, '-C', tmp, 'app.py', 'huge.bin', 'floom.yaml']);
+      },
+    },
+  ]) {
+    const tmp = mkdtempSync(join(tmpdir(), `floom-bad-tar-${probe.name}-`));
+    try {
+      writeFileSync(join(tmp, 'floom.yaml'), `slug: bad-tar-${probe.name}\ncommand: python app.py\n`);
+      writeFileSync(join(tmp, 'app.py'), 'print("bad")\n');
+      const tarballPath = join(tmp, 'bad.tar.gz');
+      probe.build(tmp, tarballPath);
+
+    let uncaught = false;
+    const onUncaught = () => {
+      uncaught = true;
+    };
+    process.once('uncaughtException', onUncaught);
+    await assert.rejects(
+      () => validateUploadedTarball(readFileSync(tarballPath)),
+      probe.pattern
+    );
+    process.removeListener('uncaughtException', onUncaught);
+    assert.equal(uncaught, false);
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  }
 }
 
 async function testTemplateBundles() {
@@ -197,6 +315,61 @@ async function testFakeRunner() {
     stdout: 'hello from fake mode',
     exit_code: 0,
   });
+}
+
+async function testQuotaRpcContract() {
+  const calls = [];
+  let consumed = 0;
+  const admin = {
+    rpc(name, params) {
+      calls.push({ name, params });
+      if (name === 'floom_reserve_app_quota_usage') {
+        consumed += params.p_seconds;
+        return Promise.resolve({
+          data: [{
+            allowed: true,
+            reason: null,
+            e2b_seconds_consumed: consumed,
+            owner_e2b_seconds_consumed: consumed,
+          }],
+          error: null,
+        });
+      }
+      if (name === 'floom_adjust_app_quota_usage') {
+        consumed = Math.max(0, consumed + params.p_seconds_delta);
+        return Promise.resolve({ data: consumed, error: null });
+      }
+      throw new Error(`unexpected rpc: ${name}`);
+    },
+    from(table) {
+      assert.equal(table, 'app_quota_usage');
+      return {
+        delete() {
+          return {
+            lt() {
+              return Promise.resolve({ error: null });
+            },
+          };
+        },
+      };
+    },
+  };
+
+  const reservations = await Promise.all([
+    reserveDailyQuota(admin, '00000000-0000-0000-0000-000000000001', 'owner-1', 10),
+    reserveDailyQuota(admin, '00000000-0000-0000-0000-000000000001', 'owner-1', 10),
+  ]);
+  assert.deepEqual(reservations.map((item) => item.allowed), [true, true]);
+  assert.equal(consumed, 20);
+  assert.equal(calls.filter((call) => call.name === 'floom_reserve_app_quota_usage').length, 2);
+
+  const reconcile = await reconcileQuotaReservation(admin, '00000000-0000-0000-0000-000000000001', 10, 3);
+  assert.equal(reconcile.ok, true);
+  assert.equal(consumed, 13);
+
+  const recorded = await recordQuotaUsage(admin, '00000000-0000-0000-0000-000000000001', 2.1);
+  assert.equal(recorded.ok, true);
+  assert.equal(consumed, 16);
 }
 
 async function testMcpContract() {
@@ -282,7 +455,12 @@ function testDocsAndSpecs() {
 function testMigration() {
   const migrationText = readFileSync('supabase/migrations/20260502100000_stock_e2b_mode.sql', 'utf8');
   assert.match(migrationText, /bundle_kind/);
+  assert.match(migrationText, /command text/);
+  assert.match(migrationText, /app_versions_tarball_command_check/);
   assert.match(migrationText, /app_quota_usage/);
+  assert.match(migrationText, /floom_reserve_app_quota_usage/);
+  assert.match(migrationText, /floom_adjust_app_quota_usage/);
+  assert.match(migrationText, /on conflict \(app_id, window_start\)/i);
   assert.match(migrationText, /error_detail jsonb/);
   assert.match(migrationText, /timed_out/);
 }

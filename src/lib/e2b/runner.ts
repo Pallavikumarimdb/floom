@@ -1,4 +1,5 @@
 import { Sandbox } from "e2b";
+import { isSafePythonEntrypoint, isSafePythonIdentifier } from "../floom/manifest";
 import type { RuntimeDependencies } from "../floom/requirements";
 import type { RuntimeSecrets } from "../floom/runtime-secrets";
 import {
@@ -55,10 +56,12 @@ export type RunnerConfig = {
   bundleKind: "single_file" | "tarball";
   command?: string;
   legacyEntrypoint?: string | null;
+  legacyHandler?: string | null;
   inputs: unknown;
   hasOutputSchema: boolean;
   dependencies?: RuntimeDependencies;
   secrets?: RuntimeSecrets;
+  deadlineAt?: number;
 };
 
 type SandboxRunner = typeof runInSandbox;
@@ -78,6 +81,7 @@ export async function runInSandbox(config: RunnerConfig): Promise<RunnerResult> 
 
   let sandbox: Awaited<ReturnType<typeof Sandbox.create>> | null = null;
   const startedAt = Date.now();
+  const deadlineAt = config.deadlineAt ?? startedAt + SANDBOX_TIMEOUT_MS;
   try {
     sandbox = await Sandbox.create("base", sandboxOptions({ allowInternetAccess: true }));
   } catch {
@@ -89,9 +93,9 @@ export async function runInSandbox(config: RunnerConfig): Promise<RunnerResult> 
   }
 
   try {
-    await prepareWorkspace(sandbox, config);
+    await prepareWorkspace(sandbox, config, deadlineAt);
 
-    const installResult = await installDependenciesIfNeeded(sandbox, config);
+    const installResult = await installDependenciesIfNeeded(sandbox, config, deadlineAt);
     if (installResult) {
       const elapsedMs = Date.now() - startedAt;
       if (installResult.kind === "failed") {
@@ -114,8 +118,12 @@ export async function runInSandbox(config: RunnerConfig): Promise<RunnerResult> 
       };
     }
 
-    const command = config.command?.trim() || await detectCommandInSandbox(sandbox);
-    const runResult = await runCommand(sandbox, command, config.inputs, undefined, config.secrets);
+    if (config.bundleKind === "single_file") {
+      return await runLegacyHandler(sandbox, config, startedAt, deadlineAt);
+    }
+
+    const command = config.command?.trim() || await detectCommandInSandbox(sandbox, deadlineAt);
+    const runResult = await runCommand(sandbox, command, config.inputs, undefined, config.secrets, deadlineAt);
     const elapsedMs = Date.now() - startedAt;
 
     if (runResult.kind !== "success") {
@@ -197,7 +205,8 @@ export async function runInSandboxContained(
 
 async function prepareWorkspace(
   sandbox: Awaited<ReturnType<typeof Sandbox.create>>,
-  config: RunnerConfig
+  config: RunnerConfig,
+  deadlineAt: number
 ) {
   if (config.bundleKind === "single_file") {
     const entrypoint = config.legacyEntrypoint?.trim();
@@ -213,32 +222,33 @@ async function prepareWorkspace(
   }
 
   await sandbox.files.write("/home/user/bundle.tar.gz", toArrayBuffer(config.bundle));
-  await sandbox.commands.run("mkdir -p /home/user/app && tar -xzf /home/user/bundle.tar.gz -C /home/user/app", {
-    timeoutMs: COMMAND_TIMEOUT_MS,
-    requestTimeoutMs: REQUEST_TIMEOUT_MS,
-  });
+  const options = commandTimeoutOptions(deadlineAt);
+  await sandbox.commands.run("mkdir -p /home/user/app && tar -xzf /home/user/bundle.tar.gz -C /home/user/app", options);
 }
 
 async function installDependenciesIfNeeded(
   sandbox: Awaited<ReturnType<typeof Sandbox.create>>,
-  config: RunnerConfig
+  config: RunnerConfig,
+  deadlineAt: number
 ) {
   const cwd = config.bundleKind === "single_file" ? "/home/user" : "/home/user/app";
   const hasRequirements = await fileExists(
     sandbox,
-    `${cwd}/requirements.txt`
+    `${cwd}/requirements.txt`,
+    deadlineAt
   );
-  const hasPackageJson = await fileExists(sandbox, `${cwd}/package.json`);
+  const hasPackageJson = await fileExists(sandbox, `${cwd}/package.json`, deadlineAt);
 
   if (!hasRequirements && !hasPackageJson) {
     return null;
   }
 
   if (hasRequirements) {
+    const targetFlag = config.bundleKind === "single_file" ? " --target /home/user/.deps" : "";
     const pipCommand = config.dependencies?.python_require_hashes
-      ? "python3 -m pip install --disable-pip-version-check --no-input --require-hashes -r requirements.txt"
-      : "python3 -m pip install --disable-pip-version-check --no-input -r requirements.txt";
-    const result = await runCommand(sandbox, pipCommand, undefined, cwd);
+      ? `python3 -m pip install --disable-pip-version-check --no-input --require-hashes${targetFlag} -r requirements.txt`
+      : `python3 -m pip install --disable-pip-version-check --no-input${targetFlag} -r requirements.txt`;
+    const result = await runCommand(sandbox, pipCommand, undefined, cwd, {}, deadlineAt);
     if (result.kind !== "success") {
       return {
         ...result,
@@ -251,7 +261,7 @@ async function installDependenciesIfNeeded(
   }
 
   if (hasPackageJson) {
-    const result = await runCommand(sandbox, "npm install", undefined, cwd);
+    const result = await runCommand(sandbox, "npm install", undefined, cwd, {}, deadlineAt);
     if (result.kind !== "success") {
       return {
         ...result,
@@ -266,7 +276,10 @@ async function installDependenciesIfNeeded(
   return null;
 }
 
-async function detectCommandInSandbox(sandbox: Awaited<ReturnType<typeof Sandbox.create>>) {
+async function detectCommandInSandbox(
+  sandbox: Awaited<ReturnType<typeof Sandbox.create>>,
+  deadlineAt: number
+) {
   const detection = await sandbox.commands.run(
     [
       "if [ -f app.py ]; then echo 'python app.py';",
@@ -275,8 +288,7 @@ async function detectCommandInSandbox(sandbox: Awaited<ReturnType<typeof Sandbox
       "else exit 2; fi",
     ].join(" "),
     {
-      timeoutMs: COMMAND_TIMEOUT_MS,
-      requestTimeoutMs: REQUEST_TIMEOUT_MS,
+      ...commandTimeoutOptions(deadlineAt),
       cwd: "/home/user/app",
     }
   ).catch((error: unknown) => error);
@@ -287,6 +299,138 @@ async function detectCommandInSandbox(sandbox: Awaited<ReturnType<typeof Sandbox
   }
 
   return stdout.split(/\r?\n/).filter(Boolean).at(-1) ?? stdout;
+}
+
+async function runLegacyHandler(
+  sandbox: Awaited<ReturnType<typeof Sandbox.create>>,
+  config: RunnerConfig,
+  startedAt: number,
+  deadlineAt: number
+): Promise<RunnerResult> {
+  const entrypoint = config.legacyEntrypoint?.trim();
+  const handler = config.legacyHandler?.trim();
+  if (!entrypoint || !handler || !isSafePythonEntrypoint(entrypoint) || !isSafePythonIdentifier(handler)) {
+    return {
+      kind: "failed",
+      output: null,
+      stdout: "",
+      stderr: "",
+      elapsedMs: Date.now() - startedAt,
+      error: {
+        phase: "run",
+        stderr_tail: "",
+        detail: "Invalid legacy app entrypoint or handler",
+      },
+    };
+  }
+
+  const moduleName = entrypoint.replace(/\.py$/, "");
+  const wrapper = [
+    "import json",
+    "import sys",
+    'sys.path.insert(0, "/home/user")',
+    'sys.path.insert(0, "/home/user/.deps")',
+    `from ${moduleName} import ${handler}`,
+    "",
+    'with open("/home/user/inputs.json") as handle:',
+    "    inputs = json.load(handle)",
+    `result = ${handler}(inputs)`,
+    'with open("/home/user/output.json", "w") as handle:',
+    "    json.dump(result, handle)",
+    "",
+  ].join("\n");
+
+  await sandbox.files.write("/home/user/runner.py", wrapper);
+  await sandbox.files.write("/home/user/inputs.json", JSON.stringify(config.inputs ?? {}));
+
+  const runResult = await runCommand(
+    sandbox,
+    "python3 /home/user/runner.py",
+    undefined,
+    "/home/user",
+    config.secrets,
+    deadlineAt
+  );
+  const elapsedMs = Date.now() - startedAt;
+  if (runResult.kind !== "success") {
+    return {
+      ...runResult,
+      elapsedMs,
+    };
+  }
+
+  const outputText = await sandbox.files.read("/home/user/output.json", {
+    requestTimeoutMs: Math.max(1, Math.min(REQUEST_TIMEOUT_MS, deadlineAt - Date.now())),
+  }).catch(() => null);
+  if (outputText === null) {
+    return {
+      kind: "failed",
+      output: null,
+      stdout: runResult.stdout,
+      stderr: runResult.stderr,
+      elapsedMs,
+      error: {
+        phase: "output_validation",
+        stderr_tail: tailBytes(runResult.stderr, MAX_STDERR_TAIL_BYTES),
+        detail: "output.json was not written",
+      },
+    };
+  }
+  if (Buffer.byteLength(outputText, "utf8") > MAX_OUTPUT_BYTES) {
+    return {
+      kind: "failed",
+      output: null,
+      stdout: runResult.stdout,
+      stderr: runResult.stderr,
+      elapsedMs,
+      error: {
+        phase: "output_validation",
+        stderr_tail: tailBytes(runResult.stderr, MAX_STDERR_TAIL_BYTES),
+        detail: "App output is too large",
+      },
+    };
+  }
+
+  let output: unknown;
+  try {
+    output = JSON.parse(outputText);
+  } catch {
+    return {
+      kind: "failed",
+      output: null,
+      stdout: runResult.stdout,
+      stderr: runResult.stderr,
+      elapsedMs,
+      error: {
+        phase: "output_validation",
+        stderr_tail: tailBytes(runResult.stderr, MAX_STDERR_TAIL_BYTES),
+        detail: "output.json must contain valid JSON",
+      },
+    };
+  }
+
+  if (!output || typeof output !== "object" || Array.isArray(output)) {
+    return {
+      kind: "failed",
+      output: null,
+      stdout: runResult.stdout,
+      stderr: runResult.stderr,
+      elapsedMs,
+      error: {
+        phase: "output_validation",
+        stderr_tail: tailBytes(runResult.stderr, MAX_STDERR_TAIL_BYTES),
+        detail: "App output must be a JSON object",
+      },
+    };
+  }
+
+  return {
+    kind: "success",
+    output,
+    stdout: runResult.stdout,
+    stderr: runResult.stderr,
+    elapsedMs,
+  };
 }
 
 async function readStructuredOutput(
@@ -330,7 +474,8 @@ async function runCommand(
   command: string,
   inputs?: unknown,
   cwd?: string,
-  envs: RuntimeSecrets = {}
+  envs: RuntimeSecrets = {},
+  deadlineAt?: number
 ): Promise<
   | {
       kind: "success";
@@ -345,6 +490,24 @@ async function runCommand(
       error: RunnerErrorDetail;
     }
 > {
+  const timeoutOptions = deadlineAt ? commandTimeoutOptions(deadlineAt) : {
+    timeoutMs: COMMAND_TIMEOUT_MS,
+    requestTimeoutMs: REQUEST_TIMEOUT_MS,
+  };
+  if (deadlineAt && deadlineAt <= Date.now()) {
+    return {
+      kind: "timed_out",
+      output: null,
+      stdout: "",
+      stderr: "",
+      error: {
+        phase: "run",
+        stderr_tail: "",
+        elapsed_ms: SANDBOX_TIMEOUT_MS,
+      },
+    };
+  }
+
   const inputText = inputs === undefined ? "" : JSON.stringify(inputs);
   await sandbox.files.write("/home/user/.floom-inputs.json", inputText);
 
@@ -352,8 +515,7 @@ async function runCommand(
     const result = await sandbox.commands.run(
       `sh -lc ${shellEscape(command)} < /home/user/.floom-inputs.json`,
       {
-        timeoutMs: COMMAND_TIMEOUT_MS,
-        requestTimeoutMs: REQUEST_TIMEOUT_MS,
+        ...timeoutOptions,
         envs: {
           FLOOM_INPUTS: inputText,
           ...envs,
@@ -403,16 +565,26 @@ async function runCommand(
 
 async function fileExists(
   sandbox: Awaited<ReturnType<typeof Sandbox.create>>,
-  filePath: string
+  filePath: string,
+  deadlineAt?: number
 ) {
   const result = await sandbox.commands.run(
     `[ -f ${shellEscape(filePath)} ] && echo yes || true`,
-    {
+    deadlineAt ? commandTimeoutOptions(deadlineAt) : {
       timeoutMs: COMMAND_TIMEOUT_MS,
       requestTimeoutMs: REQUEST_TIMEOUT_MS,
     }
   );
   return result.stdout.trim() === "yes";
+}
+
+function commandTimeoutOptions(deadlineAt: number) {
+  const remainingMs = deadlineAt - Date.now();
+  const timeoutMs = Math.max(1, Math.min(COMMAND_TIMEOUT_MS, remainingMs));
+  return {
+    timeoutMs,
+    requestTimeoutMs: Math.max(1, Math.min(REQUEST_TIMEOUT_MS, timeoutMs)),
+  };
 }
 
 function parseJsonLastLine(stdout: string): { ok: true; value: unknown } | { ok: false } {

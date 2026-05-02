@@ -6,6 +6,7 @@ import { demoApp, hasSupabaseConfig } from "@/lib/demo-app";
 type AppVersionBundle = {
   bundle_path: string | null;
   bundle_kind?: string | null;
+  command?: string | null;
   input_schema?: Record<string, unknown> | null;
   output_schema?: Record<string, unknown> | null;
 };
@@ -62,8 +63,7 @@ export async function GET(
     entrypoint: app.entrypoint,
     handler: app.handler,
     public: app.public,
-    command:
-      app.entrypoint && app.handler ? undefined : null,
+    command: latestVersion?.command ?? (app.entrypoint && app.handler ? undefined : null),
     input_schema: latestVersion?.input_schema ?? null,
     output_schema: latestVersion?.output_schema ?? null,
     bundle_kind: latestVersion?.bundle_kind ?? "single_file",

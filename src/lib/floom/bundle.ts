@@ -280,16 +280,22 @@ async function inspectTarball(tarballPath: string, compressedBytes: number) {
   let unpackedBytes = 0;
   let fileCount = 0;
   let hasRootManifest = false;
+  let validationError: BundleValidationError | null = null;
 
   await tar.list({
     file: tarballPath,
     strict: true,
     onReadEntry: (entry: tar.ReadEntry) => {
+      if (validationError) {
+        return;
+      }
+
       const entryPath = normalizeBundlePath(entry.path);
       const type = entry.type;
 
       if (!entryPath || entryPath.includes("..") || path.isAbsolute(entryPath)) {
-        throw new BundleValidationError("invalid_manifest", `invalid bundle path: ${entry.path}`);
+        validationError = new BundleValidationError("invalid_manifest", `invalid bundle path: ${entry.path}`);
+        return;
       }
 
       if (
@@ -299,32 +305,36 @@ async function inspectTarball(tarballPath: string, compressedBytes: number) {
         type === "BlockDevice" ||
         type === "FIFO"
       ) {
-        throw new BundleValidationError(
+        validationError = new BundleValidationError(
           "invalid_manifest",
           `bundle contains unsupported ${type.toLowerCase()} entry: ${entry.path}`
         );
+        return;
       }
 
       if (type !== "Directory") {
         fileCount += 1;
         unpackedBytes += entry.size;
         if (fileCount > MAX_BUNDLE_FILE_COUNT) {
-          throw new BundleValidationError(
+          validationError = new BundleValidationError(
             "bundle_too_large",
             `bundle exceeds the ${MAX_BUNDLE_FILE_COUNT} file limit`
           );
+          return;
         }
         if (entry.size > MAX_BUNDLE_FILE_BYTES) {
-          throw new BundleValidationError(
+          validationError = new BundleValidationError(
             "bundle_too_large",
             `bundle file exceeds the ${MAX_BUNDLE_FILE_BYTES / (1024 * 1024)} MB per-file limit: ${entry.path}`
           );
+          return;
         }
         if (unpackedBytes > MAX_BUNDLE_UNPACKED_BYTES) {
-          throw new BundleValidationError(
+          validationError = new BundleValidationError(
             "bundle_too_large",
             `bundle exceeds the ${MAX_BUNDLE_UNPACKED_BYTES / (1024 * 1024)} MB unpacked limit`
           );
+          return;
         }
       }
 
@@ -333,6 +343,10 @@ async function inspectTarball(tarballPath: string, compressedBytes: number) {
       }
     },
   });
+
+  if (validationError) {
+    throw validationError;
+  }
 
   if (!hasRootManifest) {
     throw new BundleValidationError(
@@ -396,17 +410,29 @@ export async function detectCommand(rootDir: string, manifest: FloomManifest): P
     return `python ${manifest.entrypoint}`;
   }
 
+  const candidates: string[] = [];
   if (await exists(path.join(rootDir, "app.py"))) {
-    return "python app.py";
+    candidates.push("python app.py");
   }
   if (await exists(path.join(rootDir, "index.js"))) {
-    return "node index.js";
+    candidates.push("node index.js");
   }
-  if (await hasPackageJsonStartScript(path.join(rootDir, "package.json"))) {
-    return "npm start";
+  if (candidates.length === 0 && await hasPackageJsonStartScript(path.join(rootDir, "package.json"))) {
+    candidates.push("npm start");
   }
   if (STOCK_E2B_BASE_HAS_GO && await exists(path.join(rootDir, "main.go"))) {
-    return "go run main.go";
+    candidates.push("go run main.go");
+  }
+
+  if (candidates.length > 1) {
+    throw new BundleValidationError(
+      "invalid_manifest",
+      `ambiguous command auto-detection (${candidates.join(", ")}), please specify command: in floom.yaml`
+    );
+  }
+
+  if (candidates.length === 1) {
+    return candidates[0]!;
   }
 
   throw new BundleValidationError(
@@ -420,12 +446,6 @@ async function detectRuntimeLabel(rootDir: string, manifest: FloomManifest, comm
     return "python";
   }
 
-  if (await exists(path.join(rootDir, "package.json"))) {
-    return "node";
-  }
-  if (await exists(path.join(rootDir, "app.py"))) {
-    return "python";
-  }
   if (command.startsWith("python ")) {
     return "python";
   }
@@ -437,6 +457,12 @@ async function detectRuntimeLabel(rootDir: string, manifest: FloomManifest, comm
   }
   if (command.startsWith("bun ")) {
     return "bun";
+  }
+  if (await exists(path.join(rootDir, "package.json"))) {
+    return "node";
+  }
+  if (await exists(path.join(rootDir, "app.py"))) {
+    return "python";
   }
 
   return "stock-e2b";
