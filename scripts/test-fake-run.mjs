@@ -3,18 +3,32 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { createBundleFromDirectory, createBundleFromFileMap, validateUploadedTarball } from '../src/lib/floom/bundle.ts';
-import { runInSandboxContained } from '../src/lib/e2b/runner.ts';
-import { reconcileQuotaReservation, recordQuotaUsage, reserveDailyQuota } from '../src/lib/floom/quota.ts';
-import {
+
+async function loadTsModule(path) {
+  const mod = await import(path);
+  return mod.default ?? mod;
+}
+
+const {
+  createBundleFromDirectory,
+  createBundleFromFileMap,
+  validateUploadedTarball,
+} = await loadTsModule('../src/lib/floom/bundle.ts');
+const { runInSandboxContained } = await loadTsModule('../src/lib/e2b/runner.ts');
+const {
+  reconcileQuotaReservation,
+  recordQuotaUsage,
+  reserveDailyQuota,
+} = await loadTsModule('../src/lib/floom/quota.ts');
+const {
   isLegacyPythonManifest,
   parseManifest,
   resolveManifestDisplayName,
   resolvePythonDependencyConfig,
   validatePythonSourceForManifest,
-} from '../src/lib/floom/manifest.ts';
-import { validatePythonRequirementsText } from '../src/lib/floom/requirements.ts';
-import { floomTools, callFloomTool } from '../src/lib/mcp/tools.ts';
+} = await loadTsModule('../src/lib/floom/manifest.ts');
+const { validatePythonRequirementsText } = await loadTsModule('../src/lib/floom/requirements.ts');
+const { floomTools, callFloomTool } = await loadTsModule('../src/lib/mcp/tools.ts');
 
 function parseToolResult(result) {
   return JSON.parse(result.content[0].text);

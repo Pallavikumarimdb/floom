@@ -25,7 +25,7 @@ import {
 } from "./schema";
 import { validatePythonRequirementsText } from "./requirements";
 
-const require = createRequire(import.meta.url);
+const require = createRequire(path.join(process.cwd(), "package.json"));
 const tar = require("tar") as typeof Tar;
 
 export const DEFAULT_BUNDLE_EXCLUDES = [
