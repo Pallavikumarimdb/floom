@@ -850,23 +850,6 @@ export default function AppPermalinkPage() { // exported as default so the serve
             <span aria-hidden="true" style={{ color: 'var(--line)' }}>/</span>
             <span style={{ color: 'var(--ink)', fontWeight: 500 }}>{app.name}</span>
           </div>
-          {app.author && sessionUserId && app.author === sessionUserId && (
-            <Link
-              href={`/studio/${app.slug}`}
-              data-testid="open-in-studio"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 4,
-                color: 'var(--muted)',
-                textDecoration: 'none',
-                fontWeight: 500,
-                fontSize: 13,
-              }}
-            >
-              Open in Studio <ArrowRight />
-            </Link>
-          )}
         </div>
 
         {/* R10 (2026-04-28): outer wrapper card REMOVED. Hero + tabs sit directly on cream bg. */}
@@ -1545,10 +1528,16 @@ export default function AppPermalinkPage() { // exported as default so the serve
               </div>
               <h3 style={{ fontSize: 14, fontWeight: 600, margin: '0 0 8px' }}>Run this app from HTTP clients.</h3>
               <p style={{ fontSize: 13, color: 'var(--muted)', margin: '0 0 12px', lineHeight: 1.55 }}>
-                Public apps can be called anonymously. Private apps need an owner agent token.
+                {app.public
+                  ? 'This public app can be called anonymously. Add an agent token only for private apps.'
+                  : 'This private app needs an owner agent token.'}
               </p>
               <SourceSnippet
-                value={`curl -X POST ${typeof window !== 'undefined' ? window.location.origin : ''}/api/apps/${app.slug}/run \\\n  -H "Authorization: Bearer YOUR_FLOOM_AGENT_TOKEN" \\\n  -H "Content-Type: application/json" \\\n  -d '{"inputs":{}}'`}
+                value={
+                  app.public
+                    ? `curl -X POST ${typeof window !== 'undefined' ? window.location.origin : ''}/api/apps/${app.slug}/run \\\n  -H "Content-Type: application/json" \\\n  -d '{"inputs":{}}'`
+                    : `curl -X POST ${typeof window !== 'undefined' ? window.location.origin : ''}/api/apps/${app.slug}/run \\\n  -H "Authorization: Bearer YOUR_FLOOM_AGENT_TOKEN" \\\n  -H "Content-Type: application/json" \\\n  -d '{"inputs":{}}'`
+                }
               />
             </div>
           </section>
@@ -1900,20 +1889,6 @@ function AboutMetaRow({ label, value }: { label: string; value: React.ReactNode 
   );
 }
 
-function ArrowRight() {
-  return (
-    <svg width={12} height={12} viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path
-        d="M5 12h14M13 5l7 7-7 7"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
 function ShareIcon() {
   return (
     <svg width={14} height={14} viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -2048,7 +2023,7 @@ function CelebrationCard({
           }}
         >
           <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 1 }} aria-hidden="true"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg>
-          <span><strong>Floom is in public beta</strong> {"— please don't put production secrets in apps you publish here. We're hardening secret isolation and will lift this when sandboxing is GA."}</span>
+          <span><strong>Floom is in public beta</strong> {"— v0.1 encrypts app secrets at rest and injects them only at runtime. Use sandboxed or revocable credentials while the beta hardening window is open."}</span>
         </div>
       </div>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignSelf: 'flex-start' }}>

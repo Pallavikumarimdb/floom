@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { SiteHeader } from "@/components/SiteHeader";
+import { FloomFooter } from "@/components/FloomFooter";
 
 const SITE_URL = "https://floom.dev";
 
@@ -325,6 +326,7 @@ npx @floomhq/cli@latest secrets delete YOUR_PRIVATE_SLUG OPENAI_API_KEY`}</CodeB
           </p>
         </Section>
       </article>
+      <FloomFooter />
     </main>
   );
 }

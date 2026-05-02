@@ -17,11 +17,16 @@ export async function DELETE(
 
   const admin = createAdminClient();
   const caller = await resolveAuthCaller(req, admin);
-  if (!caller || caller.kind !== "user") {
+  if (!caller) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const { id } = await params;
+
+  if (caller.kind === "agent_token" && caller.agentTokenId !== id) {
+    return NextResponse.json({ error: "Agent tokens can only revoke themselves" }, { status: 403 });
+  }
+
   const revoked = await revokeAgentToken(admin, caller.userId, id);
   if (!revoked) {
     return NextResponse.json({ error: "Active token not found" }, { status: 404 });

@@ -273,6 +273,7 @@ export async function POST(req: NextRequest) {
       id: app.id,
       slug: app.slug,
       name: app.name,
+      public: app.public,
       url: new URL(`/p/${app.slug}`, resolveMcpForwardOrigin(req.url) || req.url).toString(),
     },
   });

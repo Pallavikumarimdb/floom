@@ -27,37 +27,6 @@ export interface ShowcaseEntry {
 
 export const SHOWCASE_ENTRIES: ShowcaseEntry[] = [
   {
-    slug: 'competitor-lens',
-    name: 'Competitor Lens',
-    description:
-      'Compare your positioning to a competitor in under 2 seconds. Powered by Gemini 3 Pro, deterministic JSON.',
-    category: 'Research',
-    bannerTitle: 'competitor-lens',
-    bannerLines: [
-      { text: 'stripe vs adyen' },
-      { text: 'fee 1.4% vs 1.6%', dim: true },
-      { text: 'winner: stripe', accent: true },
-    ],
-    installVia: 'via Floom or Claude',
-    tags: ['research', 'positioning', 'gemini'],
-    topFeatured: true,
-  },
-  {
-    slug: 'ai-readiness-audit',
-    name: 'AI Readiness Audit',
-    description:
-      "Score a company's AI readiness on a single URL. Returns markdown ready to paste into Notion.",
-    category: 'Research',
-    bannerTitle: 'ai-readiness',
-    bannerLines: [
-      { text: 'floom.dev' },
-      { text: 'score: 8.4/10', dim: true },
-      { text: '3 risks · 3 wins', accent: true },
-    ],
-    installVia: 'via Floom or Cursor',
-    tags: ['research', 'positioning'],
-  },
-  {
     slug: 'meeting-action-items',
     name: 'Meeting Action Items',
     description:
@@ -71,6 +40,7 @@ export const SHOWCASE_ENTRIES: ShowcaseEntry[] = [
     ],
     installVia: 'via Floom or Claude',
     tags: ['operations', 'meetings'],
+    topFeatured: true,
   },
 ];
 

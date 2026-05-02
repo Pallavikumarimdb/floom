@@ -71,10 +71,16 @@ function CliAuthorizeContent() {
         <div className="mt-8 w-full rounded-2xl border border-[var(--line)] bg-[var(--card)] p-5 text-left shadow-[var(--shadow-3)]">
           <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--muted)]">Terminal code</p>
           <p className="mt-3 rounded-xl border border-[var(--line)] bg-[var(--bg)] px-4 py-3 font-mono text-2xl font-black tracking-[0.12em]">
-            {code || "Missing"}
+            {code || "No code"}
           </p>
           {email ? (
             <p className="mt-4 text-sm text-[var(--muted)]">Signed in as {email}</p>
+          ) : null}
+          {!code ? (
+            <p className="mt-4 text-sm leading-6 text-[var(--muted)]">
+              Run <code>npx @floomhq/cli@latest setup</code> again and open the
+              full authorization link printed in your terminal.
+            </p>
           ) : null}
         </div>
 
@@ -82,9 +88,16 @@ function CliAuthorizeContent() {
           <p className="mt-6 inline-flex items-center gap-2 text-sm text-[var(--muted)]">
             <Loader2 className="animate-spin" size={16} /> Checking session
           </p>
+        ) : !code ? (
+          <Link
+            href="/docs"
+            className="mt-6 rounded-xl bg-[var(--ink)] px-5 py-3 text-sm font-bold text-[var(--bg)]"
+          >
+            Open setup docs
+          </Link>
         ) : !sessionToken ? (
           <Link
-            href={`/login?mode=signup&next=${encodeURIComponent(next)}`}
+            href={`/login?next=${encodeURIComponent(next)}`}
             className="mt-6 rounded-xl bg-[var(--ink)] px-5 py-3 text-sm font-bold text-[var(--bg)]"
           >
             Sign in to authorize
