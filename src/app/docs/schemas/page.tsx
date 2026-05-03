@@ -3,7 +3,7 @@ import { IC, CodeBlock, Section } from "@/components/docs/DocsPrimitives";
 
 export const metadata: Metadata = {
   title: "Input / output schemas",
-  description: "JSON Schema for Floom app inputs and outputs — enum, min/max, pattern, oneOf, x-floom-format extensions.",
+  description: "JSON Schema for Floom app inputs and outputs: enum, min/max, pattern, oneOf, x-floom-format extensions.",
   alternates: { canonical: "https://floom.dev/docs/schemas" },
 };
 
@@ -144,10 +144,10 @@ export default function SchemasPage() {
           Floom passes standard JSON Schema constraints through to validation. Use any of these in your input or output schemas.
         </p>
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
-          <CodeBlock label="Enum — restrict to a fixed set of values">{schemaEnumExample}</CodeBlock>
-          <CodeBlock label="Min / max — bound a numeric range">{schemaMinMaxExample}</CodeBlock>
-          <CodeBlock label="Pattern — validate a string with regex">{schemaPatternExample}</CodeBlock>
-          <CodeBlock label="oneOf — discriminated union of shapes">{schemaOneOfExample}</CodeBlock>
+          <CodeBlock label="Enum: restrict to a fixed set of values">{schemaEnumExample}</CodeBlock>
+          <CodeBlock label="Min / max: bound a numeric range">{schemaMinMaxExample}</CodeBlock>
+          <CodeBlock label="Pattern: validate a string with regex">{schemaPatternExample}</CodeBlock>
+          <CodeBlock label="oneOf: discriminated union of shapes">{schemaOneOfExample}</CodeBlock>
         </div>
       </Section>
     </>

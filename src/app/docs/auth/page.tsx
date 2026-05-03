@@ -30,7 +30,7 @@ export default function AuthPage() {
 
       <Section id="browser-sign-in" title="1. Browser sign-in">
         <p>
-          Google OAuth at <Link href="/login" className="underline">floom.dev/login</Link>. Creates a session for the browser UI. No API access — use agent tokens for programmatic calls.
+          Google OAuth at <Link href="/login" className="underline">floom.dev/login</Link>. Creates a session for the browser UI. No API access; use agent tokens for programmatic calls.
         </p>
       </Section>
 

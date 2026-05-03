@@ -33,7 +33,7 @@ export default function CiPage() {
           CI / automation
         </h1>
         <p className="mt-3 text-lg text-neutral-600">
-          Use <IC>FLOOM_TOKEN</IC> as a repository secret. The CLI reads it automatically — no <IC>floom setup</IC> needed in CI.
+          Use <IC>FLOOM_TOKEN</IC> as a repository secret. The CLI reads it automatically; no <IC>floom setup</IC> needed in CI.
         </p>
       </div>
 

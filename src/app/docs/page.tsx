@@ -22,7 +22,7 @@ const TOPIC_CARDS = [
   { href: "/docs/secrets", title: "Secrets", desc: "Encrypted secrets injected at run time." },
   { href: "/docs/auth", title: "Authentication", desc: "Browser OAuth, CLI device flow, agent tokens." },
   { href: "/docs/api", title: "REST API", desc: "Run, poll, and publish via HTTP." },
-  { href: "/docs/mcp", title: "MCP for AI agents", desc: "All 15 tools — Claude Desktop, Cursor, and more." },
+  { href: "/docs/mcp", title: "MCP for AI agents", desc: "All 15 tools: Claude Desktop, Cursor, and more." },
   { href: "/docs/connections", title: "Connections", desc: "77 managed-auth providers via Composio." },
   { href: "/docs/ci", title: "CI / automation", desc: "GitHub Actions snippet, programmatic deploy." },
   { href: "/docs/examples", title: "Examples", desc: "5 working demo apps with run and source links." },

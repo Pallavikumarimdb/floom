@@ -3,7 +3,7 @@ import { IC, CodeBlock, Section } from "@/components/docs/DocsPrimitives";
 
 export const metadata: Metadata = {
   title: "Manifest reference",
-  description: "Every field in floom.yaml — slug, command, input_schema, output_schema, public, secrets, dependencies, bundle_exclude.",
+  description: "Every field in floom.yaml: slug, command, input_schema, output_schema, public, secrets, dependencies, bundle_exclude.",
   alternates: { canonical: "https://floom.dev/docs/manifest" },
 };
 
@@ -65,7 +65,7 @@ export default function ManifestPage() {
       </div>
 
       <Section id="all-fields" title="All fields">
-        <CodeBlock label="floom.yaml — all fields">{manifestFull}</CodeBlock>
+        <CodeBlock label="floom.yaml: all fields">{manifestFull}</CodeBlock>
         <div className="overflow-x-auto mt-4">
           <table className="w-full text-sm border-collapse">
             <thead>

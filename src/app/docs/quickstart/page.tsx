@@ -3,7 +3,7 @@ import { IC, CodeBlock, Section } from "@/components/docs/DocsPrimitives";
 
 export const metadata: Metadata = {
   title: "Quick start",
-  description: "From zero to a running Floom app in 60 seconds — CLI setup, scaffold, deploy, run.",
+  description: "From zero to a running Floom app in 60 seconds: CLI setup, scaffold, deploy, run.",
   alternates: { canonical: "https://floom.dev/docs/quickstart" },
 };
 
@@ -38,7 +38,7 @@ export default function QuickstartPage() {
           Run <IC>npx @floomhq/cli@latest setup</IC> once per machine. It opens a browser page to link your Floom account. The token is saved to <IC>~/.config/floom/token</IC>.
         </p>
         <p>
-          In CI, set the <IC>FLOOM_TOKEN</IC> env var instead — no setup command needed.
+          In CI, set the <IC>FLOOM_TOKEN</IC> env var instead; no setup command needed.
         </p>
       </Section>
 
@@ -47,9 +47,9 @@ export default function QuickstartPage() {
           <IC>floom init</IC> generates three files in the current directory:
         </p>
         <ul className="list-disc space-y-1 pl-5">
-          <li><IC>floom.yaml</IC> — the app manifest</li>
-          <li><IC>app.py</IC> — a minimal Python app</li>
-          <li><IC>requirements.txt</IC> — empty, ready to fill</li>
+          <li><IC>floom.yaml</IC>: the app manifest</li>
+          <li><IC>app.py</IC>: a minimal Python app</li>
+          <li><IC>requirements.txt</IC>: empty, ready to fill</li>
         </ul>
       </Section>
 
@@ -58,7 +58,7 @@ export default function QuickstartPage() {
           <IC>floom deploy</IC> bundles the current directory into a <IC>.tar.gz</IC>, uploads it, and registers the app under your account. The slug from <IC>floom.yaml</IC> becomes the app ID.
         </p>
         <p>
-          After deploy, the app is live at <IC>https://floom.dev/p/your-slug</IC> with a browser UI, REST endpoint, and MCP tool — no extra config.
+          After deploy, the app is live at <IC>https://floom.dev/p/your-slug</IC> with a browser UI, REST endpoint, and MCP tool. No extra config.
         </p>
       </Section>
 
@@ -66,7 +66,7 @@ export default function QuickstartPage() {
         <p>
           Use the CLI or the browser UI. The CLI returns JSON:
         </p>
-        <CodeBlock label="Terminal — full four-step flow">{launchCommand}</CodeBlock>
+        <CodeBlock label="Terminal: full four-step flow">{launchCommand}</CodeBlock>
       </Section>
 
       <Section id="what-is-a-floom-app" title="What is a Floom app?">
@@ -77,7 +77,7 @@ export default function QuickstartPage() {
           When you deploy, Floom bundles the directory, stores it, and registers the metadata. When someone runs the app, Floom spins up a stock E2B sandbox, extracts the bundle, installs declared dependencies, and executes the command.
         </p>
         <ul className="list-disc space-y-2 pl-5">
-          <li>Each run is isolated — a fresh sandbox, no state from previous runs.</li>
+          <li>Each run is isolated: a fresh sandbox, no state from previous runs.</li>
           <li>Inputs arrive via <IC>stdin</IC> and the <IC>FLOOM_INPUTS</IC> env var as JSON.</li>
           <li>Output is whatever the command prints to stdout, optionally validated against a schema.</li>
           <li>Python and Node.js both work. Python is the primary target.</li>

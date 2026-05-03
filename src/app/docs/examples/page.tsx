@@ -3,7 +3,7 @@ import Link from "next/link";
 
 export const metadata: Metadata = {
   title: "Examples",
-  description: "5 working Floom demo apps with run and source links — meeting action items, invoice calculator, UTM builder, CSV stats, multi-file Python.",
+  description: "5 working Floom demo apps with run and source links: meeting action items, invoice calculator, UTM builder, CSV stats, multi-file Python.",
   alternates: { canonical: "https://floom.dev/docs/examples" },
 };
 

@@ -3,7 +3,7 @@ import { IC, CodeBlock, Section } from "@/components/docs/DocsPrimitives";
 
 export const metadata: Metadata = {
   title: "Connections (Composio)",
-  description: "77 managed-auth providers for Floom apps — Gmail, Slack, GitHub, Notion, Linear, and more via Composio.",
+  description: "77 managed-auth providers for Floom apps: Gmail, Slack, GitHub, Notion, Linear, and more via Composio.",
   alternates: { canonical: "https://floom.dev/docs/connections" },
 };
 
@@ -68,7 +68,7 @@ export default function ConnectionsPage() {
         </p>
         <ul className="list-disc space-y-2 pl-5">
           <li>Rate limit on the Composio proxy: 60 calls per minute per token.</li>
-          <li>Connections are scoped to your Floom account — not shared across apps unless you use the same connection ID secret.</li>
+          <li>Connections are scoped to your Floom account, not shared across apps unless you use the same connection ID secret.</li>
           <li>Revoke access at any time from your Floom settings.</li>
         </ul>
       </Section>

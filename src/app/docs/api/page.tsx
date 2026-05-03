@@ -3,7 +3,7 @@ import { IC, CodeBlock, Section } from "@/components/docs/DocsPrimitives";
 
 export const metadata: Metadata = {
   title: "REST API",
-  description: "Floom REST API — run apps, poll async executions, deploy programmatically.",
+  description: "Floom REST API: run apps, poll async executions, deploy programmatically.",
   alternates: { canonical: "https://floom.dev/docs/api" },
 };
 
@@ -88,7 +88,7 @@ export default function ApiPage() {
         <CodeBlock label="Step 1: fire and forget">{asyncFireAndForgetExample}</CodeBlock>
         <CodeBlock label="Step 2: poll for result">{asyncPollExample}</CodeBlock>
         <p>
-          The <IC>floom run</IC> CLI does this polling automatically — no extra code needed for command-line use.
+          The <IC>floom run</IC> CLI does this polling automatically; no extra code needed for command-line use.
         </p>
       </Section>
 

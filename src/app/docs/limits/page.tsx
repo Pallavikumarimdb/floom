@@ -4,7 +4,7 @@ import { IC } from "@/components/docs/DocsPrimitives";
 
 export const metadata: Metadata = {
   title: "Limits",
-  description: "Floom limits — sandbox timeout, rate limits, bundle size caps, concurrent runs.",
+  description: "Floom limits: sandbox timeout, rate limits, bundle size caps, concurrent runs.",
   alternates: { canonical: "https://floom.dev/docs/limits" },
 };
 
@@ -56,7 +56,7 @@ export default function LimitsPage() {
 
       <div className="mt-6 space-y-3 text-sm text-neutral-500">
         <p>
-          Runs exceeding the 290-second cap return <IC>status: timed_out</IC>. For longer jobs, use the async pattern — see <Link href="/docs/api#async-runs" className="underline">async runs</Link>.
+          Runs exceeding the 290-second cap return <IC>status: timed_out</IC>. For longer jobs, use the async pattern; see <Link href="/docs/api#async-runs" className="underline">async runs</Link>.
         </p>
         <p>
           Bundle size includes all files in the directory minus any paths in <IC>bundle_exclude</IC>. Large fixtures or datasets should be excluded or fetched at run time.

@@ -6,7 +6,7 @@ import { CommandPalette } from "@/components/docs/CommandPalette";
 
 export default function DocsLayout({ children }: { children: ReactNode }) {
   return (
-    <main id="main" className="min-h-screen overflow-x-hidden bg-[#faf9f5] text-[#11110f]">
+    <main id="main" className="min-h-screen bg-[#faf9f5] text-[#11110f]">
       <SiteHeader />
       <CommandPalette />
 

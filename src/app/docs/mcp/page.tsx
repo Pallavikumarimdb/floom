@@ -3,7 +3,7 @@ import { IC, CodeBlock, Section } from "@/components/docs/DocsPrimitives";
 
 export const metadata: Metadata = {
   title: "MCP for AI agents",
-  description: "Floom MCP server — all 15 tools for AI agents. Claude Desktop, Cursor, agent tokens.",
+  description: "Floom MCP server: all 15 tools for AI agents. Claude Desktop, Cursor, agent tokens.",
   alternates: { canonical: "https://floom.dev/docs/mcp" },
 };
 

@@ -3,7 +3,7 @@ import { IC, CodeBlock, Section } from "@/components/docs/DocsPrimitives";
 
 export const metadata: Metadata = {
   title: "Secrets",
-  description: "Encrypted secrets for Floom apps — set via CLI or REST, injected as env vars at run time.",
+  description: "Encrypted secrets for Floom apps: set via CLI or REST, injected as env vars at run time.",
   alternates: { canonical: "https://floom.dev/docs/secrets" },
 };
 
@@ -33,7 +33,7 @@ export default function SecretsPage() {
         <CodeBlock label="Terminal">{secretsExample}</CodeBlock>
         <ul className="list-disc space-y-2 pl-5">
           <li>Use <IC>--value-stdin</IC> to keep the value out of shell history.</li>
-          <li>Names must be uppercase letters, digits, and underscores — e.g. <IC>OPENAI_API_KEY</IC>.</li>
+          <li>Names must be uppercase letters, digits, and underscores, e.g. <IC>OPENAI_API_KEY</IC>.</li>
           <li>Undeclared secrets are never injected, even if the values exist.</li>
         </ul>
       </Section>
@@ -54,7 +54,7 @@ export default function SecretsPage() {
       <Section id="rules" title="Rules">
         <ul className="list-disc space-y-2 pl-5">
           <li>Secret values are never visible in logs or the browser UI.</li>
-          <li>Values are scoped to a single app slug — not shared across apps.</li>
+          <li>Values are scoped to a single app slug, not shared across apps.</li>
           <li>Declaring a secret name in <IC>floom.yaml</IC> is required; the value must be set separately before the first run that needs it.</li>
         </ul>
       </Section>
