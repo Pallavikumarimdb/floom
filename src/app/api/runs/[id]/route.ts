@@ -26,11 +26,19 @@ type AppRow = {
   owner_id: string;
 };
 
+// UUID v4 pattern — rejects obviously invalid IDs before hitting the DB.
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
+
+  if (!UUID_RE.test(id)) {
+    return NextResponse.json({ error: "Run not found" }, { status: 400 });
+  }
+
   if (!hasSupabaseConfig()) {
     return NextResponse.json(
       { error: "Supabase is not configured. Run lookup is unavailable." },

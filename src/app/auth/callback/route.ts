@@ -24,6 +24,11 @@ export async function GET(req: NextRequest) {
   const safeNext = next.startsWith("/") && !next.startsWith("//") ? next : "/";
 
   const supabase = await createClient();
+
+  // Track whether this is a code-exchange (OAuth) path before the exchange,
+  // so we can detect first-time users after the session is established.
+  const isCodeExchange = !!code;
+
   const { error } = code
     ? await supabase.auth.exchangeCodeForSession(code)
     : tokenHash && isEmailOtpType(type)
@@ -34,14 +39,23 @@ export async function GET(req: NextRequest) {
     return redirectToLoginWithAuthError(req);
   }
 
+  const publicOrigin = resolvePublicOrigin(req);
+
   // Fire welcome email on first-time email confirmation (type=signup).
   // after() keeps the serverless function alive until the promise settles
   // without blocking the redirect response.
   if (type === "signup") {
-    after(fireWelcomeEmail(supabase, resolvePublicOrigin(req)));
+    after(fireWelcomeEmail(supabase, publicOrigin));
   }
 
-  return NextResponse.redirect(new URL(safeNext, resolvePublicOrigin(req)));
+  // Fire welcome email for Google OAuth (and other provider) first-time signups.
+  // The code-exchange path doesn't carry type=signup, so we detect "new user"
+  // by checking whether created_at is within the last 30 seconds.
+  if (isCodeExchange && type !== "signup") {
+    after(maybeFireOAuthWelcomeEmail(supabase, publicOrigin));
+  }
+
+  return NextResponse.redirect(new URL(safeNext, publicOrigin));
 }
 
 async function fireWelcomeEmail(
@@ -68,6 +82,39 @@ async function fireWelcomeEmail(
   } catch (err) {
     // Welcome email failures must never surface to the user.
     console.error("[auth:callback] welcome email error:", err);
+  }
+}
+
+// For OAuth provider signups (Google, GitHub, etc.) the callback arrives via
+// the code-exchange path without type=signup. Detect first-time signups by
+// checking whether the user's created_at is within the last 30 seconds.
+async function maybeFireOAuthWelcomeEmail(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  publicOrigin: string,
+): Promise<void> {
+  try {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user?.email || !user.created_at) return;
+
+    const createdMs = new Date(user.created_at).getTime();
+    const isNewUser = Date.now() - createdMs < 30_000;
+    if (!isNewUser) return;
+
+    const name =
+      (user.user_metadata?.full_name as string | undefined) ??
+      (user.user_metadata?.name as string | undefined) ??
+      null;
+
+    const { subject, html, text } = renderWelcomeEmail({
+      name,
+      publicUrl: publicOrigin,
+    });
+
+    await sendEmail({ to: user.email, subject, html, text });
+  } catch (err) {
+    console.error("[auth:callback] oauth welcome email error:", err);
   }
 }
 
