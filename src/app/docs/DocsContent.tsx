@@ -597,7 +597,7 @@ export default function DocsContent() {
                   </thead>
                   <tbody className="divide-y divide-[#f0ede6]">
                     {[
-                      ["Sync run cap", "250 seconds (5 min function ceiling)"],
+                      ["Sync run cap", "290 seconds (Vercel Pro 300s ceiling, 10s response buffer)"],
                       ["Anonymous public rate limit", "20 runs / caller / 60s"],
                       ["Per-app public rate limit", "100 runs / 60s"],
                       ["Per-app E2B quota", "30 min / day"],
