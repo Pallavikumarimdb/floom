@@ -900,6 +900,9 @@ function getAppContract(): McpToolResult {
       requires_authorization: true,
       note: "Use this full publish check from MCP clients when you already have floom.yaml and the app file map in memory. The legacy source shortcut still works for v0.1-style Python apps.",
     },
+    async_calling: asyncEnabled
+      ? "To call a long-running app without waiting: POST /api/apps/:slug/run (no ?wait=true). The response is 202 { execution_id, status: 'queued' } returned immediately. Then poll GET /api/executions/<id> every 1-2 seconds until status is one of the terminal values: succeeded, failed, timed_out, cancelled. Read the app result from .output on the final poll response. The floom CLI (floom run) performs this polling automatically. For a blocking call with a time budget up to 250 s, add ?wait=true to the POST; the response shape is identical but only arrives once the run is complete or the budget expires. Use async (no ?wait=true) for apps that may exceed 250 s. Within MCP, pass async: true to run_app to receive the queued response immediately instead of waiting."
+      : "Async runtime is not enabled on this Floom deployment. Call POST /api/apps/:slug/run?wait=true (or omit async) for synchronous runs within the 60 s execution cap. Async poll pattern (POST without ?wait=true then GET /api/executions/<id>) is available on deployments with async runtime enabled.",
     run_tool: {
       name: "run_app",
       requires_authorization_for_private_apps: true,

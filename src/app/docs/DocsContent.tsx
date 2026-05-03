@@ -15,6 +15,7 @@ const TOC_ITEMS = [
   { id: "secrets", label: "Secrets" },
   { id: "authentication", label: "Authentication" },
   { id: "run-through-api", label: "Run through API" },
+  { id: "async-runs", label: "Async runs" },
   { id: "mcp-for-ai-agents", label: "MCP for AI agents" },
   { id: "connections", label: "Connections (Composio)" },
   { id: "examples", label: "Examples" },
@@ -177,6 +178,34 @@ from composio import ComposioToolSet
 toolset = ComposioToolSet()
 tools = toolset.get_tools(actions=["GMAIL_SEND_EMAIL"])
 # connection_id is read from COMPOSIO_CONNECTION_ID automatically`;
+
+const asyncFireAndForgetExample = `# Fire-and-forget — returns 202 immediately
+curl -X POST https://floom.dev/api/apps/my-app/run \\
+  -H 'Authorization: Bearer YOUR_AGENT_TOKEN' \\
+  -H 'Content-Type: application/json' \\
+  -d '{"inputs":{"text":"process this"}}'
+# Response: 202 { "execution_id": "exec_abc123", "status": "queued" }`;
+
+const asyncPollExample = `# Poll until terminal status
+while true; do
+  STATUS=$(curl -s https://floom.dev/api/executions/exec_abc123 \\
+    -H 'Authorization: Bearer YOUR_AGENT_TOKEN' | jq -r '.status')
+  echo "Status: $STATUS"
+  if [[ "$STATUS" == "succeeded" || "$STATUS" == "failed" || "$STATUS" == "timed_out" || "$STATUS" == "cancelled" ]]; then
+    break
+  fi
+  sleep 1
+done
+
+# Read the result
+curl -s https://floom.dev/api/executions/exec_abc123 \\
+  -H 'Authorization: Bearer YOUR_AGENT_TOKEN' | jq '.output'`;
+
+const asyncSyncBudgetExample = `# Sync style with up to 250s budget — blocks until done or times out
+curl -X POST 'https://floom.dev/api/apps/my-app/run?wait=true' \\
+  -H 'Authorization: Bearer YOUR_AGENT_TOKEN' \\
+  -H 'Content-Type: application/json' \\
+  -d '{"inputs":{"text":"process this"}}'`;
 
 const ciExample = `# GitHub Actions
 - name: Deploy Floom app
@@ -477,6 +506,29 @@ export default function DocsContent() {
               <CodeBlock label="Response">{apiResponseExample}</CodeBlock>
               <p className="text-sm text-neutral-500">
                 Sandbox boot failures return HTTP 502 with <IC>error: sandbox_unavailable</IC>. Install errors and non-zero exits return HTTP 200 with <IC>status: failed</IC>.
+              </p>
+            </Section>
+
+            <Section id="async-runs" title="Async runs">
+              <p>
+                Apps that may run longer than 250 seconds should be called <strong>without</strong> <IC>?wait=true</IC>. The default POST returns <IC>202</IC> with an <IC>execution_id</IC> immediately; your code then polls until the status is terminal.
+              </p>
+              <ol className="list-decimal space-y-2 pl-5">
+                <li><strong>POST without <IC>?wait=true</IC></strong> — returns <IC>202 {`{ execution_id, status: "queued" }`}</IC> right away.</li>
+                <li><strong>Poll <IC>GET /api/executions/:id</IC></strong> every 1–2 s until <IC>status</IC> is <IC>succeeded</IC>, <IC>failed</IC>, <IC>timed_out</IC>, or <IC>cancelled</IC>.</li>
+                <li><strong>Read the result</strong> from <IC>.output</IC> in the final poll response.</li>
+              </ol>
+              <CodeBlock label="Step 1 — fire and forget">{asyncFireAndForgetExample}</CodeBlock>
+              <CodeBlock label="Step 2 — poll for result">{asyncPollExample}</CodeBlock>
+              <p>
+                The <IC>floom run</IC> CLI does this polling automatically — no extra code needed for command-line use.
+              </p>
+              <p>
+                If you prefer a blocking call with a time budget, pass <IC>?wait=true</IC> to wait up to 250 s for completion:
+              </p>
+              <CodeBlock label="Sync style (≤ 250s budget)">{asyncSyncBudgetExample}</CodeBlock>
+              <p className="text-sm text-neutral-500">
+                Async mode is the default for REST calls. Only use <IC>?wait=true</IC> when you need a single blocking response and your app reliably finishes within 250 s.
               </p>
             </Section>
 
