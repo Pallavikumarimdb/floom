@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { callerHasScope, resolveAuthCaller } from "@/lib/supabase/auth";
 import yaml from "js-yaml";
@@ -275,8 +275,9 @@ export async function POST(req: NextRequest) {
     resolveMcpForwardOrigin(req.url) || req.url,
   ).toString();
 
-  // Fire app-published email. Best-effort: never fail the publish response.
-  void fireAppPublishedEmail(admin, ownerId, app.name, appUrl, req);
+  // Fire app-published email. after() keeps the serverless function alive
+  // until the promise settles without blocking the publish response.
+  after(fireAppPublishedEmail(admin, ownerId, app.name, appUrl, req));
 
   return NextResponse.json({
     app: {

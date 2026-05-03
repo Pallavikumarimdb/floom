@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import type { EmailOtpType } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { sendEmail } from "@/lib/email/send";
@@ -35,9 +35,10 @@ export async function GET(req: NextRequest) {
   }
 
   // Fire welcome email on first-time email confirmation (type=signup).
-  // Best-effort: never block the redirect on email delivery failure.
+  // after() keeps the serverless function alive until the promise settles
+  // without blocking the redirect response.
   if (type === "signup") {
-    void fireWelcomeEmail(supabase, resolvePublicOrigin(req));
+    after(fireWelcomeEmail(supabase, resolvePublicOrigin(req)));
   }
 
   return NextResponse.redirect(new URL(safeNext, resolvePublicOrigin(req)));
