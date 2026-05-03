@@ -797,7 +797,8 @@ function OutputDisplay({ output }: { output: unknown }) {
   const rows = useMemo(() => extractRows(output), [output]);
 
   if (rows && rows.length > 0) {
-    const keys = Object.keys(rows[0] ?? {});
+    // Union of all keys across every row so heterogeneous shapes don't drop columns.
+    const keys = Array.from(new Set(rows.flatMap((r) => Object.keys(r))));
     const allConsistent = rows.every((r) => keys.every((k) => k in r));
     if (keys.length > 0 && allConsistent) {
       return (
