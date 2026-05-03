@@ -14,7 +14,7 @@
   {
     "kind": "page",
     "title": "Manifest reference",
-    "description": "floom.yaml — all fields and their meaning",
+    "description": "floom.yaml: all fields and their meaning",
     "url": "/docs/manifest"
   },
   {
@@ -56,7 +56,7 @@
   {
     "kind": "page",
     "title": "Connections (Composio)",
-    "description": "77 managed-auth providers — Gmail, Slack, GitHub, Notion...",
+    "description": "77 managed-auth providers: Gmail, Slack, GitHub, Notion...",
     "url": "/docs/connections"
   },
   {
@@ -86,7 +86,7 @@
   {
     "kind": "section",
     "title": "Async runs",
-    "description": "Fire-and-forget with polling — POST without ?wait=true",
+    "description": "Fire-and-forget with polling; POST without ?wait=true",
     "url": "/docs/api#async-runs"
   },
   {
@@ -98,7 +98,7 @@
   {
     "kind": "section",
     "title": "Agent tokens",
-    "description": "Create at floom.dev/tokens — scopes: read, run, publish",
+    "description": "Create at floom.dev/tokens; scopes: read, run, publish",
     "url": "/docs/auth#agent-tokens"
   },
   {
@@ -110,19 +110,19 @@
   {
     "kind": "section",
     "title": "CLI device flow",
-    "description": "floom setup — opens browser, polls until approved",
+    "description": "floom setup: opens browser, polls until approved",
     "url": "/docs/auth#device-flow"
   },
   {
     "kind": "section",
     "title": "Legacy v0.1 manifest",
-    "description": "runtime/entrypoint/handler format — still supported",
+    "description": "runtime/entrypoint/handler format, still supported",
     "url": "/docs/manifest#legacy"
   },
   {
     "kind": "section",
     "title": "x-floom-format extension",
-    "description": "textarea or file — controls browser UI rendering",
+    "description": "textarea or file, controls browser UI rendering",
     "url": "/docs/schemas#extensions"
   },
   {
@@ -140,7 +140,7 @@
   {
     "kind": "section",
     "title": "Composio usage in Python",
-    "description": "ComposioToolSet — connection ID as env var",
+    "description": "ComposioToolSet: connection ID as env var",
     "url": "/docs/connections#usage"
   },
   {
@@ -151,13 +151,13 @@
   },
   {
     "kind": "section",
-    "title": "Secrets — set via CLI",
+    "title": "Secrets: set via CLI",
     "description": "floom secrets set ... --value-stdin",
     "url": "/docs/secrets#cli"
   },
   {
     "kind": "section",
-    "title": "Secrets — set via REST",
+    "title": "Secrets: set via REST",
     "description": "PUT /api/apps/:slug/secrets",
     "url": "/docs/secrets#rest"
   },
@@ -206,7 +206,7 @@
   {
     "kind": "cli-cmd",
     "title": "floom setup",
-    "description": "Authenticate — opens browser, saves token",
+    "description": "Authenticate: opens browser, saves token",
     "url": "/docs/quickstart#setup"
   },
   {
