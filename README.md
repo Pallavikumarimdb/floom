@@ -92,6 +92,16 @@ NEXT_PUBLIC_APP_URL=https://floom.dev
 # E2B (required for production runs; local tests can use explicit fake mode)
 E2B_API_KEY=your-e2b-api-key
 
+# Async execution runtime (off by default)
+FLOOM_ASYNC_RUNTIME=disabled
+FLOOM_WORKER_URL=https://your-preview-or-production-url
+QSTASH_TOKEN=your-upstash-qstash-token
+QSTASH_CURRENT_SIGNING_KEY=your-current-qstash-signing-key
+QSTASH_NEXT_SIGNING_KEY=your-next-qstash-signing-key
+FLOOM_EXECUTION_LEASE_MS=90000
+FLOOM_APP_CONCURRENCY_SOFT_LIMIT=10
+FLOOM_APP_QUEUE_MAX=100
+
 ```
 
 
@@ -219,9 +229,13 @@ def run(inputs: dict) -> dict:
 4. With Supabase env configured, Floom API creates app/version records in Supabase.
 5. App owners store declared secret values through `/api/apps/:slug/secrets`; values are encrypted in `app_secrets`.
 6. Floom runs through E2B when `E2B_API_KEY` is configured.
-7. In fake mode, the runner returns mock output for local development and tests only.
-8. With `E2B_API_KEY`, the runner uploads the entrypoint to E2B, decrypts declared secrets server-side, injects them as E2B environment variables, and invokes the handler.
-9. Floom validates inputs and outputs, stores execution records when Supabase is configured, and renders results.
+7. With `FLOOM_ASYNC_RUNTIME=disabled`, `POST /api/apps/:slug/run` keeps the v0.1 synchronous response.
+8. With `FLOOM_ASYNC_RUNTIME=enabled`, `POST /api/apps/:slug/run` returns `202` with `{ execution_id, status: "queued" }`; callers poll `GET /api/executions/:id` or pass `?wait=true` for best-effort synchronous waiting.
+9. QStash calls `/api/internal/executions/process`; each worker invocation claims a DB lease, starts or polls one E2B sandbox, writes status/progress/events, then requeues when more work remains.
+10. Server-Sent Events on `GET /api/executions/:id` tail `execution_events` from Supabase. E2B stdout/stderr are persisted as internal events by short worker polls; the public SSE stream exposes status/progress snapshots through the DB rather than holding one Vercel function open against E2B.
+11. In fake mode, the runner returns mock output for local development and tests only.
+12. With `E2B_API_KEY`, the runner uploads the entrypoint to E2B, decrypts declared secrets server-side, injects them as E2B environment variables, and invokes the handler.
+13. Floom validates inputs and outputs, stores execution records when Supabase is configured, and renders results.
 
 ## MCP
 

@@ -21,6 +21,7 @@ import { validatePythonRequirementsText } from "@/lib/floom/requirements";
 import { validateJsonSchemaValue } from "@/lib/floom/schema";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { resolveAuthCaller } from "@/lib/supabase/auth";
+import { isAsyncRuntimeEnabled } from "@/lib/floom/executions";
 
 export type JsonObject = Record<string, unknown>;
 
@@ -54,7 +55,8 @@ type FloomToolName =
   | "publish_app"
   | "find_candidate_apps"
   | "get_app"
-  | "run_app";
+  | "run_app"
+  | "get_execution";
 
 const SLUG_RE = /^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$/;
 const MAX_MCP_FILE_COUNT = 500;
@@ -211,7 +213,7 @@ export const floomTools: McpToolDefinition[] = [
   },
   {
     name: "run_app",
-    description: "Run a Floom app with optional JSON inputs. Returns { execution_id, status, output, error }. Private apps require Authorization: Bearer <agent-token>.",
+    description: "Run a Floom app with optional JSON inputs. Returns { execution_id, status, output, error }. Use async=true to return immediately with execution_id; omit async or set false for wait=true compatibility. Private apps require Authorization: Bearer <agent-token>.",
     inputSchema: {
       type: "object",
       properties: {
@@ -222,8 +224,27 @@ export const floomTools: McpToolDefinition[] = [
         inputs: {
           description: "Optional JSON inputs. If the app declares input_schema they must match it; otherwise they pass through as raw JSON.",
         },
+        async: {
+          type: "boolean",
+          description: "If true, return immediately with execution_id instead of waiting for the terminal result.",
+        },
       },
       required: ["slug"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "get_execution",
+    description: "Fetch a Floom execution by execution_id. Returns the same envelope as GET /api/executions/<id>.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        execution_id: {
+          type: "string",
+          description: "The execution UUID returned by run_app or POST /api/apps/<slug>/run.",
+        },
+      },
+      required: ["execution_id"],
       additionalProperties: false,
     },
   },
@@ -266,6 +287,10 @@ async function callFloomToolUnchecked(
 
   if (name === "run_app") {
     return runApp(args, context);
+  }
+
+  if (name === "get_execution") {
+    return getExecution(args, context);
   }
 
   if (name === "auth_status") {
@@ -330,18 +355,30 @@ async function getApp(args: JsonObject, context: McpToolContext): Promise<McpToo
 
 async function runApp(args: JsonObject, context: McpToolContext): Promise<McpToolResult> {
   const slug = requiredSlug(args);
-  const inputs = asObject(args.inputs);
   if (!slug) {
     return errorResult("slug must be lowercase letters, numbers, and hyphens");
   }
 
-  if (!inputs) {
+  // inputs is optional — apps with no required fields accept an empty object.
+  // Match the REST route's behaviour (POST body may omit inputs entirely).
+  const rawInputs = args.inputs;
+  if (rawInputs !== undefined && (typeof rawInputs !== "object" || Array.isArray(rawInputs) || rawInputs === null)) {
     return errorResult("inputs must be an object");
   }
+  const inputs: JsonObject = rawInputs !== undefined ? (rawInputs as JsonObject) : {};
 
   const inputSize = jsonByteLength(inputs);
   if (inputSize === null || inputSize > MAX_INPUT_BYTES) {
     return errorResult("inputs are too large");
+  }
+
+  const asyncRun = args.async === true;
+  if (args.async !== undefined && typeof args.async !== "boolean") {
+    return errorResult("async must be a boolean");
+  }
+
+  if (asyncRun && !isAsyncRuntimeEnabled()) {
+    return errorResult("Async runtime is not enabled on this Floom deployment");
   }
 
   const body = JSON.stringify({ inputs });
@@ -349,13 +386,26 @@ async function runApp(args: JsonObject, context: McpToolContext): Promise<McpToo
     return errorResult("run_app request body is too large");
   }
 
-  return proxyJson(`${context.baseUrl}/api/apps/${encodeURIComponent(slug)}/run`, {
+  const waitParam = asyncRun ? "" : "?wait=true";
+  return proxyJson(`${context.baseUrl}/api/apps/${encodeURIComponent(slug)}/run${waitParam}`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       ...forwardedHeaders(context),
     },
     body,
+  });
+}
+
+async function getExecution(args: JsonObject, context: McpToolContext): Promise<McpToolResult> {
+  const executionId = args.execution_id;
+  if (typeof executionId !== "string" || executionId.length < 8) {
+    return errorResult("execution_id must be a string");
+  }
+
+  return proxyJson(`${context.baseUrl}/api/executions/${encodeURIComponent(executionId)}`, {
+    method: "GET",
+    headers: forwardedHeaders(context),
   });
 }
 
@@ -420,9 +470,11 @@ function getAppContract(): McpToolResult {
       "tarball bundle of the whole app directory rooted at floom.yaml",
       "stock E2B base runtimes such as Python and Node when your command can run there",
       "multi-file projects",
+      "single-file Python (legacy v0.1 mode: runtime + entrypoint + handler)",
       "optional input_schema and optional output_schema",
       "requirements.txt auto-install when present; npm install when package.json is present",
       "stdin plus FLOOM_INPUTS env injection for the same JSON inputs",
+      "async execution handles through POST /run, GET /api/executions/<id>, and MCP get_execution",
       "manifest-declared secret names with owner-managed encrypted secret values; never hardcode credential-looking strings in source, manifests, docs, MCP prompts, or reports",
       "public apps with public: true; private apps when public is omitted or false",
       "legacy v0.1 runtime: python + entrypoint + handler manifests remain supported",
@@ -539,9 +591,18 @@ function getAppContract(): McpToolResult {
     response_shapes: {
       run_app: {
         execution_id: "string",
-        status: "success | failed | timed_out",
+        status: "queued | running | succeeded | failed | timed_out | cancelled | success | failed | timed_out",
         output: "validated JSON when output_schema is declared, parsed JSON when stdout last line is JSON, otherwise { stdout, exit_code }",
-        error: "null | { phase, stderr_tail, exit_code?, elapsed_ms?, detail? }",
+        error: "string | null | { phase, stderr_tail, exit_code?, elapsed_ms?, detail? }",
+      },
+      get_execution: {
+        execution_id: "string",
+        status: "queued | running | succeeded | failed | timed_out | cancelled",
+        output: "object | null",
+        error: "string | null",
+        started_at: "ISO timestamp | null",
+        completed_at: "ISO timestamp | null",
+        progress: "object | null",
       },
       publish_app: {
         app: {
@@ -601,7 +662,13 @@ function getAppContract(): McpToolResult {
     run_tool: {
       name: "run_app",
       requires_authorization_for_private_apps: true,
-      response_envelope: "Read result.output for the app result; the top level contains execution_id, status, output, and error.",
+      response_envelope: "By default MCP calls POST /run?wait=true for compatibility. Set async=true to receive { execution_id, status: 'queued' } immediately, then call get_execution until status is terminal. Read result.output for the app result; the top level contains execution_id, status, output, and error.",
+      async_is_caller_side: true,
+      status_vocabulary: ["queued", "running", "succeeded", "failed", "timed_out", "cancelled"],
+    },
+    execution_tool: {
+      name: "get_execution",
+      response_envelope: "Same JSON shape as GET /api/executions/<id>.",
     },
   });
 }

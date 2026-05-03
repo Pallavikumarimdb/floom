@@ -12,10 +12,17 @@ import {
 } from "@/lib/floom/limits";
 import { reconcileQuotaReservation, reserveDailyQuota } from "@/lib/floom/quota";
 import {
+  appendExecutionEvent,
+  appQueueMax,
+  isAsyncRuntimeEnabled,
+  syncWaitBudgetMs,
+} from "@/lib/floom/executions";
+import {
   getPublicRunAppRateLimitKey,
   getPublicRunRateLimitKey,
   getRunCallerKey,
 } from "@/lib/floom/rate-limit";
+import { publishExecutionProcessMessage } from "@/lib/floom/queue";
 import { readRuntimeDependencies } from "@/lib/floom/requirements";
 import { resolveRuntimeSecrets } from "@/lib/floom/runtime-secrets";
 import {
@@ -23,6 +30,7 @@ import {
   redactSecretInput,
   redactSecretOutput,
 } from "@/lib/floom/schema";
+import { executionSnapshotAfterWait } from "@/lib/floom/execution-worker";
 
 export const maxDuration = 60;
 
@@ -158,17 +166,8 @@ export async function POST(
     }
   }
 
-  const { data: bundleData, error: bundleError } = await admin.storage
-    .from("app-bundles")
-    .download(latestVersion.bundle_path);
-
-  if (bundleError || !bundleData) {
-    return NextResponse.json(
-      { error: "sandbox_unavailable", retry_after: Math.floor(Date.now() / 1000) + 60 },
-      { status: 502 }
-    );
-  }
-
+  // Resolve secrets and redact inputs before branching on async vs sync path.
+  // Both paths need redactedInputs for the execution record.
   const runtimeSecrets = await resolveRuntimeSecrets(
     admin,
     latestVersion.secrets ?? [],
@@ -191,6 +190,97 @@ export async function POST(
   const redactedInputs = inputSchema
     ? redactSecretInput(inputSchema, inputs)
     : redactExactSecretValues(inputs ?? null, Object.values(runtimeSecrets.envs));
+
+  if (isAsyncRuntimeEnabled()) {
+    const queueDepth = await checkAppQueueDepth(admin, app.id);
+    if (!queueDepth.allowed) {
+      return NextResponse.json({ error: queueDepth.error }, { status: queueDepth.status });
+    }
+
+    const { data: execution, error: execError } = await admin
+      .from("executions")
+      .insert({
+        app_id: app.id,
+        version_id: latestVersion.id,
+        caller_user_id: caller?.kind === "user" ? caller.userId : null,
+        caller_agent_token_id: caller?.kind === "agent_token" ? caller.agentTokenId : null,
+        input: redactedInputs,
+        status: "queued",
+      })
+      .select()
+      .single();
+
+    if (execError || !execution) {
+      return NextResponse.json({ error: "Failed to create execution" }, { status: 500 });
+    }
+
+    await appendExecutionEvent(admin, execution.id, "status", { status: "queued" });
+
+    try {
+      const messageId = await publishExecutionProcessMessage({
+        executionId: execution.id,
+        pollCount: 0,
+        baseUrl: req.nextUrl.origin,
+      });
+      const { error: queueMessageError } = await admin
+        .from("executions")
+        .update({ queue_message_id: messageId })
+        .eq("id", execution.id);
+      if (queueMessageError) {
+        throw queueMessageError;
+      }
+    } catch {
+      await admin
+        .from("executions")
+        .update({
+          status: "failed",
+          error: "Failed to enqueue execution",
+          completed_at: new Date().toISOString(),
+        })
+        .eq("id", execution.id);
+      await appendExecutionEvent(admin, execution.id, "status", {
+        status: "failed",
+        error: "Failed to enqueue execution",
+      });
+      return NextResponse.json({ error: "Failed to enqueue execution" }, { status: 500 });
+    }
+
+    if (req.nextUrl.searchParams.get("wait") === "true") {
+      const waited = await executionSnapshotAfterWait(admin, execution.id, syncWaitBudgetMs());
+      if (waited?.terminal) {
+        return NextResponse.json(waited.snapshot);
+      }
+      return NextResponse.json(waited?.snapshot ?? {
+        execution_id: execution.id,
+        status: "queued",
+        output: null,
+        error: null,
+        started_at: null,
+        completed_at: null,
+        progress: null,
+      }, { status: 202 });
+    }
+
+    return NextResponse.json(
+      {
+        execution_id: execution.id,
+        status: "queued",
+      },
+      { status: 202 }
+    );
+  }
+
+  // Fetch bundle
+  const { data: bundleData, error: bundleError } = await admin.storage
+    .from("app-bundles")
+    .download(latestVersion.bundle_path);
+
+  if (bundleError || !bundleData) {
+    return NextResponse.json(
+      { error: "sandbox_unavailable", retry_after: Math.floor(Date.now() / 1000) + 60 },
+      { status: 502 }
+    );
+  }
 
   const { data: execution, error: execError } = await admin
     .from("executions")
@@ -367,6 +457,34 @@ export async function POST(
     output: redactedOutput,
     error: null,
   });
+}
+
+async function checkAppQueueDepth(
+  admin: ReturnType<typeof createAdminClient>,
+  appId: string
+): Promise<
+  | { allowed: true }
+  | {
+      allowed: false;
+      status: number;
+      error: string;
+    }
+> {
+  const { count, error } = await admin
+    .from("executions")
+    .select("id", { count: "exact", head: true })
+    .eq("app_id", appId)
+    .in("status", ["queued", "running"]);
+
+  if (error) {
+    return { allowed: false, status: 503, error: "Run queue check failed" };
+  }
+
+  if ((count ?? 0) >= appQueueMax()) {
+    return { allowed: false, status: 429, error: "Run queue is full" };
+  }
+
+  return { allowed: true };
 }
 
 async function checkPublicRunRateLimit(
