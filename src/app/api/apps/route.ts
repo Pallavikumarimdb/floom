@@ -205,7 +205,7 @@ export async function POST(req: NextRequest) {
           buffer: await fs.readFile(path.join(validated.extractedDir, legacyManifest.entrypoint)),
           kind: "single_file" as const,
           command: null,
-          contentType: "text/x-python",
+          contentType: "application/octet-stream",
           extension: "py",
           dependencies: validated.dependencyConfig
             ? {

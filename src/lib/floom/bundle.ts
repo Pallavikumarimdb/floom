@@ -251,7 +251,14 @@ export async function validateUploadedTarball(
       const requirementsExists = await fs.stat(defaultRequirementsPath).then(() => true).catch(() => false);
       if (requirementsExists) {
         const requirementsText = await fs.readFile(defaultRequirementsPath, "utf8");
-        validatePythonRequirementsText(requirementsText);
+        // Skip validation for comment-only / empty requirements.txt (treat as absent).
+        // A requirements.txt with no real package lines means "no deps" — not an error.
+        const hasPackageLines = requirementsText
+          .split(/\r?\n/)
+          .some((line) => line.trim() !== "" && !line.trim().startsWith("#"));
+        if (hasPackageLines) {
+          validatePythonRequirementsText(requirementsText);
+        }
       }
     }
 
