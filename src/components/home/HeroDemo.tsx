@@ -161,6 +161,54 @@ function tokenizePython(source: string): Token[] {
   return tokens;
 }
 
+/**
+ * The manifest (floom.yaml) — the primary config file users write.
+ * Shown in the BUILD state as the dominant panel. handler.py is supporting code.
+ */
+const MANIFEST_CODE = `name: meeting-action-items
+description: Pull owned tasks out of meeting notes
+handler: handler.py
+
+inputs:
+  - id: transcript
+    label: Meeting notes
+    type: text
+
+outputs:
+  - id: items
+    label: Action items
+    type: list
+`;
+
+/** Minimal YAML tokenizer — just enough for the manifest snippet. */
+function tokenizeYaml(source: string): Token[] {
+  const tokens: Token[] = [];
+  const lines = source.split('\n');
+  for (let li = 0; li < lines.length; li++) {
+    const line = lines[li];
+    if (li > 0) tokens.push({ text: '\n', cls: 'pn' });
+    const keyMatch = line.match(/^(\s*)([\w-]+)(:)(.*)/);
+    if (keyMatch) {
+      const [, indent, key, colon, rest] = keyMatch;
+      if (indent) tokens.push({ text: indent, cls: 'pn' });
+      tokens.push({ text: key, cls: 'kw' });
+      tokens.push({ text: colon, cls: 'pn' });
+      if (rest) tokens.push({ text: rest, cls: 'str' });
+    } else if (line.match(/^\s*-/)) {
+      const dashMatch = line.match(/^(\s*-\s*)(.*)/);
+      if (dashMatch) {
+        tokens.push({ text: dashMatch[1], cls: 'pn' });
+        tokens.push({ text: dashMatch[2], cls: 'vr' });
+      } else {
+        tokens.push({ text: line, cls: 'pn' });
+      }
+    } else {
+      tokens.push({ text: line, cls: 'pn' });
+    }
+  }
+  return tokens;
+}
+
 function renderTokens(tokens: Token[], cap: number): React.ReactElement[] {
   const out: React.ReactElement[] = [];
   let emitted = 0;
@@ -612,10 +660,18 @@ interface EditorProps {
 }
 
 function EditorSurface({ active, cycle, reducedMotion }: EditorProps) {
-  const codeCap = useTypewriter(HANDLER_CODE, active, cycle, 14, reducedMotion);
+  // Manifest types first; handler follows once manifest is done
+  const manifestCap = useTypewriter(MANIFEST_CODE, active, cycle, 22, reducedMotion);
+  const handlerActive = active && (reducedMotion || manifestCap >= MANIFEST_CODE.length);
+  const codeCap = useTypewriter(HANDLER_CODE, handlerActive, cycle, 14, reducedMotion);
 
-  const tokens = useMemo(() => tokenizePython(HANDLER_CODE), []);
-  const lineCount = useMemo(
+  const manifestTokens = useMemo(() => tokenizeYaml(MANIFEST_CODE), []);
+  const handlerTokens = useMemo(() => tokenizePython(HANDLER_CODE), []);
+  const manifestLineCount = useMemo(
+    () => countLines(MANIFEST_CODE, manifestCap || MANIFEST_CODE.length),
+    [manifestCap],
+  );
+  const handlerLineCount = useMemo(
     () => countLines(HANDLER_CODE, codeCap || HANDLER_CODE.length),
     [codeCap],
   );
@@ -624,48 +680,49 @@ function EditorSurface({ active, cycle, reducedMotion }: EditorProps) {
 
   return (
     <div style={surfaceStyle} aria-hidden={!active}>
-      <div style={EDITOR_GRID} data-hd="editor-grid">
-        <aside style={SIDEBAR_STYLE} aria-hidden="true" data-hd="sidebar">
-          <div style={SIDEBAR_SECTION}>my-app</div>
-          <div style={{ ...SIDEBAR_ITEM, ...SIDEBAR_ITEM_ACTIVE }}>handler.py</div>
-          <div style={SIDEBAR_ITEM}>floom.yaml</div>
-          <div style={SIDEBAR_ITEM}>README.md</div>
-        </aside>
-
-        <div style={MAIN_PANE}>
-          <div style={EDITOR_PANE} data-hd="editor-pane">
-            <div style={TAB_ROW}>
-              <div style={{ ...TAB_STYLE, ...TAB_ACTIVE }}>handler.py</div>
-            </div>
-            <div style={GUTTER_WRAP}>
-              <div style={GUTTER}>
-                {Array.from({ length: Math.max(lineCount, 1) }).map((_, i) => (
-                  <span key={i}>{i + 1}</span>
-                ))}
-              </div>
-              <pre style={CODE_PRE}>
-                {renderTokens(tokens, codeCap)}
-                {active && !reducedMotion && codeCap < HANDLER_CODE.length && (
-                  <span style={CARET_STYLE} aria-hidden="true" />
-                )}
-              </pre>
-            </div>
+      {/* BUILD: manifest primary (65%) + handler secondary (35%) */}
+      <div style={BUILD_SPLIT_GRID} data-hd="build-split-grid">
+        {/* PRIMARY: floom.yaml — the config users write */}
+        <div style={BUILD_PRIMARY_PANE} data-hd="manifest-pane">
+          <div style={TAB_ROW}>
+            <div style={{ ...TAB_STYLE, ...TAB_ACTIVE, fontWeight: 700 }}>floom.yaml</div>
           </div>
-
-          <div style={TERMINAL_PANE}>
-            <div style={TERMINAL_LINE}>
-              <span style={PROMPT_SIGN}>&gt;</span>
-              <span style={{ color: '#8b8680' }}>claude code &middot; meeting-action-items</span>
+          <div style={GUTTER_WRAP}>
+            <div style={GUTTER}>
+              {Array.from({ length: Math.max(manifestLineCount, 1) }).map((_, i) => (
+                <span key={i}>{i + 1}</span>
+              ))}
             </div>
-            {active && !reducedMotion && codeCap >= HANDLER_CODE.length && (
-              <div style={{ ...TERMINAL_LINE, color: '#8b8680' }}>
-                <span style={PROMPT_SIGN}>&gt;</span>
-                <span>
-                  npx @floomhq/cli@latest publish ./my-app
-                </span>
-              </div>
-            )}
+            <pre style={{ ...CODE_PRE, fontSize: 13 }}>
+              {renderTokens(manifestTokens, manifestCap)}
+              {active && !reducedMotion && manifestCap < MANIFEST_CODE.length && (
+                <span style={CARET_STYLE} aria-hidden="true" />
+              )}
+            </pre>
           </div>
+        </div>
+
+        {/* SECONDARY: handler.py — supporting code, 60% opacity + smaller font */}
+        <div style={{ ...BUILD_SECONDARY_PANE, opacity: 0.55 }} data-hd="handler-pane">
+          <div style={{ ...TAB_ROW, background: '#ece8de' }}>
+            <div style={{ ...TAB_STYLE, fontSize: 10.5, color: '#8b8680' }}>handler.py</div>
+          </div>
+          <div style={{ ...GUTTER_WRAP, flex: 1 }}>
+            <div style={{ ...GUTTER, fontSize: 10.5 }}>
+              {Array.from({ length: Math.max(handlerLineCount, 1) }).map((_, i) => (
+                <span key={i}>{i + 1}</span>
+              ))}
+            </div>
+            <pre style={{
+              ...CODE_PRE,
+              fontSize: 11,
+              WebkitMaskImage: 'linear-gradient(to bottom, #000 0, #000 65%, transparent 100%)',
+              maskImage: 'linear-gradient(to bottom, #000 0, #000 65%, transparent 100%)',
+            }}>
+              {renderTokens(handlerTokens, reducedMotion ? HANDLER_CODE.length : codeCap)}
+            </pre>
+          </div>
+          <div style={BUILD_HANDLER_CLIP}>&hellip; handler continues</div>
         </div>
       </div>
     </div>
@@ -769,88 +826,132 @@ function DeploySurface({
   return (
     <div style={surfaceStyle} aria-hidden={!active}>
       <div style={DEPLOY_GRID} data-hd="deploy-grid">
-        {/* Left column: the publish timeline, full-height. */}
-        <div style={DEPLOY_LEFT}>
-          <div style={DEPLOY_HEADER_ROW}>
-            <span style={DEPLOY_HEADER_LABEL}>
-              {done ? 'PREVIEW READY' : 'PUBLISHING'}
-            </span>
-            <span style={DEPLOY_HEADER_PCT}>{progress}%</span>
-          </div>
-
-          <div style={DEPLOY_SLASH_ROW}>
-            <span style={DEPLOY_PROMPT}>$</span>
-            <span style={DEPLOY_SLASH_TEXT}>
-              {SLASH.slice(0, slashChars)}
-            </span>
-            {active && !reducedMotion && slashChars < SLASH.length && (
-              <span style={DEPLOY_CARET} aria-hidden="true" />
-            )}
-          </div>
-
-          <div style={DEPLOY_BAR_TRACK_WRAP}>
-            <div style={DEPLOY_BAR_TRACK}>
-              <div style={{ ...DEPLOY_BAR_FILL, width: `${progress}%` }} />
+        {/* Left column: hero URL card (visible when done) + muted build log */}
+        <div style={{ ...DEPLOY_LEFT, position: 'relative' }}>
+          {/* Pre-deploy: command + progress bar — fades out once done */}
+          <div
+            style={{
+              ...DEPLOY_PRE_WRAP,
+              opacity: done ? 0 : 1,
+              transition: reducedMotion ? 'none' : 'opacity .3s ease',
+              pointerEvents: done ? 'none' : 'auto',
+            }}
+            aria-hidden={done}
+          >
+            <div style={DEPLOY_HEADER_ROW}>
+              <span style={DEPLOY_HEADER_LABEL}>PUBLISHING</span>
+              <span style={DEPLOY_HEADER_PCT}>{progress}%</span>
+            </div>
+            <div style={DEPLOY_SLASH_ROW}>
+              <span style={DEPLOY_PROMPT}>$</span>
+              <span style={DEPLOY_SLASH_TEXT}>
+                {SLASH.slice(0, slashChars)}
+              </span>
+              {active && !reducedMotion && slashChars < SLASH.length && (
+                <span style={DEPLOY_CARET} aria-hidden="true" />
+              )}
+            </div>
+            <div style={DEPLOY_BAR_TRACK_WRAP}>
+              <div style={DEPLOY_BAR_TRACK}>
+                <div style={{ ...DEPLOY_BAR_FILL, width: `${progress}%` }} />
+              </div>
             </div>
           </div>
 
-          <ul style={DEPLOY_STEPS_LIST}>
-            {DEPLOY_STEPS.map((label, i) => {
-              const isComplete = stepIndex > i;
-              const isActive = stepIndex === i + 1 && !isComplete;
-              const inFlight = !isComplete && !isActive;
-              return (
-                <li
-                  key={label}
-                  style={{
-                    ...DEPLOY_STEP_ITEM,
-                    opacity: inFlight ? 0.45 : 1,
-                    transition: reducedMotion ? 'none' : 'opacity .2s ease',
-                  }}
-                >
-                  <span
-                    style={{
-                      ...DEPLOY_STEP_MARK,
-                      background: isComplete ? '#d1fae5' : isActive ? '#fef3c7' : '#f0ede5',
-                      color: isComplete ? '#047857' : isActive ? '#b45309' : '#a8a49b',
-                      borderColor: isComplete ? '#a7f3d0' : isActive ? '#fde68a' : '#e8e6e0',
-                    }}
-                  >
-                    {isComplete ? '✓' : isActive ? '•' : ' '}
-                  </span>
-                  <span style={DEPLOY_STEP_LABEL}>{label}</span>
-                </li>
-              );
-            })}
-          </ul>
-
+          {/* HERO: large URL card — the visual payoff once deployment completes */}
           <div
             style={{
-              ...DEPLOY_URL_CARD,
+              ...DEPLOY_HERO_CARD,
               opacity: done ? 1 : 0,
-              transform: done ? 'translateY(0)' : 'translateY(4px)',
+              transform: done
+                ? 'translateY(0) scale(1)'
+                : 'translateY(10px) scale(0.97)',
               transition: reducedMotion
                 ? 'none'
-                : 'opacity .25s ease, transform .3s cubic-bezier(0.22, 0.9, 0.28, 1)',
+                : 'opacity .4s ease .05s, transform .45s cubic-bezier(0.22, 0.9, 0.28, 1) .05s',
+              pointerEvents: done ? 'auto' : 'none',
             }}
             aria-hidden={!done}
           >
-            <span style={LIVE_DOT_WRAP} aria-hidden="true">
-              <span
-                style={{
-                  ...LIVE_DOT,
-                  animation:
-                    reducedMotion || !done
-                      ? 'none'
-                      : 'hd-live-pulse 1.6s ease-out infinite',
-                }}
-              />
-              <span style={LIVE_DOT_CORE} />
-            </span>
-            <div style={DEPLOY_URL_TEXT_WRAP}>
-              <div style={DEPLOY_URL_MAIN}>/p/meeting-action-items</div>
-              <div style={DEPLOY_URL_META_CARD}>Live preview &middot; HTTPS &middot; edge</div>
+            <div style={DEPLOY_HERO_PILL}>
+              <span style={DEPLOY_HERO_PILL_DOT} aria-hidden="true">
+                <span
+                  style={{
+                    ...LIVE_DOT,
+                    animation:
+                      reducedMotion || !done
+                        ? 'none'
+                        : 'hd-live-pulse 1.6s ease-out infinite',
+                  }}
+                />
+                <span style={LIVE_DOT_CORE} />
+              </span>
+              DEPLOYED
             </div>
+            <div style={DEPLOY_HERO_URL}>/p/meeting-action-items</div>
+            <div style={DEPLOY_HERO_META}>
+              Deployed in 1.2s · HTTPS · edge
+            </div>
+          </div>
+
+          {/* Build log — muted supporting context, shrinks once card is up */}
+          <div
+            style={{
+              marginTop: 'auto',
+              opacity: done ? 0.4 : 0.85,
+              transition: reducedMotion ? 'none' : 'opacity .4s ease',
+            }}
+          >
+            <ul style={DEPLOY_STEPS_LIST}>
+              {DEPLOY_STEPS.map((label, i) => {
+                const isComplete = stepIndex > i;
+                const isActive = stepIndex === i + 1 && !isComplete;
+                const inFlight = !isComplete && !isActive;
+                return (
+                  <li
+                    key={label}
+                    style={{
+                      ...DEPLOY_STEP_ITEM,
+                      fontSize: done ? 11.5 : 13,
+                      opacity: inFlight ? 0.45 : 1,
+                      transition: reducedMotion
+                        ? 'none'
+                        : 'opacity .2s ease, font-size .2s ease',
+                    }}
+                  >
+                    <span
+                      style={{
+                        ...DEPLOY_STEP_MARK,
+                        width: done ? 18 : 22,
+                        height: done ? 18 : 22,
+                        fontSize: done ? 10 : 12,
+                        background: isComplete
+                          ? '#d1fae5'
+                          : isActive
+                            ? '#fef3c7'
+                            : '#f0ede5',
+                        color: isComplete
+                          ? '#047857'
+                          : isActive
+                            ? '#b45309'
+                            : '#a8a49b',
+                        borderColor: isComplete
+                          ? '#a7f3d0'
+                          : isActive
+                            ? '#fde68a'
+                            : '#e8e6e0',
+                        transition: reducedMotion
+                          ? 'none'
+                          : 'width .2s ease, height .2s ease',
+                      }}
+                    >
+                      {isComplete ? '✓' : isActive ? '•' : ' '}
+                    </span>
+                    <span style={DEPLOY_STEP_LABEL}>{label}</span>
+                  </li>
+                );
+              })}
+            </ul>
           </div>
         </div>
 
@@ -875,7 +976,6 @@ function DeploySurface({
   );
 }
 
-// -----------------------------------------------------------------------------
 // RunSurfaceDemo — consumer ChatGPT-style payoff
 // NOTE: This is the hero demo's internal RunSurface component (NOT the app
 // runner at src/components/runner/RunSurface.tsx). Renamed to RunSurfaceDemo
@@ -1015,6 +1115,19 @@ function RunSurfaceDemo({
             >
               {thinking ? 'Running…' : 'Run'}
             </button>
+
+            {/* API meta — fills the left panel height and teaches users
+                that this app is also callable via REST. */}
+            <div style={RUN_API_META}>
+              <div style={RUN_API_META_LABEL}>API endpoint</div>
+              <div style={RUN_API_ENDPOINT}>
+                <span style={RUN_API_METHOD}>POST</span>
+                <code style={RUN_API_PATH}>/api/apps/meeting-action-items/run</code>
+              </div>
+              <pre style={RUN_API_SNIPPET}>{`curl -X POST \\
+  /api/apps/meeting-action-items/run \\
+  -d '{"transcript": "..."}'`}</pre>
+            </div>
           </div>
 
           {/* RIGHT — output column (3fr) -------------------------------- */}
@@ -1546,6 +1659,102 @@ const DEPLOY_RIGHT: CSSProperties = {
   background: '#faf8f3',
 };
 
+// Pre-deploy wrapper — command + progress bar, fades out once done
+const DEPLOY_PRE_WRAP: CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 14,
+};
+
+// Hero card: deployment URL shown large and celebratory once done.
+const DEPLOY_HERO_CARD: CSSProperties = {
+  background: '#ffffff',
+  border: '1.5px solid #a7f3d0',
+  borderRadius: 18,
+  padding: '20px 24px',
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 8,
+  boxShadow:
+    '0 12px 40px -16px rgba(4, 120, 87, 0.28), 0 2px 8px -4px rgba(4, 120, 87, 0.10)',
+};
+
+const DEPLOY_HERO_PILL: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 8,
+  background: '#d1fae5',
+  color: '#047857',
+  border: '1px solid #a7f3d0',
+  borderRadius: 999,
+  padding: '4px 12px 4px 8px',
+  fontSize: 11,
+  fontWeight: 700,
+  letterSpacing: '0.10em',
+  textTransform: 'uppercase',
+  width: 'fit-content',
+};
+
+const DEPLOY_HERO_PILL_DOT: CSSProperties = {
+  position: 'relative',
+  display: 'inline-flex',
+  width: 10,
+  height: 10,
+  flexShrink: 0,
+};
+
+const DEPLOY_HERO_URL: CSSProperties = {
+  fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+  fontSize: 20,
+  fontWeight: 700,
+  color: '#047857',
+  letterSpacing: '-0.01em',
+  lineHeight: 1.2,
+};
+
+const DEPLOY_HERO_META: CSSProperties = {
+  fontFamily: "'Inter', system-ui, sans-serif",
+  fontSize: 12,
+  color: '#6a665f',
+  letterSpacing: '0.01em',
+};
+
+// BUILD split-pane: manifest primary (65%), handler secondary (35%)
+const BUILD_SPLIT_GRID: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: '65fr 35fr',
+  height: '100%',
+  background: '#faf8f3',
+  color: '#2a2825',
+  fontFamily: "'JetBrains Mono', 'SFMono-Regular', Menlo, Consolas, monospace",
+};
+
+const BUILD_PRIMARY_PANE: CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  minHeight: 0,
+  borderRight: '1px solid #ece8de',
+  background: '#faf8f3',
+};
+
+const BUILD_SECONDARY_PANE: CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  minHeight: 0,
+  background: '#f0ede5',
+  position: 'relative',
+};
+
+const BUILD_HANDLER_CLIP: CSSProperties = {
+  padding: '6px 12px 8px',
+  fontSize: 10.5,
+  color: '#a8a49b',
+  fontStyle: 'italic',
+  borderTop: '1px solid #ece8de',
+  background: '#ece8de',
+  flexShrink: 0,
+};
+
 const LIVE_DOT_WRAP: CSSProperties = {
   position: 'relative',
   display: 'inline-flex',
@@ -1771,6 +1980,64 @@ const RUN_BUTTON: CSSProperties = {
   fontFamily: "'Inter', sans-serif",
   width: '100%',
   letterSpacing: '-0.005em',
+};
+
+// API meta block — sits below the Run button in the left panel to fill
+// the empty space and teach users the endpoint at the same time.
+const RUN_API_META: CSSProperties = {
+  marginTop: 'auto',
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 6,
+  paddingTop: 14,
+  borderTop: '1px solid #e4e1d8',
+};
+
+const RUN_API_META_LABEL: CSSProperties = {
+  fontSize: 10,
+  textTransform: 'uppercase',
+  letterSpacing: '0.10em',
+  color: '#a8a49b',
+  fontWeight: 600,
+};
+
+const RUN_API_ENDPOINT: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 6,
+};
+
+const RUN_API_METHOD: CSSProperties = {
+  fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+  fontSize: 10,
+  fontWeight: 700,
+  color: '#047857',
+  background: '#ecfdf5',
+  border: '1px solid #d1fae5',
+  borderRadius: 3,
+  padding: '1px 5px',
+  flexShrink: 0,
+};
+
+const RUN_API_PATH: CSSProperties = {
+  fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+  fontSize: 10,
+  color: '#6a665f',
+  wordBreak: 'break-all',
+};
+
+const RUN_API_SNIPPET: CSSProperties = {
+  margin: 0,
+  padding: '8px 10px',
+  background: '#f5f4f0',
+  border: '1px solid #e8e6e0',
+  borderRadius: 6,
+  fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+  fontSize: 9.5,
+  color: '#8b8680',
+  lineHeight: 1.6,
+  whiteSpace: 'pre',
+  overflow: 'hidden',
 };
 
 const RUN_OUTPUT_HEADER: CSSProperties = {
