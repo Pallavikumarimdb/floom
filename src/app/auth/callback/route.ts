@@ -46,7 +46,7 @@ export async function GET(req: NextRequest) {
   // after() keeps the serverless function alive until the promise settles
   // without blocking the redirect response.
   if (type === "signup") {
-    after(fireWelcomeEmail(supabase, publicOrigin));
+    after(maybeFireSignupWelcomeEmail(supabase, publicOrigin));
   }
 
   // Fire welcome email for Google OAuth (and other provider) first-time signups.
@@ -59,7 +59,43 @@ export async function GET(req: NextRequest) {
   return NextResponse.redirect(new URL(safeNext, publicOrigin));
 }
 
-async function fireWelcomeEmail(
+// Shared: send welcome email and mark welcome_email_sent_at in user_metadata.
+// Returns true if the email was sent, false if skipped (already sent).
+// source: caller label for logging ("email-otp" | "oauth").
+async function sendWelcomeEmailIdempotent(
+  user: { id: string; email: string; user_metadata?: Record<string, unknown> },
+  publicOrigin: string,
+  _source: string,
+): Promise<boolean> {
+  if (user.user_metadata?.welcome_email_sent_at) return false;
+
+  const name =
+    (user.user_metadata?.full_name as string | undefined) ??
+    (user.user_metadata?.name as string | undefined) ??
+    null;
+
+  const { subject, html, text } = renderWelcomeEmail({
+    name,
+    publicUrl: publicOrigin,
+  });
+
+  await sendEmail({ to: user.email, subject, html, text });
+
+  const admin = createAdminClient();
+  await admin.auth.admin.updateUserById(user.id, {
+    user_metadata: {
+      ...user.user_metadata,
+      welcome_email_sent_at: new Date().toISOString(),
+    },
+  });
+
+  return true;
+}
+
+// For email-OTP signups (type=signup confirmation link).
+// Idempotency guard: re-clicking a confirmation link must not fire a second
+// welcome email. Mirrors the OAuth path.
+async function maybeFireSignupWelcomeEmail(
   supabase: Awaited<ReturnType<typeof createClient>>,
   publicOrigin: string,
 ): Promise<void> {
@@ -69,17 +105,11 @@ async function fireWelcomeEmail(
     } = await supabase.auth.getUser();
     if (!user?.email) return;
 
-    const name =
-      (user.user_metadata?.full_name as string | undefined) ??
-      (user.user_metadata?.name as string | undefined) ??
-      null;
-
-    const { subject, html, text } = renderWelcomeEmail({
-      name,
-      publicUrl: publicOrigin,
-    });
-
-    await sendEmail({ to: user.email, subject, html, text });
+    await sendWelcomeEmailIdempotent(
+      user as { id: string; email: string; user_metadata?: Record<string, unknown> },
+      publicOrigin,
+      "email-otp",
+    );
   } catch (err) {
     // Welcome email failures must never surface to the user.
     console.error("[auth:callback] welcome email error:", err);
@@ -103,33 +133,15 @@ async function maybeFireOAuthWelcomeEmail(
     } = await supabase.auth.getUser();
     if (!user?.email || !user.created_at) return;
 
-    // Idempotency guard: skip if we already sent the welcome email.
-    if (user.user_metadata?.welcome_email_sent_at) return;
-
     const createdMs = new Date(user.created_at).getTime();
     const isNewUser = Date.now() - createdMs < 30_000;
     if (!isNewUser) return;
 
-    const name =
-      (user.user_metadata?.full_name as string | undefined) ??
-      (user.user_metadata?.name as string | undefined) ??
-      null;
-
-    const { subject, html, text } = renderWelcomeEmail({
-      name,
-      publicUrl: publicOrigin,
-    });
-
-    await sendEmail({ to: user.email, subject, html, text });
-
-    // Mark as sent so re-bounces within the 30s window don't re-fire.
-    const admin = createAdminClient();
-    await admin.auth.admin.updateUserById(user.id, {
-      user_metadata: {
-        ...user.user_metadata,
-        welcome_email_sent_at: new Date().toISOString(),
-      },
-    });
+    await sendWelcomeEmailIdempotent(
+      user as { id: string; email: string; user_metadata?: Record<string, unknown> },
+      publicOrigin,
+      "oauth",
+    );
   } catch (err) {
     console.error("[auth:callback] oauth welcome email error:", err);
   }
