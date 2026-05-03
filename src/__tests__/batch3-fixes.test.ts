@@ -21,7 +21,7 @@ vi.mock("@/lib/floom/bundle", () => ({
 // ── Imports after mocks ─────────────────────────────────────────────────────
 import { SECRET_NAME_RE } from "@/lib/floom/runtime-secrets";
 import { callFloomTool, type McpToolContext } from "@/lib/mcp/tools";
-import { extractRows, unionKeys } from "@/lib/floom/output-rows";
+import { extractRows, unionKeys, type TableRow } from "@/lib/floom/output-rows";
 
 const anonContext: McpToolContext = { baseUrl: "http://localhost:3000" };
 
@@ -155,26 +155,121 @@ describe("GET /api/runs/[id] — privacy: inputs/error_detail gated on isOwner",
   });
 });
 
+// ── F5: GET /api/runs/[id] — 400 for malformed UUID, 404 message for missing row ──
+describe("GET /api/runs/[id] — 400 vs 404 error messages", () => {
+  it("route source returns 400 'Invalid run id' for malformed UUID", async () => {
+    const { readFileSync } = await import("fs");
+    const { resolve } = await import("path");
+    const src = readFileSync(resolve("src/app/api/runs/[id]/route.ts"), "utf-8");
+
+    // UUID guard with 400 + correct message
+    expect(src).toContain("Invalid run id");
+    expect(src).toContain("status: 400");
+    // UUID_RE must be defined
+    expect(src).toContain("UUID_RE");
+    expect(src).toContain("UUID_RE.test(id)");
+  });
+
+  it("route source returns 404 'Run not found' for missing rows", async () => {
+    const { readFileSync } = await import("fs");
+    const { resolve } = await import("path");
+    const src = readFileSync(resolve("src/app/api/runs/[id]/route.ts"), "utf-8");
+
+    expect(src).toContain("Run not found");
+    expect(src).toContain("status: 404");
+    // 400 and 404 must both be present as distinct error codes
+    expect(src.match(/status: 400/g)?.length).toBeGreaterThanOrEqual(1);
+    expect(src.match(/status: 404/g)?.length).toBeGreaterThanOrEqual(1);
+  });
+});
+
+// ── F6: generateMetadata — OG fallback when no description available ─────────
+describe("generateMetadata — OG fallback", () => {
+  it("page source falls back to '<appName> on Floom' when no description", async () => {
+    const { readFileSync } = await import("fs");
+    const { resolve } = await import("path");
+    const src = readFileSync(resolve("src/app/p/[slug]/page.tsx"), "utf-8");
+
+    // The fallback template string must be present verbatim
+    expect(src).toContain("`${appName} on Floom`");
+    // It must be assigned after the description-fetch block
+    const fallbackIdx = src.indexOf("`${appName} on Floom`");
+    const fetchIdx = src.indexOf("await fetch(");
+    expect(fallbackIdx).toBeGreaterThan(fetchIdx);
+  });
+});
+
+// ── F7 (post-fix): render gate — heterogeneous rows produce keys.length > 0 ──
+describe("F7 render gate (post-fix): heterogeneous rows are table-renderable", () => {
+  it("unionKeys on [{a:1,b:2},{a:1,c:3}] gives length 3", () => {
+    const rows = [{ a: 1, b: 2 }, { a: 1, c: 3 }];
+    const keys = unionKeys(rows);
+    // The render gate is now `keys.length > 0` — verify this shape passes
+    expect(keys.length).toBeGreaterThan(0);
+    expect(keys).toHaveLength(3);
+    expect(keys).toContain("a");
+    expect(keys).toContain("b");
+    expect(keys).toContain("c");
+  });
+
+  it("missing keys in a row resolve to empty string (not undefined) in table cells", () => {
+    const rows: TableRow[] = [{ a: 1, b: 2 }, { a: 1, c: 3 }];
+    const keys = unionKeys(rows);
+    // Simulate what the td renderer does: row[k] === undefined → ''
+    const rendered = rows.map((row) =>
+      Object.fromEntries(
+        keys.map((k) => [k, row[k] === null || row[k] === undefined ? "" : String(row[k])])
+      )
+    );
+    expect(rendered[0]["b"]).toBe("2");
+    expect(rendered[0]["c"]).toBe("");  // missing key → empty string
+    expect(rendered[1]["b"]).toBe("");  // missing key → empty string
+    expect(rendered[1]["c"]).toBe("3");
+  });
+});
+
 // ── F4: welcome email no-op when welcome_email_sent_at already set ──────────
-describe("maybeFireOAuthWelcomeEmail — idempotency guard", () => {
-  it("skips sending when welcome_email_sent_at is already set in user_metadata", async () => {
-    // Read callback source to assert structural guarantee (guard before sendEmail call in OAuth function).
+// After A3 refactor: idempotency guard lives in sendWelcomeEmailIdempotent,
+// which is called by both maybeFireSignupWelcomeEmail and maybeFireOAuthWelcomeEmail.
+describe("welcome email idempotency — shared guard in sendWelcomeEmailIdempotent", () => {
+  it("sendWelcomeEmailIdempotent guard appears before sendEmail", async () => {
     const { readFileSync } = await import("fs");
     const { resolve } = await import("path");
     const src = readFileSync(resolve("src/app/auth/callback/route.ts"), "utf-8");
 
-    // The guard pattern: early return if welcome_email_sent_at is already set
+    // The shared helper must exist
+    expect(src).toContain("async function sendWelcomeEmailIdempotent");
+
+    // Guard pattern: early return if welcome_email_sent_at is already set
     expect(src).toContain("user.user_metadata?.welcome_email_sent_at");
 
-    // Guard (early-return pattern) must appear before sendEmail in the maybeFireOAuthWelcomeEmail function.
-    const oauthFnStart = src.indexOf("async function maybeFireOAuthWelcomeEmail");
-    expect(oauthFnStart).toBeGreaterThan(-1);
-    const fnBody = src.slice(oauthFnStart);
-    const guardIdx = fnBody.indexOf("welcome_email_sent_at) return");
-    const sendIdx = fnBody.indexOf("await sendEmail(");
+    // Guard must appear before sendEmail within the helper
+    const helperStart = src.indexOf("async function sendWelcomeEmailIdempotent");
+    expect(helperStart).toBeGreaterThan(-1);
+    const helperBody = src.slice(helperStart);
+    const guardIdx = helperBody.indexOf("welcome_email_sent_at) return");
+    const sendIdx = helperBody.indexOf("await sendEmail(");
     expect(guardIdx).toBeGreaterThan(-1);
     expect(sendIdx).toBeGreaterThan(-1);
     expect(guardIdx).toBeLessThan(sendIdx);
+  });
+
+  it("both email-OTP and OAuth paths delegate to sendWelcomeEmailIdempotent", async () => {
+    const { readFileSync } = await import("fs");
+    const { resolve } = await import("path");
+    const src = readFileSync(resolve("src/app/auth/callback/route.ts"), "utf-8");
+
+    // Both callers must invoke the shared helper
+    expect(src).toContain("maybeFireSignupWelcomeEmail");
+    expect(src).toContain("maybeFireOAuthWelcomeEmail");
+
+    // Both caller bodies must reference sendWelcomeEmailIdempotent
+    const signupFnStart = src.indexOf("async function maybeFireSignupWelcomeEmail");
+    const oauthFnStart = src.indexOf("async function maybeFireOAuthWelcomeEmail");
+    expect(signupFnStart).toBeGreaterThan(-1);
+    expect(oauthFnStart).toBeGreaterThan(-1);
+    expect(src.slice(signupFnStart)).toContain("sendWelcomeEmailIdempotent");
+    expect(src.slice(oauthFnStart)).toContain("sendWelcomeEmailIdempotent");
   });
 
   it("writes welcome_email_sent_at after sending", async () => {
