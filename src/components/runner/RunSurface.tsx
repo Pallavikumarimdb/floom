@@ -774,8 +774,7 @@ function OutputDisplay({ output }: { output: unknown }) {
   if (rows && rows.length > 0) {
     // Union of all keys across every row so heterogeneous shapes don't drop columns.
     const keys = unionKeys(rows);
-    const allConsistent = rows.every((r) => keys.every((k) => k in r));
-    if (keys.length > 0 && allConsistent) {
+    if (keys.length > 0) {
       return (
         <div style={{ overflowX: 'auto', maxHeight: 400, overflow: 'auto', borderRadius: 8, border: '1px solid var(--line)', background: 'var(--card)' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
