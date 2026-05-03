@@ -62,7 +62,16 @@ const HERO_SUBHEAD: Record<string, string> = {
     'Paste meeting notes. Get a structured list of action items — task, owner, due date.',
 };
 
-export default function AppPermalinkPage() { // exported as default so the server page can dynamic-import without renaming
+export interface PermalinkInitialApp {
+  id: string;
+  slug: string;
+  name: string;
+  handler?: string | null;
+  input_schema?: Record<string, unknown> | null;
+  public?: boolean;
+}
+
+export default function AppPermalinkPage({ initialApp }: { initialApp?: PermalinkInitialApp }) { // exported as default so the server page can dynamic-import without renaming
   const params = useParams();
   const slug = params?.slug as string | undefined;
   const searchParams = useSearchParams();
@@ -74,9 +83,45 @@ export default function AppPermalinkPage() { // exported as default so the serve
   const { data: session } = useSession();
   const sessionUserId = session?.user?.id ?? null;
 
-  const [app, setApp] = useState<AppDetail | null>(null);
+  const [app, setApp] = useState<AppDetail | null>(() => {
+    if (!initialApp) return null;
+    // Normalize server-prefetched data into the AppDetail shape so we
+    // skip the client-side fetch on first paint.
+    const handlerKey = initialApp.handler ?? 'run';
+    const schema = (initialApp.input_schema ?? null) as
+      | { properties?: Record<string, { type?: string; title?: string; description?: string }>; required?: ReadonlyArray<string> }
+      | null;
+    const inputs = schema?.properties
+      ? Object.entries(schema.properties).map(([name, prop]) => ({
+          name,
+          type: prop.type ?? 'string',
+        }))
+      : [];
+    return {
+      id: initialApp.id,
+      slug: initialApp.slug,
+      name: initialApp.name,
+      description: '',
+      public: initialApp.public ?? false,
+      manifest: {
+        name: initialApp.name,
+        actions: {
+          [handlerKey]: {
+            label: initialApp.name,
+            description: '',
+            inputs,
+          },
+        },
+        primary_action: handlerKey,
+        secrets_needed: [],
+        capabilities: {},
+      },
+      version: '0.1.0',
+      author_display: '@floom',
+    };
+  });
   const [summary, setSummary] = useState<ReviewSummary | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!initialApp);
   const [notFound, setNotFound] = useState(false);
   const [loadFailure, setLoadFailure] = useState<PermalinkLoadOutcome | null>(null);
   const [shareModalOpen, setShareModalOpen] = useState(false);

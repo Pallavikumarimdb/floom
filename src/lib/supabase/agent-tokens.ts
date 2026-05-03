@@ -5,6 +5,7 @@ export type AgentTokenRecord = {
   id: string;
   owner_id: string;
   scopes: string[];
+  name: string | null;
 };
 
 function tokenPepper() {
@@ -32,7 +33,7 @@ export async function resolveAgentToken(
   const tokenHash = hashAgentToken(token);
   const { data, error } = await admin
     .from("agent_tokens")
-    .select("id, owner_id, scopes")
+    .select("id, owner_id, scopes, name")
     .eq("token_hash", tokenHash)
     .is("revoked_at", null)
     .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`)

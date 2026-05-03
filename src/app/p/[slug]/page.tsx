@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import AppPermalinkPage from "./AppPermalinkPage";
+import AppPermalinkPage, { type PermalinkInitialApp } from "./AppPermalinkPage";
 import { demoApp, hasBrowserAuthConfig, hasSupabaseConfig } from "@/lib/demo-app";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient as createServerSupabaseClient } from "@/lib/supabase/server";
@@ -85,7 +85,54 @@ export default async function Page({ params }: Props) {
     notFound();
   }
 
-  return <AppPermalinkPage />;
+  // Pre-fetch the app data server-side so the first paint renders the form
+  // rather than a loading skeleton.
+  const initialApp = await fetchInitialApp(slug);
+
+  return <AppPermalinkPage initialApp={initialApp ?? undefined} />;
+}
+
+async function fetchInitialApp(slug: string): Promise<PermalinkInitialApp | null> {
+  if (!hasSupabaseConfig()) {
+    const { demoApp } = await import("@/lib/demo-app");
+    if (slug === demoApp.slug) {
+      return {
+        id: demoApp.id,
+        slug: demoApp.slug,
+        name: demoApp.name,
+        handler: (demoApp as Record<string, unknown>).handler as string ?? null,
+        input_schema: (demoApp as Record<string, unknown>).input_schema as Record<string, unknown> ?? null,
+        public: true,
+      };
+    }
+    return null;
+  }
+
+  try {
+    const admin = createAdminClient();
+    const { data: app, error } = await admin
+      .from("apps")
+      .select("id, slug, name, handler, public, app_versions(input_schema)")
+      .eq("slug", slug)
+      .order("version", { foreignTable: "app_versions", ascending: false })
+      .limit(1, { foreignTable: "app_versions" })
+      .maybeSingle();
+
+    if (error || !app) return null;
+
+    const latestVersion = (app.app_versions as Array<{ input_schema: Record<string, unknown> | null }>)?.[0];
+
+    return {
+      id: app.id,
+      slug: app.slug,
+      name: app.name,
+      handler: app.handler as string | null ?? null,
+      input_schema: latestVersion?.input_schema ?? null,
+      public: app.public as boolean,
+    };
+  } catch {
+    return null;
+  }
 }
 
 async function isUnavailablePermalink(slug: string) {

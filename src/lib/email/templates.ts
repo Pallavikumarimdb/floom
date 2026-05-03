@@ -118,8 +118,8 @@ ${body}
 
 <tr><td style="padding:24px 4px 4px;font-family:${SANS};font-size:12px;line-height:1.6;color:${EMAIL_MUTED};">
 <strong style="color:${EMAIL_INK};font-weight:600;">Floom</strong>: the runtime for agentic work.<br>
-<a href="https://floom.dev" style="color:${EMAIL_MUTED};text-decoration:underline;">floom.dev</a> &middot; Floom, Inc. &middot; Wilmington, DE<br>
-Questions? Just reply to this email, or write <a href="mailto:hello@floom.dev" style="color:${EMAIL_MUTED};text-decoration:underline;">hello@floom.dev</a>.${unsubscribeBlock}
+<a href="https://floom.dev" style="color:${EMAIL_MUTED};text-decoration:underline;">floom.dev</a> &middot; Floom<br>
+Questions? Just reply to this email, or write <a href="mailto:team@floom.dev" style="color:${EMAIL_MUTED};text-decoration:underline;">team@floom.dev</a>.${unsubscribeBlock}
 </td></tr>
 
 </table>
@@ -188,8 +188,8 @@ export function renderWelcomeEmail(input: WelcomeTemplateInput): {
     "",
     "Stuck? Just reply to this email. A human reads every one.",
     "",
-    "Floom, Inc. · Wilmington, DE",
-    "hello@floom.dev",
+    "Floom",
+    "team@floom.dev",
   ].join("\n");
 
   return {
@@ -243,8 +243,8 @@ export function renderAppPublishedEmail(input: AppPublishedTemplateInput): {
     "",
     "Need to update it? Run `floom publish` — the URL stays the same.",
     "",
-    "Floom, Inc. · Wilmington, DE",
-    "hello@floom.dev",
+    "Floom",
+    "team@floom.dev",
   ].join("\n");
 
   return {
@@ -293,8 +293,8 @@ export function renderResetPasswordEmail(
     "",
     "If you didn't request this, ignore this email. The link expires in 1 hour.",
     "",
-    "Floom, Inc. · Wilmington, DE",
-    "hello@floom.dev",
+    "Floom",
+    "team@floom.dev",
   ].join("\n");
 
   return {
@@ -343,8 +343,8 @@ export function renderVerificationEmail(
     "",
     "If you did not create this account, you can ignore this email.",
     "",
-    "Floom, Inc. · Wilmington, DE",
-    "hello@floom.dev",
+    "Floom",
+    "team@floom.dev",
   ].join("\n");
 
   return {
@@ -399,8 +399,8 @@ export function renderAppInviteEmail(input: AppInviteTemplateInput): {
     "",
     "If you were not expecting this invite, you can ignore this email.",
     "",
-    "Floom, Inc. · Wilmington, DE",
-    "hello@floom.dev",
+    "Floom",
+    "team@floom.dev",
   ].join("\n");
 
   return {

@@ -13,6 +13,7 @@ export type AuthCaller =
       userId: string;
       agentTokenId: string;
       scopes: string[];
+      tokenName: string | null;
     };
 
 export function getBearerToken(req: NextRequest) {
@@ -72,6 +73,7 @@ export async function resolveAuthCaller(
     userId: agentToken.owner_id,
     agentTokenId: agentToken.id,
     scopes: agentToken.scopes,
+    tokenName: agentToken.name ?? null,
   };
 }
 

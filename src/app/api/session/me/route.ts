@@ -39,6 +39,7 @@ export async function GET(req: NextRequest) {
     token_type: "agent_token",
     agent_token: {
       id: caller.agentTokenId,
+      name: caller.tokenName ?? null,
       scopes: caller.scopes,
     },
   });

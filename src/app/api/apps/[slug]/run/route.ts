@@ -159,9 +159,15 @@ export async function POST(
       getRunCallerKey(caller, req.headers)
     );
     if (!rateLimit.allowed) {
+      const retryAfterSeconds = String(
+        readPositiveIntegerEnv(
+          "FLOOM_PUBLIC_RUN_RATE_LIMIT_WINDOW_SECONDS",
+          DEFAULT_PUBLIC_RUN_RATE_LIMIT_WINDOW_SECONDS
+        )
+      );
       return NextResponse.json(
         { error: rateLimit.error },
-        { status: rateLimit.status }
+        { status: rateLimit.status, headers: { "Retry-After": retryAfterSeconds } }
       );
     }
   }
@@ -194,7 +200,8 @@ export async function POST(
   if (isAsyncRuntimeEnabled()) {
     const queueDepth = await checkAppQueueDepth(admin, app.id);
     if (!queueDepth.allowed) {
-      return NextResponse.json({ error: queueDepth.error }, { status: queueDepth.status });
+      const queueHeaders = queueDepth.status === 429 ? { "Retry-After": "30" } : undefined;
+      return NextResponse.json({ error: queueDepth.error }, { status: queueDepth.status, headers: queueHeaders });
     }
 
     const { data: execution, error: execError } = await admin
@@ -325,9 +332,12 @@ export async function POST(
       );
     }
 
+    const quotaRetryAfter = quota.retryAfterUnix
+      ? String(Math.max(1, quota.retryAfterUnix - Math.floor(Date.now() / 1000)))
+      : "60";
     return NextResponse.json(
       { error: "app_quota_exhausted", retry_after: quota.retryAfterUnix },
-      { status: 429 }
+      { status: 429, headers: { "Retry-After": quotaRetryAfter } }
     );
   }
 
