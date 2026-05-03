@@ -73,11 +73,15 @@ export async function GET(
     return NextResponse.json({ error: "Run not found" }, { status: 404 });
   }
 
-  const canReadPrivateRun =
+  // isOwner: authenticated caller who owns the app or submitted this run.
+  // Used both to gate private-app access AND to decide whether to include
+  // inputs/error_detail in the response. Anonymous callers on public apps
+  // can see status/output (shareable-run UX) but not the submitter's inputs.
+  const isOwner =
     callerHasScope(caller, "read") &&
     (caller?.userId === app.owner_id || caller?.userId === execution.caller_user_id);
 
-  if (!app.public && !canReadPrivateRun) {
+  if (!app.public && !isOwner) {
     return NextResponse.json({ error: "Run not found" }, { status: 404 });
   }
 
@@ -85,10 +89,10 @@ export async function GET(
     id: execution.id,
     app_slug: app.slug,
     status: normalizeExecutionStatus(execution.status),
-    inputs: execution.input,
+    ...(isOwner ? { inputs: execution.input } : {}),
     output: execution.output,
     error: execution.error,
-    error_detail: execution.error_detail,
+    ...(isOwner ? { error_detail: execution.error_detail } : {}),
     created_at: execution.created_at,
     started_at: execution.started_at,
     completed_at: execution.completed_at,
