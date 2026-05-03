@@ -407,7 +407,20 @@ async function loadOptionalSchema(
 
 export async function detectCommand(rootDir: string, manifest: FloomManifest): Promise<string> {
   if (manifest.mode === "stock_e2b" && manifest.command?.trim()) {
-    return manifest.command.trim();
+    const command = manifest.command.trim();
+    // Validate the command's primary target file exists in the bundle so we
+    // fail at publish time, not silently at sandbox runtime. We extract the
+    // first non-flag token after the runtime (python/node/bun/go) as the
+    // entrypoint file and check it. Heuristic — multi-arg shell pipelines or
+    // `npm start` style are skipped (no single file to verify).
+    const target = extractCommandTargetFile(command);
+    if (target && !(await exists(path.join(rootDir, target)))) {
+      throw new BundleValidationError(
+        "invalid_manifest",
+        `command target '${target}' is not present in the bundle`
+      );
+    }
+    return command;
   }
 
   if (isLegacyPythonManifest(manifest)) {
@@ -443,6 +456,25 @@ export async function detectCommand(rootDir: string, manifest: FloomManifest): P
     "invalid_manifest",
     "no command detected, please specify `command:` in floom.yaml"
   );
+}
+
+// Extract the primary target file from a stock_e2b command string.
+// Returns null for commands that don't reference a single source file
+// (e.g. `npm start`, `bash -c "..."`) — we don't try to validate those.
+function extractCommandTargetFile(command: string): string | null {
+  const tokens = command.trim().split(/\s+/);
+  if (tokens.length < 2) return null;
+  const runtime = tokens[0]?.toLowerCase();
+  const RUNTIMES_WITH_FILE_TARGET = new Set(["python", "python3", "node", "bun", "deno", "ruby", "php"]);
+  if (!runtime || !RUNTIMES_WITH_FILE_TARGET.has(runtime)) return null;
+  const target = tokens.slice(1).find((token) => !token.startsWith("-"));
+  if (!target) return null;
+  // Reject obvious non-file targets to keep the heuristic conservative.
+  if (target.startsWith("/") || target.includes("..")) return null;
+  // Filenames must include an extension to count as a target we can check.
+  // Avoids false positives on `python -m module_name`.
+  if (!/\.[a-z0-9]+$/i.test(target)) return null;
+  return target;
 }
 
 async function detectRuntimeLabel(rootDir: string, manifest: FloomManifest, command: string) {

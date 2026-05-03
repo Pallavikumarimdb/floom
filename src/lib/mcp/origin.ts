@@ -6,7 +6,28 @@ export function resolveMcpForwardOrigin(requestUrl: string): string | null {
     return localOrigin;
   }
 
+  // On Vercel preview deploys prefer the request's own origin so MCP calls
+  // stay inside the deploy under test. The configured FLOOM_ORIGIN points at
+  // production which may lack the new routes/runtime that the preview is
+  // shipping, breaking preview-side verification.
+  if (process.env.VERCEL_ENV === "preview") {
+    const requestOrigin = sameOriginAsRequest(requestUrl);
+    if (requestOrigin) {
+      return requestOrigin;
+    }
+  }
+
   return configuredFloomOrigin();
+}
+
+function sameOriginAsRequest(requestUrl: string): string | null {
+  try {
+    const url = new URL(requestUrl);
+    if (!["https:", "http:"].includes(url.protocol)) return null;
+    return url.origin;
+  } catch {
+    return null;
+  }
 }
 
 function configuredFloomOrigin(): string | null {
