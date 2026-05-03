@@ -15,8 +15,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
 
   let appName = slug;
-  let appDescription =
-    "Run this Floom app from the browser. Inputs are validated with JSON Schema and executed in an isolated sandbox.";
+  let appDescription = "";
   try {
     const res = await fetch(`${SITE_URL}/api/apps/${slug}`, {
       next: { revalidate: 300 },
@@ -45,6 +44,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     }
   } catch {
     // Fall back to slug + generic description.
+  }
+
+  // If no description was found from any source, emit a minimal fallback so
+  // OG/Twitter cards are never blank.
+  if (!appDescription) {
+    appDescription = `${appName} on Floom`;
   }
 
   // Title is bare app name; layout.tsx metadata.title.template adds " · Floom".

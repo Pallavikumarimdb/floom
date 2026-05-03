@@ -1,0 +1,32 @@
+// Pure utility: extract table rows from heterogeneous output shapes.
+// Shared between RunSurface (React) and tests (Node) without any React dep.
+
+export type TableRow = Record<string, unknown>;
+
+export function isArrayOfObjects(value: unknown): value is TableRow[] {
+  return (
+    Array.isArray(value) &&
+    value.length > 0 &&
+    value.every((r) => r !== null && typeof r === "object" && !Array.isArray(r))
+  );
+}
+
+// Detects {count, items: [{...}, ...]} or similar wrapper shapes.
+export function extractRows(output: unknown): TableRow[] | null {
+  if (isArrayOfObjects(output)) return output as TableRow[];
+  if (output !== null && typeof output === "object" && !Array.isArray(output)) {
+    const obj = output as Record<string, unknown>;
+    for (const key of ["items", "results", "rows", "data", "list", "tasks", "actions"]) {
+      if (isArrayOfObjects(obj[key])) return obj[key] as TableRow[];
+    }
+    for (const val of Object.values(obj)) {
+      if (isArrayOfObjects(val)) return val as TableRow[];
+    }
+  }
+  return null;
+}
+
+// Union of all keys across all rows so heterogeneous shapes don't drop columns.
+export function unionKeys(rows: TableRow[]): string[] {
+  return Array.from(new Set(rows.flatMap((r) => Object.keys(r))));
+}

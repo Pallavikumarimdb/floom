@@ -83,6 +83,47 @@ no output_schema + stdout final line is valid JSON:
 no output_schema + plain stdout:
 - Floom returns { "stdout": "<last 4 KB tail>", "exit_code": 0 }`;
 
+const setupExample = `# Interactive browser-based login — run once per machine
+npx @floomhq/cli@latest setup
+
+# After setup, your token is saved to ~/.config/floom/token.
+# Alternatively, export it manually:
+#   export FLOOM_TOKEN=<your-agent-token>`;
+
+const deviceFlowNote = `The \`floom setup\` command opens a browser page where you approve the token.
+The CLI polls /api/cli/device/poll until the flow completes, then saves the
+token. No passwords are stored; the token is a UUID tied to your account.`;
+
+const secretsExample = `# Set a secret value for an app (reads from stdin, never shell history)
+npx @floomhq/cli@latest secrets set my-app-slug OPENAI_API_KEY --value-stdin
+
+# REST equivalent
+curl -X PUT https://floom.dev/api/apps/my-app-slug/secrets \\
+  -H 'Authorization: Bearer <agent-token>' \\
+  -H 'Content-Type: application/json' \\
+  -d '{"name":"OPENAI_API_KEY","value":"sk-..."}'`;
+
+const ciExample = `# FLOOM_TOKEN env var — works in GitHub Actions, Vercel, and any CI
+export FLOOM_TOKEN=\${{ secrets.FLOOM_TOKEN }}
+npx @floomhq/cli@latest deploy
+
+# Equivalent long-form flags
+FLOOM_TOKEN=<token> FLOOM_API_URL=https://floom.dev npx @floomhq/cli@latest deploy`;
+
+const runCliExample = `# Run an app synchronously and print JSON output
+npx @floomhq/cli@latest run my-app-slug '{"text":"hello"}' --json
+
+# 400 errors include field hints from the schema validator:
+# { "error": "Invalid input", "details": [{ "instancePath": "/text", ... }] }`;
+
+const initExample = `# Scaffold a new app with the current (command-based) shape
+npx @floomhq/cli@latest init \\
+  --name "My App" \\
+  --slug my-app \\
+  --type custom
+
+# Generated floom.yaml uses command: python app.py and requirements.txt`;
+
 const autoExcludes = `node_modules/
 .git/
 .next/
@@ -131,7 +172,7 @@ export default function DocsPage() {
           Floom stock-E2B docs
         </p>
         <h1 className="text-4xl font-black tracking-tight sm:text-5xl">
-          Thin wrapper on top of E2B.
+          Publish a small AI app from your CLI, run it from anywhere.
         </h1>
         <p className="mt-4 max-w-3xl text-lg text-neutral-600">
           Floom no longer forces a single-file Python handler shape for new apps. Publish the whole app directory as a tarball, let stock E2B run it, and keep Floom focused on sharing, secrets, rate limits, redaction, API, browser UI, and MCP.
@@ -239,6 +280,39 @@ export default function DocsPage() {
           <p className="text-sm text-neutral-500">
             <code>publish_app</code> now prefers a file map for the full app directory. The old single-file Python shortcut still exists for legacy manifests.
           </p>
+        </Section>
+
+        <Section title="Authentication and CLI setup">
+          <p>
+            Run <code>npx @floomhq/cli@latest setup</code> once per machine to authorise the CLI through your browser. This starts the device authorization flow — your browser opens a confirmation page and the CLI polls until approved.
+          </p>
+          <CodeBlock>{setupExample}</CodeBlock>
+          <p className="text-sm text-neutral-500">{deviceFlowNote}</p>
+        </Section>
+
+        <Section title="Dependencies and secrets">
+          <p>
+            Declare secret names in <code>floom.yaml</code> under <code>secrets:</code>. Set the actual values through the CLI or REST. Values are encrypted at rest and injected as environment variables at run time. Never paste raw secret values into source files, manifests, or MCP arguments.
+          </p>
+          <CodeBlock>{secretsExample}</CodeBlock>
+        </Section>
+
+        <Section title="CI and automation">
+          <p>
+            The <code>FLOOM_TOKEN</code> environment variable is the standard way to authenticate in CI. Set it as a repository secret and reference it in your workflow.
+          </p>
+          <CodeBlock>{ciExample}</CodeBlock>
+          <p className="text-sm text-neutral-500">
+            400 errors from <code>floom run</code> include the failing field path from the schema validator. Example: <code>{`{"error":"Invalid input","details":[{"instancePath":"/text","message":"must be string"}]}`}</code>.
+          </p>
+          <CodeBlock>{runCliExample}</CodeBlock>
+        </Section>
+
+        <Section title="Scaffolding a new app">
+          <p>
+            <code>floom init</code> creates a new app directory with the current command-based manifest shape. A <code>requirements.txt</code> is included for Python apps.
+          </p>
+          <CodeBlock>{initExample}</CodeBlock>
         </Section>
 
         <Section title="Quotas and limits">

@@ -1,7 +1,7 @@
 import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-const SECRET_NAME_RE = /^[A-Z][A-Z0-9_]{1,63}$/;
+export const SECRET_NAME_RE = /^[A-Z][A-Z0-9_]{1,63}$/;
 const ENCRYPTION_ALGORITHM = "aes-256-gcm";
 const ENCRYPTION_VERSION = "v1";
 const NONCE_BYTES = 12;

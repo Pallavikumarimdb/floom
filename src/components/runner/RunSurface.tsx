@@ -8,6 +8,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { AppDetail, RunRecord } from '@/lib/types';
 import { createClient } from '@/lib/supabase/client';
+import { extractRows, unionKeys } from '@/lib/floom/output-rows';
 
 export interface RunSurfaceResult {
   runId?: string;
@@ -566,27 +567,7 @@ export function RunSurface({ app, initialRun, initialInputs, examplePrefillInput
             </div>
           )}
           {state.kind === 'ok' && (
-            <pre
-              style={{
-                fontFamily: "'JetBrains Mono', ui-monospace, monospace",
-                fontSize: 12.5,
-                background: 'var(--card)',
-                border: '1px solid var(--line)',
-                borderRadius: 8,
-                padding: 14,
-                margin: 0,
-                lineHeight: 1.5,
-                whiteSpace: 'pre-wrap',
-                wordBreak: 'break-word',
-                color: 'var(--ink)',
-                maxHeight: 400,
-                overflow: 'auto',
-              }}
-            >
-              {typeof state.output === 'string'
-                ? state.output
-                : JSON.stringify(state.output, null, 2)}
-            </pre>
+            <OutputDisplay output={state.output} />
           )}
           {state.kind === 'error' && (
             <div
@@ -700,7 +681,7 @@ function isTerminalStatus(status: string) {
 }
 
 function terminalMessage(status: ExecutionStatus) {
-  if (status === 'timed_out') return 'Execution exceeded SANDBOX_TIMEOUT_MS';
+  if (status === 'timed_out') return 'This run took too long. Try a shorter input.';
   if (status === 'cancelled') return 'Execution was cancelled';
   return 'App execution failed';
 }
@@ -737,7 +718,7 @@ function statusColor(status: ExecutionStatus) {
 
 function ProgressView({ progress }: { progress: unknown }) {
   if (!progress || typeof progress !== 'object' || Array.isArray(progress)) {
-    return <p style={{ fontSize: 13, color: '#b45309', margin: 0 }}>Talking to the sandbox...</p>;
+    return <p style={{ fontSize: 13, color: '#b45309', margin: 0 }}>Running your app...</p>;
   }
   const p = progress as {
     kind?: string;
@@ -782,6 +763,94 @@ function ProgressView({ progress }: { progress: unknown }) {
     );
   }
   return <p style={{ fontSize: 13, color: '#b45309', margin: 0 }}>Running...</p>;
+}
+
+// ── Output display: table for known shapes, pre for everything else ──
+// extractRows, unionKeys, TableRow imported from @/lib/floom/output-rows
+
+function OutputDisplay({ output }: { output: unknown }) {
+  const rows = useMemo(() => extractRows(output), [output]);
+
+  if (rows && rows.length > 0) {
+    // Union of all keys across every row so heterogeneous shapes don't drop columns.
+    const keys = unionKeys(rows);
+    if (keys.length > 0) {
+      return (
+        <div style={{ overflowX: 'auto', maxHeight: 400, overflow: 'auto', borderRadius: 8, border: '1px solid var(--line)', background: 'var(--card)' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+            <thead>
+              <tr>
+                {keys.map((k) => (
+                  <th
+                    key={k}
+                    style={{
+                      textAlign: 'left',
+                      padding: '8px 12px',
+                      fontWeight: 700,
+                      color: 'var(--ink)',
+                      borderBottom: '1px solid var(--line)',
+                      whiteSpace: 'nowrap',
+                      background: 'var(--bg)',
+                      fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+                      fontSize: 11,
+                      letterSpacing: '0.03em',
+                    }}
+                  >
+                    {k}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row, i) => (
+                <tr key={i} style={{ borderBottom: '1px solid var(--line)' }}>
+                  {keys.map((k) => (
+                    <td
+                      key={k}
+                      style={{
+                        padding: '8px 12px',
+                        color: 'var(--ink)',
+                        verticalAlign: 'top',
+                        lineHeight: 1.45,
+                      }}
+                    >
+                      {row[k] === null || row[k] === undefined
+                        ? ''
+                        : typeof row[k] === 'object'
+                        ? JSON.stringify(row[k])
+                        : String(row[k])}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      );
+    }
+  }
+
+  return (
+    <pre
+      style={{
+        fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+        fontSize: 12.5,
+        background: 'var(--card)',
+        border: '1px solid var(--line)',
+        borderRadius: 8,
+        padding: 14,
+        margin: 0,
+        lineHeight: 1.5,
+        whiteSpace: 'pre-wrap',
+        wordBreak: 'break-word',
+        color: 'var(--ink)',
+        maxHeight: 400,
+        overflow: 'auto',
+      }}
+    >
+      {typeof output === 'string' ? output : JSON.stringify(output, null, 2)}
+    </pre>
+  );
 }
 
 // ── Output actions: copy + download .json + download .csv (when applicable) ──

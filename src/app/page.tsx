@@ -208,7 +208,7 @@ export default function LandingV17PageMvp() {
             You&apos;re signed in.
           </span>
           <Link
-            href="/tokens"
+            href="/settings/agent-tokens"
             data-testid="landing-resume-cta"
             style={{
               fontWeight: 600,
@@ -219,9 +219,7 @@ export default function LandingV17PageMvp() {
               gap: 4,
             }}
           >
-            {/* TODO: session.active_workspace not available in floom-minimal.
-                Using generic label. Original: session.active_workspace?.name */}
-            Resume in your workspace →
+            Manage your tokens →
           </Link>
         </div>
       )}
