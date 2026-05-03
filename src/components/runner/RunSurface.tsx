@@ -8,6 +8,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { AppDetail, RunRecord } from '@/lib/types';
 import { createClient } from '@/lib/supabase/client';
+import { extractRows, unionKeys } from '@/lib/floom/output-rows';
 
 export interface RunSurfaceResult {
   runId?: string;
@@ -765,40 +766,14 @@ function ProgressView({ progress }: { progress: unknown }) {
 }
 
 // ── Output display: table for known shapes, pre for everything else ──
-
-type TableRow = Record<string, unknown>;
-
-function isArrayOfObjects(value: unknown): value is TableRow[] {
-  return (
-    Array.isArray(value) &&
-    value.length > 0 &&
-    value.every((r) => r !== null && typeof r === 'object' && !Array.isArray(r))
-  );
-}
-
-// Detects {count, items: [{task, owner, due}, ...]} or similar wrapper shapes.
-function extractRows(output: unknown): TableRow[] | null {
-  if (isArrayOfObjects(output)) return output as TableRow[];
-  if (output !== null && typeof output === 'object' && !Array.isArray(output)) {
-    const obj = output as Record<string, unknown>;
-    // Look for a key whose value is an array of objects.
-    for (const key of ['items', 'results', 'rows', 'data', 'list', 'tasks', 'actions']) {
-      if (isArrayOfObjects(obj[key])) return obj[key] as TableRow[];
-    }
-    // Fallback: first array-of-objects property found.
-    for (const val of Object.values(obj)) {
-      if (isArrayOfObjects(val)) return val as TableRow[];
-    }
-  }
-  return null;
-}
+// extractRows, unionKeys, TableRow imported from @/lib/floom/output-rows
 
 function OutputDisplay({ output }: { output: unknown }) {
   const rows = useMemo(() => extractRows(output), [output]);
 
   if (rows && rows.length > 0) {
     // Union of all keys across every row so heterogeneous shapes don't drop columns.
-    const keys = Array.from(new Set(rows.flatMap((r) => Object.keys(r))));
+    const keys = unionKeys(rows);
     const allConsistent = rows.every((r) => keys.every((k) => k in r));
     if (keys.length > 0 && allConsistent) {
       return (
