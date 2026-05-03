@@ -676,6 +676,21 @@ textarea:focus-visible {
   }
 }
 
+/* ── Tab bar: wrap on narrow viewports (≤479px) ─────────── */
+/* At 375px the 5-tab row clips. Wrap tabs to a second row so  */
+/* all tabs are visible without a scrollbar.                   */
+@media (max-width: 479px) {
+  .permalink-tab-bar {
+    flex-wrap: wrap !important;
+    overflow-x: visible !important;
+  }
+  /* Hide the sliding underline when wrapped — it can't track  */
+  /* absolute position across rows correctly.                  */
+  .permalink-tab-bar .permalink-tab-underline {
+    display: none !important;
+  }
+}
+
 /* ── RunSurface mobile: stack input/output vertically ───── */
 @media (max-width: 639px) {
   .run-surface-grid {
