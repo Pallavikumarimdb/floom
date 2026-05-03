@@ -9,7 +9,7 @@ export const metadata: Metadata = {
   alternates: { canonical: `${SITE_URL}/docs` },
   openGraph: {
     title: "Floom Docs",
-    description: "Everything you need to build and ship a Floom app — from CLI setup to MCP integration.",
+    description: "Everything you need to build and ship a Floom app: from CLI setup to MCP integration.",
     url: `${SITE_URL}/docs`,
     images: [{ url: `${SITE_URL}/opengraph-image`, width: 1200, height: 630 }],
   },

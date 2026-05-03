@@ -59,7 +59,7 @@ const DOCKER_RUNTIME_COMING_SOON_SLUGS = new Set<string>([]);
 // trust killer.
 const HERO_SUBHEAD: Record<string, string> = {
   'meeting-action-items':
-    'Paste meeting notes. Get a structured list of action items — task, owner, due date.',
+    'Paste meeting notes. Get a structured list of action items: task, owner, due date.',
 };
 
 export interface PermalinkInitialApp {
@@ -269,7 +269,7 @@ export default function AppPermalinkPage({ initialApp }: { initialApp?: Permalin
         if (!a.description) {
           a.description =
             `**${a.name}** is a Python function-style app running on Floom's E2B sandbox. ` +
-            `Each run is hosted on Floom — no per-app deploy. The same handler is exposed as a web UI here, ` +
+            `Each run is hosted on Floom, no per-app deploy. The same handler is exposed as a web UI here, ` +
             `as a REST endpoint at \`POST /api/apps/${a.slug}/run\`, and as an MCP tool at \`/mcp\`.`;
         }
         // version + author fallbacks the v5 chrome reads.
@@ -2067,7 +2067,7 @@ function CelebrationCard({
           Your app is live
         </strong>
         <p style={{ margin: '4px 0 8px', color: 'var(--muted, #64748b)', fontSize: 13 }}>
-          This link works for anyone — send it to coworkers, Twitter, anywhere.
+          This link works for anyone; send it to coworkers, Twitter, anywhere.
         </p>
         <div
           style={{
@@ -2084,7 +2084,7 @@ function CelebrationCard({
           }}
         >
           <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 1 }} aria-hidden="true"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg>
-          <span><strong>Floom is in public beta</strong> {"— v0.1 encrypts app secrets at rest and injects them only at runtime. Use sandboxed or revocable credentials while the beta hardening window is open."}</span>
+          <span><strong>Floom is in public beta</strong> {": v0.1 encrypts app secrets at rest and injects them only at runtime. Use sandboxed or revocable credentials while the beta hardening window is open."}</span>
         </div>
       </div>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignSelf: 'flex-start' }}>

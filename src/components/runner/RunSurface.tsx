@@ -452,7 +452,7 @@ export function RunSurface({ app, initialRun, initialInputs, examplePrefillInput
               <span aria-hidden="true" style={{ fontSize: 13, opacity: 0.7 }}>⚡</span>
               Try with example
               <span style={{ opacity: 0.6, fontWeight: 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
-                {' '}— {String(Object.values(examplePrefillInputs)[0] ?? '').slice(0, 40)}{String(Object.values(examplePrefillInputs)[0] ?? '').length > 40 ? '…' : ''}
+                {' '}: {String(Object.values(examplePrefillInputs)[0] ?? '').slice(0, 40)}{String(Object.values(examplePrefillInputs)[0] ?? '').length > 40 ? '…' : ''}
               </span>
             </button>
           )}
@@ -680,10 +680,10 @@ export function RunSurface({ app, initialRun, initialInputs, examplePrefillInput
               )}
               <p style={{ fontSize: 11.5, color: '#9b1c1c', marginTop: 8, marginBottom: 0, opacity: 0.8 }}>
                 {/timeout|timed out|too long|slow/i.test(state.message)
-                  ? 'Sandbox can be slow on first run — give it a moment.'
+                  ? 'Sandbox can be slow on first run, give it a moment.'
                   : /^(4\d\d|bad request|invalid|missing|required)/i.test(state.message) || state.message.includes('400')
                   ? 'Check your inputs and try again.'
-                  : 'Floom is having a moment — try again or DM us in Discord.'}
+                  : 'Floom is having a moment; try again or DM us in Discord.'}
               </p>
             </div>
           )}

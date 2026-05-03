@@ -7,7 +7,7 @@ const SITE_URL = "https://floom.dev";
 export const metadata: Metadata = {
   title: "Privacy Policy",
   description:
-    "Privacy Policy for Floom, Inc. — what data we collect, how we use it, and your rights.",
+    "Privacy Policy for Floom, Inc.: what data we collect, how we use it, and your rights.",
   alternates: { canonical: `${SITE_URL}/privacy` },
 };
 
@@ -246,11 +246,11 @@ export default function PrivacyPage() {
               marginBottom: "16px",
             }}
           >
-            <li><strong>Know</strong> — what personal information we collect and how we use it</li>
-            <li><strong>Access</strong> — a copy of your personal information</li>
-            <li><strong>Delete</strong> — your personal information, subject to certain exceptions</li>
-            <li><strong>Opt out of sale</strong> — we do not sell personal information</li>
-            <li><strong>Non-discrimination</strong> — we will not penalize you for exercising these rights</li>
+            <li><strong>Know</strong>: what personal information we collect and how we use it</li>
+            <li><strong>Access</strong>: a copy of your personal information</li>
+            <li><strong>Delete</strong>: your personal information, subject to certain exceptions</li>
+            <li><strong>Opt out of sale</strong>: we do not sell personal information</li>
+            <li><strong>Non-discrimination</strong>: we will not penalize you for exercising these rights</li>
           </ul>
           <p style={{ color: "var(--muted)" }}>
             To exercise any of these rights, email{" "}

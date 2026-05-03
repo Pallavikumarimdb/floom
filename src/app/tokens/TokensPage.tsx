@@ -338,7 +338,7 @@ npx @floomhq/cli@latest deploy`,
                   }}
                 >
                   <p style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--accent)', margin: '0 0 10px' }}>
-                    Manual token created — copy now if you need it
+                    Manual token created: copy now if you need it
                   </p>
                   <pre style={{ maxHeight: 120, overflow: 'auto', borderRadius: 8, border: '1px solid var(--accent-border)', background: 'var(--card)', padding: '10px 12px', fontSize: 11.5, margin: '0 0 10px', fontFamily: "'JetBrains Mono', monospace", color: 'var(--ink)', wordBreak: 'break-all', whiteSpace: 'pre-wrap' }}>
                     {newToken}
@@ -591,7 +591,7 @@ npx @floomhq/cli@latest deploy`,
                     }}
                   >
                     <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--accent)', margin: '0 0 8px' }}>
-                      Copy now — not shown again
+                      Copy now, not shown again
                     </p>
                     <pre style={{ maxHeight: 80, overflow: 'auto', borderRadius: 6, border: '1px solid var(--accent-border)', background: 'var(--card)', padding: '8px 10px', fontSize: 11, margin: '0 0 8px', fontFamily: "'JetBrains Mono', monospace", color: 'var(--ink)', wordBreak: 'break-all', whiteSpace: 'pre-wrap' }}>
                       {newToken}

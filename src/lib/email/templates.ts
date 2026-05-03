@@ -172,7 +172,7 @@ export function renderWelcomeEmail(input: WelcomeTemplateInput): {
   const body = [
     bodyParagraph(greeting),
     bodyParagraph(
-      "Your account is live. Get your agent token, then point the CLI at a GitHub repo or OpenAPI spec — Floom does the rest.",
+      "Your account is live. Get your agent token, then point the CLI at a GitHub repo or OpenAPI spec. Floom does the rest.",
     ),
     ctaButton(tokensUrl, "Get your agent token"),
     mutedParagraph(
@@ -231,7 +231,7 @@ export function renderAppPublishedEmail(input: AppPublishedTemplateInput): {
     ctaButton(input.appUrl, "Open your app"),
     fallbackLink(input.appUrl),
     mutedParagraph(
-      "Need to update it? Push a new version with <code style=\"font-family:monospace;font-size:12px;\">floom publish</code> — the URL stays the same.",
+      "Need to update it? Push a new version with <code style=\"font-family:monospace;font-size:12px;\">floom publish</code>; the URL stays the same.",
     ),
   ].join("\n");
 
@@ -241,7 +241,7 @@ export function renderAppPublishedEmail(input: AppPublishedTemplateInput): {
     `"${input.appName}" is live on Floom:`,
     input.appUrl,
     "",
-    "Need to update it? Run `floom publish` — the URL stays the same.",
+    "Need to update it? Run `floom publish`; the URL stays the same.",
     "",
     "Floom",
     "team@floom.dev",

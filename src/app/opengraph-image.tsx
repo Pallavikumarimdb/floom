@@ -3,7 +3,7 @@ import { ImageResponse } from "next/og";
 export const runtime = "edge";
 export const contentType = "image/png";
 export const size = { width: 1200, height: 630 };
-export const alt = "Floom — Localhost to live in 60 seconds";
+export const alt = "Floom: Localhost to live in 60 seconds";
 
 export default function OpengraphImage() {
   return new ImageResponse(

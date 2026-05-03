@@ -45,7 +45,7 @@ export default function NotFound() {
             color: "var(--ink)",
           }}
         >
-          Page not found — or this app is private.
+          Page not found: this app may be private.
         </h1>
         <p
           style={{

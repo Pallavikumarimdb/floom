@@ -246,20 +246,6 @@ export function SiteHeader({ compact = false, onStudioMenuOpen }: Props = {}) {
           )}
 
           <nav
-            aria-label="Product"
-            className="topbar-links topbar-links-desktop"
-            style={{
-              gap: 4,
-              marginLeft: 8,
-              alignItems: 'center',
-            }}
-          >
-            <Link href="/docs" style={{ ...navLinkStyle, color: pathname === '/docs' ? INK : MUTED }}>
-              Docs
-            </Link>
-          </nav>
-
-          <nav
             aria-label="Site navigation"
             className="topbar-links topbar-links-desktop"
             style={{
@@ -269,6 +255,11 @@ export function SiteHeader({ compact = false, onStudioMenuOpen }: Props = {}) {
               alignItems: 'center',
             }}
           >
+            {/* Docs link */}
+            <Link href="/docs" style={{ ...navLinkStyle, color: pathname === '/docs' ? INK : MUTED }}>
+              Docs
+            </Link>
+
             {/* GitHub stars badge */}
             <a
               href="https://github.com/floomhq/floom"

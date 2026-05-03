@@ -11,7 +11,7 @@ const STATUS_API_ORIGIN =
 
 export const metadata: Metadata = {
   title: "Status",
-  description: "Live status of Floom services — Supabase auth, E2B sandbox runtime, and the Floom MCP endpoint.",
+  description: "Live status of Floom services: Supabase auth, E2B sandbox runtime, and the Floom MCP endpoint.",
   alternates: { canonical: `${SITE_URL}/status` },
   // Don't index — the page is purely real-time, no canonical content for crawlers.
   robots: { index: false, follow: true },

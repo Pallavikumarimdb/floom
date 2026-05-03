@@ -12,14 +12,14 @@ export const metadata: Metadata = {
   alternates: { canonical: `${SITE_URL}/legal` },
   openGraph: {
     type: "article",
-    title: "Floom — Legal & privacy",
+    title: "Floom: Legal & privacy",
     description: "Alpha service notice. Honest scope.",
     url: `${SITE_URL}/legal`,
     images: [{ url: `${SITE_URL}/opengraph-image`, width: 1200, height: 630 }],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Floom — Legal & privacy",
+    title: "Floom: Legal & privacy",
     description: "Alpha service notice. Honest scope.",
     images: [`${SITE_URL}/opengraph-image`],
   },

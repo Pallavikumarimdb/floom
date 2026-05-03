@@ -7,7 +7,7 @@ const SITE_URL = "https://floom.dev";
 export const metadata: Metadata = {
   title: "Terms of Service",
   description:
-    "Terms of Service for Floom, Inc. — acceptable use, intellectual property, disclaimers, and governing law.",
+    "Terms of Service for Floom, Inc.: acceptable use, intellectual property, disclaimers, and governing law.",
   alternates: { canonical: `${SITE_URL}/terms` },
 };
 

@@ -10,7 +10,7 @@ export function GET() {
     {
       mcp_endpoint: `${base}/mcp`,
       service: "floom",
-      name: "Floom — publish + run small AI apps from anywhere",
+      name: "Floom: publish + run small AI apps from anywhere",
       version: "0.1.0",
       auth: {
         device_flow_start: `${base}/api/cli/device/start`,

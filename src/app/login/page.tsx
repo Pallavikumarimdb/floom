@@ -92,7 +92,7 @@ function LoginContent() {
     }
 
     setMessage(
-      "Check your email to finish signing in. The link can take up to a minute. If nothing arrives, signups are rate-limited during alpha — try again in a bit.",
+      "Check your email to finish signing in. The link can take up to a minute. If nothing arrives, signups are rate-limited during alpha; try again in a bit.",
     );
   }
 

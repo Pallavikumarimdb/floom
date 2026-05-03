@@ -109,6 +109,51 @@ const outputModes = `# With output_schema declared:
 # No output_schema, plain stdout:
 # Floom returns { "stdout": "<last 4 KB>", "exit_code": 0 }`;
 
+// Schema constraint examples (fix #8)
+const schemaEnumExample = `// Use this when a field must be one of a fixed set of values
+{
+  "type": "string",
+  "title": "Size",
+  "enum": ["small", "medium", "large"]
+}`;
+
+const schemaMinMaxExample = `// Use this when a number must fall within a range
+{
+  "type": "integer",
+  "title": "Count",
+  "minimum": 1,
+  "maximum": 100
+}`;
+
+const schemaPatternExample = `// Use this when a string must match a specific format
+{
+  "type": "string",
+  "title": "Slug",
+  "pattern": "^[a-z][a-z0-9-]{0,30}$"
+}`;
+
+const schemaOneOfExample = `// Use this when a field can be one of several distinct shapes
+{
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "kind": { "const": "url" },
+        "url": { "type": "string" }
+      },
+      "required": ["kind", "url"]
+    },
+    {
+      "type": "object",
+      "properties": {
+        "kind": { "const": "text" },
+        "text": { "type": "string" }
+      },
+      "required": ["kind", "text"]
+    }
+  ]
+}`;
+
 const secretsExample = `# Set a secret via stdin (never echoed to shell history)
 npx @floomhq/cli@latest secrets set my-app OPENAI_API_KEY --value-stdin
 
@@ -154,12 +199,31 @@ const mcpConfigExample = `// Claude Desktop config
   }
 }`;
 
-const mcpToolsExample = `# Available MCP tools:
-# get_app_contract     — self-contained walkthrough for AI agents
-# list_app_templates   — browse scaffolding templates
-# get_app_template     — fetch a template by key (e.g. "multi_file_python")
-# run_app              — run any public or owned app by slug
-# publish_app          — deploy an app from a file map`;
+// All 15 MCP tools (fix #4)
+const mcpToolsExample = `# Auth
+# auth_status          — check whether the current token is valid and what scopes it has
+# start_device_flow    — begin CLI device-flow auth; returns a verification URL for the user
+# poll_device_flow     — poll the device-flow until approved; returns an agent token on success
+
+# Discovery
+# get_app_contract     — self-contained walkthrough for AI agents new to Floom
+# list_app_templates   — browse scaffolding templates (e.g. multi_file_python, csv_stats)
+# get_app_template     — fetch a template by key and return its file map
+# find_candidate_apps  — search for apps that match a natural-language task description
+
+# Apps
+# list_apps            — list all apps owned by the authenticated user
+# get_app              — fetch metadata for a specific app by slug
+# validate_manifest    — validate a floom.yaml before deploying (returns errors/warnings)
+# publish_app          — deploy an app from a file map (no local filesystem required)
+
+# Execution
+# run_app              — run any public or owned app by slug; returns output synchronously
+# get_execution        — fetch the status and output of an async execution by ID
+
+# Connections
+# list_my_connections  — list the caller's active Composio OAuth connections
+# set_secret           — set a secret value for an app (requires publish scope)`;
 
 const mcpRunExample = `# Claude calls run_app internally when you say:
 # "Run my floom app csv-stats with this CSV..."
@@ -230,8 +294,17 @@ function Section({
   children: ReactNode;
 }) {
   return (
-    <section id={id} className="border-t border-[#ded8cc] py-10 scroll-mt-20">
-      <h2 className="text-2xl font-black tracking-tight text-[#11110f]">{title}</h2>
+    <section id={id} className="border-t border-[#ded8cc] py-10 scroll-mt-[88px]">
+      <h2 className="group flex items-center gap-2 text-2xl font-black tracking-tight text-[#11110f]">
+        {title}
+        <a
+          href={`#${id}`}
+          className="opacity-0 group-hover:opacity-100 transition-opacity text-neutral-300 hover:text-neutral-500 font-normal text-lg no-underline"
+          aria-label={`Link to ${title}`}
+        >
+          #
+        </a>
+      </h2>
       <div className="mt-4 space-y-4 text-neutral-600">{children}</div>
     </section>
   );
@@ -280,7 +353,7 @@ function TocSidebar({ activeId }: { activeId: string }) {
       className="hidden lg:block w-52 flex-shrink-0"
       aria-label="Table of contents"
     >
-      <div className="sticky top-[72px]">
+      <div className="sticky top-[80px] max-h-[calc(100vh-100px)] overflow-y-auto">
         <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-neutral-400">
           On this page
         </p>
@@ -290,10 +363,10 @@ function TocSidebar({ activeId }: { activeId: string }) {
               <li key={item.id}>
                 <a
                   href={`#${item.id}`}
-                  className={`block text-sm py-1 pr-2 transition-colors rounded ${
+                  className={`block text-sm px-2 py-1 transition-colors rounded ${
                     activeId === item.id
-                      ? "text-[#047857] font-semibold"
-                      : "text-neutral-500 hover:text-[#11110f]"
+                      ? "text-[#047857] font-semibold bg-emerald-50"
+                      : "text-neutral-500 hover:text-[#11110f] hover:bg-[#f5f4ed]"
                   }`}
                 >
                   {item.label}
@@ -307,10 +380,33 @@ function TocSidebar({ activeId }: { activeId: string }) {
   );
 }
 
+// Mobile TOC dropdown (fix #3)
+function MobileToc() {
+  return (
+    <details className="lg:hidden sticky top-[56px] z-10 bg-[#faf9f5] border-b border-[#e0dbd0] px-4 py-2">
+      <summary className="text-sm font-semibold cursor-pointer text-[#11110f]">On this page</summary>
+      <nav className="mt-2 pb-2">
+        <ul className="space-y-1">
+          {TOC_ITEMS.map((item) => (
+            <li key={item.id}>
+              <a
+                href={`#${item.id}`}
+                className="block text-sm py-1 text-neutral-600 hover:text-[#047857] transition-colors"
+              >
+                {item.label}
+              </a>
+            </li>
+          ))}
+        </ul>
+      </nav>
+    </details>
+  );
+}
+
 // ── Page ─────────────────────────────────────────────────────
 
 export default function DocsContent() {
-  const [activeId, setActiveId] = useState<string>("");
+  const [activeId, setActiveId] = useState<string>("getting-started");
   const observerRef = useRef<IntersectionObserver | null>(null);
 
   useEffect(() => {
@@ -336,7 +432,7 @@ export default function DocsContent() {
   }, []);
 
   return (
-    <main id="main" className="min-h-screen overflow-x-hidden bg-[#faf9f5] text-[#11110f]">
+    <main id="main" className="min-h-screen bg-[#faf9f5] text-[#11110f]">
       <SiteHeader />
 
       <div className="mx-auto max-w-6xl px-5 py-14">
@@ -349,26 +445,32 @@ export default function DocsContent() {
             Publish a small AI app from your CLI, run it from anywhere.
           </h1>
           <p className="mt-4 text-lg text-neutral-600">
-            Write a Python script, add a <IC>floom.yaml</IC>, and deploy. Floom handles the sandbox, API endpoint, browser UI, MCP tool, and secrets — you own the code.
+            Write a Python script, add a <IC>floom.yaml</IC>, and deploy. Floom handles the sandbox, API endpoint, browser UI, MCP tool, and secrets. You own the code.
           </p>
+          {/* Fix #9: primary CTA is "Try the live demo", secondary is "Mint an agent token" */}
           <div className="mt-6 flex flex-wrap gap-3">
             <Link
-              href="/tokens"
+              href="/p/meeting-action-items"
               className="rounded-md bg-[#11110f] px-4 py-2 text-sm font-semibold text-white hover:bg-neutral-800 transition-colors"
             >
-              Create token
+              Try the live demo
             </Link>
             <Link
-              href="/p/meeting-action-items"
+              href="/tokens"
               className="rounded-md border border-[#ded8cc] bg-white px-4 py-2 text-sm font-semibold text-neutral-800 hover:border-neutral-400 transition-colors"
             >
-              Run live demo
+              Mint an agent token
             </Link>
           </div>
         </div>
 
+        {/* Mobile TOC (fix #3) */}
+        <div className="mt-8">
+          <MobileToc />
+        </div>
+
         {/* Two-column layout: sticky sidebar + scrollable content */}
-        <div className="mt-12 flex gap-14">
+        <div className="mt-4 lg:mt-12 flex gap-14">
           <TocSidebar activeId={activeId} />
 
           <article className="min-w-0 flex-1">
@@ -379,13 +481,13 @@ export default function DocsContent() {
               </p>
               <CodeBlock label="Terminal">{launchCommand}</CodeBlock>
               <ol className="list-decimal space-y-2 pl-5">
-                <li><strong>Setup</strong> — opens a browser page to link your account. Token saved to <IC>~/.config/floom/token</IC>.</li>
-                <li><strong>Init</strong> — scaffolds <IC>floom.yaml</IC>, <IC>app.py</IC>, and <IC>requirements.txt</IC> in the current directory.</li>
-                <li><strong>Deploy</strong> — bundles the directory, uploads it, and registers the app under your account.</li>
-                <li><strong>Run</strong> — fires a synchronous run, waits for output, prints JSON.</li>
+                <li><strong>Setup</strong>: opens a browser page to link your account. Token saved to <IC>~/.config/floom/token</IC>.</li>
+                <li><strong>Init</strong>: scaffolds <IC>floom.yaml</IC>, <IC>app.py</IC>, and <IC>requirements.txt</IC> in the current directory.</li>
+                <li><strong>Deploy</strong>: bundles the directory, uploads it, and registers the app under your account.</li>
+                <li><strong>Run</strong>: fires a synchronous run, waits for output, prints JSON.</li>
               </ol>
               <p className="text-sm text-neutral-500">
-                After deploy, your app is live at <IC>https://floom.dev/p/your-slug</IC> with a browser UI, REST endpoint, and MCP tool — no extra config.
+                After deploy, your app is live at <IC>https://floom.dev/p/your-slug</IC> with a browser UI, REST endpoint, and MCP tool, no extra config.
               </p>
             </Section>
 
@@ -397,13 +499,13 @@ export default function DocsContent() {
                 When you deploy, Floom bundles the directory into a <IC>.tar.gz</IC>, stores it, and registers the metadata. When someone runs the app, Floom spins up a stock E2B sandbox, extracts the bundle, installs declared dependencies, and executes the command.
               </p>
               <ul className="list-disc space-y-2 pl-5">
-                <li>Each run is isolated — a fresh sandbox, no state from previous runs.</li>
+                <li>Each run is isolated: a fresh sandbox, no state from previous runs.</li>
                 <li>Inputs arrive via <IC>stdin</IC> and the <IC>FLOOM_INPUTS</IC> env var as JSON.</li>
                 <li>Output is whatever the command prints to stdout, optionally validated against a schema.</li>
                 <li>Python and Node.js both work. Python is the primary target.</li>
               </ul>
               <p className="text-sm text-neutral-500">
-                Floom is a thin wrapper — it does not rewrite your code or proxy HTTP traffic. The E2B sandbox is the execution environment; see <a className="underline" href="https://e2b.dev/docs" target="_blank" rel="noreferrer">e2b.dev/docs</a> for available system packages and preinstalled tools.
+                Floom is a thin wrapper. It does not rewrite your code or proxy HTTP traffic. The E2B sandbox is the execution environment; see <a className="underline" href="https://e2b.dev/docs" target="_blank" rel="noreferrer">e2b.dev/docs</a> for available system packages and preinstalled tools.
               </p>
             </Section>
 
@@ -411,7 +513,7 @@ export default function DocsContent() {
               <p>
                 The manifest lives at the root of your app directory. Only <IC>slug</IC> is required.
               </p>
-              <CodeBlock label="floom.yaml — all fields">{manifestFull}</CodeBlock>
+              <CodeBlock label="floom.yaml: all fields">{manifestFull}</CodeBlock>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm border-collapse">
                   <thead>
@@ -424,6 +526,7 @@ export default function DocsContent() {
                   <tbody className="divide-y divide-[#f0ede6]">
                     {[
                       ["slug", "Yes", "URL-safe identifier. Used in /p/:slug, API, and MCP calls."],
+                      ["name", "No", "Display name shown in the browser UI and app cards. Defaults to slug if omitted."],
                       ["command", "No", "Shell command to run the app. Auto-detected from app.py or index.js if omitted."],
                       ["input_schema", "No", "Relative path to a JSON Schema file. Floom validates inputs before running."],
                       ["output_schema", "No", "Relative path to a JSON Schema file. Floom validates stdout output against this."],
@@ -460,6 +563,28 @@ export default function DocsContent() {
                 If <IC>output_schema</IC> is declared, your app must print a JSON object as the last line of stdout, or write it to <IC>/home/user/output.json</IC>.
               </p>
               <CodeBlock label="Output behaviour by config">{outputModes}</CodeBlock>
+
+              {/* Fix #8: enum / min-max / pattern / oneOf examples */}
+              <div className="mt-6">
+                <p className="font-semibold text-[#11110f]">Supported schema constraints</p>
+                <p className="mt-1 text-sm text-neutral-500">
+                  Floom passes standard JSON Schema constraints through to validation. Use any of these in your input or output schemas.
+                </p>
+                <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <CodeBlock label="Enum: restrict to a fixed set of values">{schemaEnumExample}</CodeBlock>
+                  </div>
+                  <div>
+                    <CodeBlock label="Min / max: bound a numeric range">{schemaMinMaxExample}</CodeBlock>
+                  </div>
+                  <div>
+                    <CodeBlock label="Pattern: validate a string with regex">{schemaPatternExample}</CodeBlock>
+                  </div>
+                  <div>
+                    <CodeBlock label="oneOf: discriminated union of shapes">{schemaOneOfExample}</CodeBlock>
+                  </div>
+                </div>
+              </div>
             </Section>
 
             <Section id="secrets" title="Secrets">
@@ -514,19 +639,19 @@ export default function DocsContent() {
                 Apps that may run longer than 250 seconds should be called <strong>without</strong> <IC>?wait=true</IC>. The default POST returns <IC>202</IC> with an <IC>execution_id</IC> immediately; your code then polls until the status is terminal.
               </p>
               <ol className="list-decimal space-y-2 pl-5">
-                <li><strong>POST without <IC>?wait=true</IC></strong> — returns <IC>202 {`{ execution_id, status: "queued" }`}</IC> right away.</li>
-                <li><strong>Poll <IC>GET /api/executions/:id</IC></strong> every 1–2 s until <IC>status</IC> is <IC>succeeded</IC>, <IC>failed</IC>, <IC>timed_out</IC>, or <IC>cancelled</IC>.</li>
+                <li><strong>POST without <IC>?wait=true</IC></strong>: returns <IC>202 {`{ execution_id, status: "queued" }`}</IC> right away.</li>
+                <li><strong>Poll <IC>GET /api/executions/:id</IC></strong> every 1-2 s until <IC>status</IC> is <IC>succeeded</IC>, <IC>failed</IC>, <IC>timed_out</IC>, or <IC>cancelled</IC>.</li>
                 <li><strong>Read the result</strong> from <IC>.output</IC> in the final poll response.</li>
               </ol>
-              <CodeBlock label="Step 1 — fire and forget">{asyncFireAndForgetExample}</CodeBlock>
-              <CodeBlock label="Step 2 — poll for result">{asyncPollExample}</CodeBlock>
+              <CodeBlock label="Step 1: fire and forget">{asyncFireAndForgetExample}</CodeBlock>
+              <CodeBlock label="Step 2: poll for result">{asyncPollExample}</CodeBlock>
               <p>
-                The <IC>floom run</IC> CLI does this polling automatically — no extra code needed for command-line use.
+                The <IC>floom run</IC> CLI does this polling automatically, no extra code needed for command-line use.
               </p>
               <p>
                 If you prefer a blocking call with a time budget, pass <IC>?wait=true</IC> to wait up to 250 s for completion:
               </p>
-              <CodeBlock label="Sync style (≤ 250s budget)">{asyncSyncBudgetExample}</CodeBlock>
+              <CodeBlock label="Sync style (up to 250s budget)">{asyncSyncBudgetExample}</CodeBlock>
               <p className="text-sm text-neutral-500">
                 Async mode is the default for REST calls. Only use <IC>?wait=true</IC> when you need a single blocking response and your app reliably finishes within 250 s.
               </p>
@@ -537,7 +662,8 @@ export default function DocsContent() {
                 Floom exposes a Model Context Protocol server at <IC>https://floom.dev/mcp</IC>. Add it to Claude Desktop, Cursor, or any MCP-compatible client.
               </p>
               <CodeBlock label="Claude Desktop config">{mcpConfigExample}</CodeBlock>
-              <CodeBlock label="Available tools">{mcpToolsExample}</CodeBlock>
+              {/* Fix #4: all 15 MCP tools with descriptions grouped by purpose */}
+              <CodeBlock label="All 15 available tools">{mcpToolsExample}</CodeBlock>
               <p>
                 The <IC>get_app_contract</IC> tool returns a self-contained walkthrough designed for AI agents that need to understand how Floom works before building or running apps.
               </p>
@@ -552,8 +678,9 @@ export default function DocsContent() {
                 Apps that need to call external services can use Floom Connections, powered by Composio. Connect your accounts once via OAuth in Settings, then reference the connection in your app as an env var.
               </p>
               <CodeBlock label="Python app using Gmail">{composioExample}</CodeBlock>
+              {/* Fix #5: updated connections list with 77 providers */}
               <p>
-                Available connections: <strong>Gmail</strong>, <strong>Slack</strong>, <strong>GitHub</strong>. More rolling out — check <a href="/connections" className="underline">floom.dev/connections</a>.
+                77 managed-auth providers available, including <strong>Gmail</strong>, <strong>Slack</strong>, <strong>GitHub</strong>, <strong>Notion</strong>, <strong>Linear</strong>, <strong>Google Calendar</strong>, <strong>HubSpot</strong>, <strong>Stripe</strong>, <strong>Salesforce</strong>, <strong>Asana</strong>, <strong>Airtable</strong>, <strong>Discord</strong>, <strong>Zoom</strong>, <strong>Trello</strong>, <strong>Figma</strong>, <strong>Mailchimp</strong>, <strong>Outlook</strong>, <strong>Google Drive</strong>, <strong>Google Docs</strong>, <strong>Google Sheets</strong>, <strong>Calendly</strong>, <strong>Sentry</strong>, <strong>Supabase</strong>, and more. See the full list at <a href="/connections" className="underline">floom.dev/connections</a>.
               </p>
               <p className="text-sm text-neutral-500">
                 Composio proxies OAuth tokens; your credentials are never stored in the app bundle or visible in logs. Rate limit on the Composio proxy: 60 calls per minute per token.
@@ -627,7 +754,7 @@ export default function DocsContent() {
 
             <Section id="ci-automation" title="CI / automation">
               <p>
-                Set <IC>FLOOM_TOKEN</IC> as a repository secret and reference it in your workflow. The CLI reads it automatically — no <IC>floom setup</IC> needed in CI.
+                Set <IC>FLOOM_TOKEN</IC> as a repository secret and reference it in your workflow. The CLI reads it automatically, no <IC>floom setup</IC> needed in CI.
               </p>
               <CodeBlock label="GitHub Actions">{ciExample}</CodeBlock>
               <p>
@@ -669,8 +796,9 @@ export default function DocsContent() {
                   </tbody>
                 </table>
               </div>
+              {/* Fix #1: corrected footnote from "60-second cap" to "290-second cap" */}
               <p className="text-sm text-neutral-500">
-                Runs exceeding the 60-second cap return <IC>status: timed_out</IC>. Async run support is on the roadmap for long-running jobs.
+                Runs exceeding the 290-second cap return <IC>status: timed_out</IC>. For longer jobs, see the Async runs section.
               </p>
             </Section>
 
@@ -691,7 +819,7 @@ export default function DocsContent() {
                   },
                   {
                     q: "Can I run JavaScript or TypeScript?",
-                    a: "Yes. Add a package.json with a start script and Floom runs npm install && npm start. TypeScript needs a compile step — add it to the start script or use ts-node.",
+                    a: "Yes. Add a package.json with a start script and Floom runs npm install && npm start. TypeScript needs a compile step; add it to the start script or use ts-node.",
                   },
                   {
                     q: "Is my app code private?",
@@ -705,6 +833,14 @@ export default function DocsContent() {
                     q: "My Gemini key is hitting quota. What should I do?",
                     a: "Add your own GEMINI_API_KEY as a secret and use it in your app. The free Gemini tier allows roughly 15 requests per minute; upgrade to a paid key for higher throughput.",
                   },
+                  {
+                    q: "How do I run a job that takes longer than 5 minutes?",
+                    a: "Use async mode: POST without ?wait=true to get an execution_id immediately, then poll GET /api/executions/:id until the status is succeeded or failed. The sandbox timeout is 290 seconds per run. For jobs longer than that, split the work across multiple runs or restructure the job.",
+                  },
+                  {
+                    q: "Can I update my account email?",
+                    a: "Not via the UI yet. Email team@floom.dev with your current email and the new one; we update it manually during alpha.",
+                  },
                 ].map(({ q, a }) => (
                   <div key={q}>
                     <p className="font-semibold text-[#11110f]">{q}</p>
@@ -715,6 +851,15 @@ export default function DocsContent() {
             </Section>
 
           </article>
+        </div>
+      </div>
+
+      {/* Fix #10: last-updated + version indicator */}
+      <div className="border-t border-[#ded8cc] bg-[#faf9f5]">
+        <div className="mx-auto max-w-6xl px-5 py-4">
+          <p className="text-xs text-neutral-400">
+            Last updated: 2026-05-04 · Floom v0.3
+          </p>
         </div>
       </div>
 
