@@ -83,6 +83,7 @@ export default withSentryConfig(nextConfig, {
   silent: !process.env.SENTRY_AUTH_TOKEN || !process.env.CI,
   telemetry: false,
   release: {
+    name: process.env.VERCEL_GIT_COMMIT_SHA || process.env.SENTRY_RELEASE || undefined,
     create: Boolean(process.env.SENTRY_AUTH_TOKEN),
   },
   sourcemaps: {
