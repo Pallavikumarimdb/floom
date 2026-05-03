@@ -1272,7 +1272,7 @@ async function publishApp(args: JsonObject, context: McpToolContext): Promise<Mc
   form.append("manifest", textBlob(manifestToYaml(manifestResult.manifest), "application/x-yaml"), "floom.yaml");
   form.append(
     "bundle",
-    new Blob([bundle], { type: "application/gzip" }),
+    new Blob([bundle.buffer.buffer.slice(bundle.buffer.byteOffset, bundle.buffer.byteOffset + bundle.buffer.byteLength) as ArrayBuffer], { type: "application/gzip" }),
     "bundle.tar.gz"
   );
 
