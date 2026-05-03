@@ -36,7 +36,7 @@ export async function GET(
   const { id } = await params;
 
   if (!UUID_RE.test(id)) {
-    return NextResponse.json({ error: "Run not found" }, { status: 400 });
+    return NextResponse.json({ error: "Invalid run id" }, { status: 400 });
   }
 
   if (!hasSupabaseConfig()) {
