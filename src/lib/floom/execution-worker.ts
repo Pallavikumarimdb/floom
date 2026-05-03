@@ -1,0 +1,863 @@
+import Ajv from "ajv";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { killSandboxExecution, pollSandboxExecution, startSandboxExecution } from "@/lib/e2b/runner";
+import {
+  executionLeaseMs,
+  executionTtlMs,
+  formatExecutionSnapshot,
+  isTerminalExecutionStatus,
+  nextPollDelaySeconds,
+  normalizeExecutionStatus,
+  queueTtlMs,
+  sandboxTimeoutMs,
+  sanitizePublicError,
+  staleRunningMs,
+  type ExecutionRow,
+} from "@/lib/floom/executions";
+import { MAX_SOURCE_BYTES } from "@/lib/floom/limits";
+import { publishExecutionProcessMessage } from "@/lib/floom/queue";
+import { readRuntimeDependencies } from "@/lib/floom/requirements";
+import { resolveRuntimeSecrets } from "@/lib/floom/runtime-secrets";
+import { redactExactSecretValues, redactSecretOutput } from "@/lib/floom/schema";
+
+const ajv = new Ajv({ strict: false });
+
+type AppRow = {
+  id: string;
+  owner_id: string;
+  slug: string;
+  public: boolean;
+  runtime: "python";
+  entrypoint: string;
+  handler: string;
+  max_concurrency?: number | null;
+};
+
+type VersionRow = {
+  id: string;
+  app_id: string;
+  bundle_path: string;
+  input_schema: Record<string, unknown>;
+  output_schema: Record<string, unknown>;
+  dependencies: Record<string, unknown>;
+  secrets: string[];
+};
+
+type ExecutionEventInsert = {
+  execution_id: string;
+  kind: "status" | "progress" | "stdout" | "stderr" | "heartbeat" | "system";
+  payload: Record<string, unknown> | null;
+};
+
+class LeaseLostError extends Error {
+  constructor() {
+    super("Execution lease is no longer owned by this worker");
+  }
+}
+
+class WorkerMutationError extends Error {
+  constructor(message: string) {
+    super(message);
+  }
+}
+
+export async function processExecutionOnce(
+  admin: SupabaseClient,
+  executionId: string,
+  baseUrl?: string
+) {
+  const leaseToken = crypto.randomUUID();
+  const leaseExpiresAt = new Date(Date.now() + executionLeaseMs()).toISOString();
+  const { data: claimedRows, error: claimError } = await admin.rpc("claim_execution_lease", {
+    p_execution_id: executionId,
+    p_lease_token: leaseToken,
+    p_lease_expires_at: leaseExpiresAt,
+  });
+
+  if (claimError) {
+    return { status: 500, body: { error: "Failed to claim execution lease" } };
+  }
+
+  const execution = Array.isArray(claimedRows) ? (claimedRows[0] as ExecutionRow | undefined) : null;
+  if (!execution) {
+    return { status: 202, body: { ok: true, skipped: "lease_unavailable" } };
+  }
+
+  if (isTerminalExecutionStatus(execution.status)) {
+    return { status: 200, body: { ok: true, skipped: "terminal" } };
+  }
+
+  const context = await loadExecutionContext(admin, execution);
+  if (!context.ok) {
+    await finalizeExecution(admin, execution, leaseToken, "failed", context.error, null);
+    return { status: 200, body: { ok: true, terminal: "failed" } };
+  }
+
+  if (execution.cancel_requested_at) {
+    await cancelExecution(admin, execution, leaseToken);
+    return { status: 200, body: { ok: true, terminal: "cancelled" } };
+  }
+
+  const status = normalizeExecutionStatus(execution.status);
+  try {
+    if (status === "queued") {
+      await scheduleNextPoll(admin, execution, leaseToken, 5, baseUrl);
+      return { status: 202, body: { ok: true, queued: "concurrency_limit" } };
+    }
+
+    if (!execution.sandbox_id) {
+      return startExecution(admin, execution, context.app, context.version, leaseToken, baseUrl);
+    }
+
+    return pollExecution(admin, execution, context.app, context.version, leaseToken, baseUrl);
+  } catch (error) {
+    if (error instanceof LeaseLostError) {
+      return { status: 202, body: { ok: true, skipped: "lease_lost" } };
+    }
+    return { status: 503, body: { error: "Failed to process execution" } };
+  }
+}
+
+export async function sweepExecutions(admin: SupabaseClient, baseUrl?: string) {
+  const now = Date.now();
+  const queuedBefore = new Date(now - queueTtlMs()).toISOString();
+  const staleBefore = new Date(now - staleRunningMs()).toISOString();
+  const ttlBefore = new Date(now - executionTtlMs()).toISOString();
+
+  const { data: staleQueued } = await admin
+    .from("executions")
+    .select("*")
+    .eq("status", "queued")
+    .lt("created_at", queuedBefore)
+    .limit(50)
+    .returns<ExecutionRow[]>();
+
+  for (const execution of staleQueued ?? []) {
+    await forceFinalizeExecution(admin, execution, "timed_out", "Execution exceeded SANDBOX_TIMEOUT_MS", null, {
+      timed_out_at: new Date().toISOString(),
+    });
+  }
+
+  const { data: heartbeatStaleRunning } = await admin
+    .from("executions")
+    .select("*")
+    .eq("status", "running")
+    .lt("last_heartbeat_at", staleBefore)
+    .or(`started_at.is.null,started_at.gte.${ttlBefore}`)
+    .limit(50)
+    .returns<ExecutionRow[]>();
+
+  for (const execution of heartbeatStaleRunning ?? []) {
+    await recoverOrTerminateStaleRunning(admin, execution, "stale_heartbeat");
+  }
+
+  const { data: ttlRunning } = await admin
+    .from("executions")
+    .select("*")
+    .eq("status", "running")
+    .lt("started_at", ttlBefore)
+    .limit(50)
+    .returns<ExecutionRow[]>();
+
+  for (const execution of ttlRunning ?? []) {
+    await recoverOrTerminateStaleRunning(admin, execution, "ttl");
+  }
+
+  const { data: staleLeases } = await admin
+    .from("executions")
+    .select("*")
+    .in("status", ["queued", "running"])
+    .lt("lease_expires_at", new Date().toISOString())
+    .limit(50)
+    .returns<ExecutionRow[]>();
+
+  for (const execution of staleLeases ?? []) {
+    if (isTerminalExecutionStatus(execution.status)) {
+      continue;
+    }
+    const { error: clearError } = await admin.rpc("clear_execution_lease", { p_execution_id: execution.id });
+    if (clearError) {
+      continue;
+    }
+    await publishExecutionProcessMessage({
+      executionId: execution.id,
+      pollCount: execution.poll_count + 1,
+      delaySeconds: 0,
+      baseUrl,
+    }).catch(() => undefined);
+  }
+
+  return {
+    stale_queued: staleQueued?.length ?? 0,
+    stale_running: (heartbeatStaleRunning?.length ?? 0) + (ttlRunning?.length ?? 0),
+    stale_leases: staleLeases?.length ?? 0,
+  };
+}
+
+async function startExecution(
+  admin: SupabaseClient,
+  execution: ExecutionRow,
+  app: AppRow,
+  version: VersionRow,
+  leaseToken: string,
+  baseUrl?: string
+) {
+  const bundle = await loadBundle(admin, version.bundle_path);
+  if (!bundle.ok) {
+    await finalizeExecution(admin, execution, leaseToken, "failed", bundle.error, null);
+    return { status: 200, body: { ok: true, terminal: "failed" } };
+  }
+
+  const runtimeSecrets = await resolveRuntimeSecrets(
+    admin,
+    version.secrets ?? [],
+    app.id,
+    app.owner_id
+  );
+
+  if (!runtimeSecrets.ok) {
+    await finalizeExecution(admin, execution, leaseToken, "failed", runtimeSecrets.error, null);
+    return { status: 200, body: { ok: true, terminal: "failed" } };
+  }
+
+  if (runtimeSecrets.missing.length > 0) {
+    await finalizeExecution(
+      admin,
+      execution,
+      leaseToken,
+      "failed",
+      `Missing configured app secret(s): ${runtimeSecrets.missing.join(", ")}`,
+      null
+    );
+    return { status: 200, body: { ok: true, terminal: "failed" } };
+  }
+
+  // Re-read cancel_requested_at immediately before launching the sandbox.
+  // A DELETE request may have arrived after the lease was claimed, so the
+  // cancel flag could be set between claim_execution_lease returning and
+  // this point.  Holding the lease means no other worker can start this
+  // execution concurrently, so this single fresh SELECT closes the window.
+  const { data: freshRow } = await admin
+    .from("executions")
+    .select("cancel_requested_at, cancel_reason")
+    .eq("id", execution.id)
+    .eq("lease_token", leaseToken)
+    .maybeSingle<Pick<ExecutionRow, "cancel_requested_at" | "cancel_reason">>();
+
+  if (freshRow?.cancel_requested_at) {
+    await cancelExecution(admin, { ...execution, ...freshRow }, leaseToken);
+    return { status: 200, body: { ok: true, terminal: "cancelled" } };
+  }
+
+  let started: Awaited<ReturnType<typeof startSandboxExecution>> | null = null;
+  try {
+    started = await startSandboxExecution({
+      source: bundle.source,
+      inputs: execution.input,
+      runtime: app.runtime,
+      entrypoint: app.entrypoint,
+      handler: app.handler,
+      dependencies: readRuntimeDependencies(version.dependencies),
+      secrets: runtimeSecrets.envs,
+    });
+
+    const now = new Date().toISOString();
+    const pollDelaySeconds = nextPollDelaySeconds({ ...execution, started_at: now });
+    const nextPollAt = new Date(Date.now() + pollDelaySeconds * 1000).toISOString();
+    await updateExecutionByLease(admin, execution, leaseToken, {
+      status: "running",
+      started_at: execution.started_at ?? now,
+      last_heartbeat_at: now,
+      heartbeat_at: now,
+      sandbox_id: started.sandboxId,
+      sandbox_pid: started.pid,
+      next_poll_at: nextPollAt,
+    });
+    await insertExecutionEvents(admin, [
+      {
+        execution_id: execution.id,
+        kind: "status",
+        payload: { status: "running" },
+      },
+    ]);
+    const messageId = await publishExecutionProcessMessage({
+      executionId: execution.id,
+      pollCount: execution.poll_count + 1,
+      delaySeconds: pollDelaySeconds,
+      baseUrl,
+    });
+    await updateExecutionByLease(admin, execution, leaseToken, {
+      queue_message_id: messageId,
+      lease_token: null,
+      lease_expires_at: null,
+      lease_until: null,
+    });
+    return { status: 202, body: { ok: true, status: "running" } };
+  } catch (error) {
+    if (error instanceof LeaseLostError) {
+      return { status: 202, body: { ok: true, skipped: "lease_lost" } };
+    }
+    if (started) {
+      await killSandboxExecution(started.sandboxId, started.pid).catch((killError) => {
+        console.error("Failed to clean up sandbox after execution start error", {
+          executionId: execution.id,
+          sandboxId: started?.sandboxId,
+          error: killError,
+        });
+      });
+    }
+    await finalizeExecution(admin, execution, leaseToken, "failed", "App execution failed", null)
+      .catch(() => undefined);
+    return { status: 200, body: { ok: true, terminal: "failed" } };
+  }
+}
+
+async function pollExecution(
+  admin: SupabaseClient,
+  execution: ExecutionRow,
+  app: AppRow,
+  version: VersionRow,
+  leaseToken: string,
+  baseUrl?: string
+) {
+  if (execution.started_at) {
+    const elapsedMs = Date.now() - Date.parse(execution.started_at);
+    if (Number.isFinite(elapsedMs) && elapsedMs >= sandboxTimeoutMs()) {
+      await finalizeExecution(
+        admin,
+        execution,
+        leaseToken,
+        "timed_out",
+        "Execution exceeded SANDBOX_TIMEOUT_MS",
+        null,
+        { timed_out_at: new Date().toISOString() }
+      );
+      await killSandboxExecution(execution.sandbox_id, execution.sandbox_pid);
+      return { status: 200, body: { ok: true, terminal: "timed_out" } };
+    }
+  }
+
+  if (!execution.sandbox_id) {
+    await finalizeExecution(admin, execution, leaseToken, "failed", "App execution failed", null);
+    return { status: 200, body: { ok: true, terminal: "failed" } };
+  }
+
+  let pollResult;
+  try {
+    pollResult = await pollSandboxExecution({
+      sandboxId: execution.sandbox_id,
+      pid: execution.sandbox_pid,
+      stdoutOffset: execution.stdout_offset,
+      stderrOffset: execution.stderr_offset,
+    });
+  } catch {
+    await finalizeExecution(admin, execution, leaseToken, "failed", "App execution failed", null);
+    return { status: 200, body: { ok: true, terminal: "failed" } };
+  }
+
+  const eventInserts = await buildPollEventInserts(admin, execution, app, version, pollResult);
+
+  const now = new Date().toISOString();
+  if (pollResult.status === "running") {
+    const pollCount = execution.poll_count + 1;
+    const pollDelaySeconds = nextPollDelaySeconds({ ...execution, poll_count: pollCount });
+    const nextPollAt = new Date(Date.now() + pollDelaySeconds * 1000).toISOString();
+    await updateExecutionByLease(admin, execution, leaseToken, {
+      progress: pollResult.progress ?? execution.progress,
+      last_heartbeat_at: now,
+      heartbeat_at: now,
+      poll_count: pollCount,
+      stdout_offset: pollResult.stdoutOffset,
+      stderr_offset: pollResult.stderrOffset,
+      next_poll_at: nextPollAt,
+    });
+    await insertExecutionEvents(admin, [
+      ...eventInserts,
+      { execution_id: execution.id, kind: "heartbeat", payload: { at: now } },
+    ]);
+    let messageId: string;
+    try {
+      messageId = await publishExecutionProcessMessage({
+        executionId: execution.id,
+        pollCount,
+        delaySeconds: pollDelaySeconds,
+        baseUrl,
+      });
+    } catch {
+      await finalizeExecution(admin, execution, leaseToken, "failed", "App execution failed", null)
+        .catch(() => undefined);
+      await killSandboxExecution(execution.sandbox_id, execution.sandbox_pid);
+      return { status: 200, body: { ok: true, terminal: "failed" } };
+    }
+    try {
+      await updateExecutionByLease(admin, execution, leaseToken, {
+        queue_message_id: messageId,
+        lease_token: null,
+        lease_expires_at: null,
+        lease_until: null,
+      });
+    } catch (error) {
+      if (error instanceof LeaseLostError) {
+        return { status: 202, body: { ok: true, skipped: "lease_lost" } };
+      }
+      await finalizeExecution(admin, execution, leaseToken, "failed", "App execution failed", null)
+        .catch(() => undefined);
+      await killSandboxExecution(execution.sandbox_id, execution.sandbox_pid);
+      return { status: 200, body: { ok: true, terminal: "failed" } };
+    }
+    return { status: 202, body: { ok: true, status: "running" } };
+  }
+
+  if (pollResult.status === "succeeded") {
+    const validateOutput = ajv.compile(version.output_schema ?? {});
+    const outputValid = validateOutput(pollResult.output ?? {});
+    if (!outputValid) {
+      await finalizeExecution(admin, execution, leaseToken, "failed", "Output validation failed", null, {
+        progress: pollResult.progress ?? execution.progress,
+        stdout_offset: pollResult.stdoutOffset,
+        stderr_offset: pollResult.stderrOffset,
+      });
+      await insertExecutionEvents(admin, eventInserts);
+      await killSandboxExecution(execution.sandbox_id, execution.sandbox_pid);
+      return { status: 200, body: { ok: true, terminal: "failed" } };
+    }
+
+    const redactedOutput = redactSecretOutput(version.output_schema ?? {}, pollResult.output ?? {});
+    const runtimeSecrets = await resolveRuntimeSecrets(
+      admin,
+      version.secrets ?? [],
+      app.id,
+      app.owner_id
+    );
+    const finalOutput = runtimeSecrets.ok
+      ? redactExactSecretValues(redactedOutput, Object.values(runtimeSecrets.envs))
+      : redactedOutput;
+    await finalizeExecution(admin, execution, leaseToken, "succeeded", null, finalOutput, {
+      progress: pollResult.progress ?? execution.progress,
+      stdout_offset: pollResult.stdoutOffset,
+      stderr_offset: pollResult.stderrOffset,
+    });
+    await insertExecutionEvents(admin, eventInserts);
+    await killSandboxExecution(execution.sandbox_id, execution.sandbox_pid);
+    return { status: 200, body: { ok: true, terminal: "succeeded" } };
+  }
+
+  const terminalStatus = pollResult.status === "timed_out" ? "timed_out" : "failed";
+  // Resolve runtime secrets so we can scrub them out of pollResult.error
+  // before it lands in the public error field. The sandbox's stderr can
+  // surface env-var values via tracebacks (e.g. dumping an HTTP error body
+  // that included a leaked Authorization header).
+  const errorRedactSecrets = await resolveRuntimeSecrets(
+    admin,
+    version.secrets ?? [],
+    app.id,
+    app.owner_id
+  );
+  const errorSecretValues = errorRedactSecrets.ok
+    ? Object.values(errorRedactSecrets.envs)
+    : [];
+  await finalizeExecution(
+    admin,
+    execution,
+    leaseToken,
+    terminalStatus,
+    pollResult.error ?? "App execution failed",
+    null,
+    {
+      progress: pollResult.progress ?? execution.progress,
+      stdout_offset: pollResult.stdoutOffset,
+      stderr_offset: pollResult.stderrOffset,
+      timed_out_at: terminalStatus === "timed_out" ? new Date().toISOString() : execution.timed_out_at,
+    },
+    errorSecretValues
+  );
+  await insertExecutionEvents(admin, eventInserts);
+  await killSandboxExecution(execution.sandbox_id, execution.sandbox_pid);
+  return { status: 200, body: { ok: true, terminal: terminalStatus } };
+}
+
+async function cancelExecution(admin: SupabaseClient, execution: ExecutionRow, leaseToken: string) {
+  await finalizeExecution(admin, execution, leaseToken, "cancelled", "Execution was cancelled", null, {
+    cancel_reason: execution.cancel_reason ?? "caller",
+  });
+  if (execution.sandbox_id) {
+    await killSandboxExecution(execution.sandbox_id, execution.sandbox_pid);
+  }
+  await insertExecutionEvents(admin, [
+    { execution_id: execution.id, kind: "system", payload: { code: "cancel_completed" } },
+  ]);
+}
+
+async function finalizeExecution(
+  admin: SupabaseClient,
+  execution: ExecutionRow,
+  leaseToken: string,
+  status: "succeeded" | "failed" | "timed_out" | "cancelled",
+  error: string | null,
+  output: unknown | null,
+  extra: Record<string, unknown> = {},
+  secretValues: readonly string[] = []
+) {
+  const completedAt = new Date().toISOString();
+  const publicError = error === null ? null : sanitizePublicError(error, undefined, secretValues);
+  await updateExecutionByLease(admin, execution, leaseToken, {
+    status,
+    output,
+    error: publicError,
+    completed_at: completedAt,
+    last_heartbeat_at: completedAt,
+    heartbeat_at: completedAt,
+    lease_token: null,
+    lease_expires_at: null,
+    lease_until: null,
+    next_poll_at: null,
+    ...extra,
+  });
+  await insertExecutionEvents(admin, [
+    {
+      execution_id: execution.id,
+      kind: "status",
+      payload: {
+        status,
+        error: publicError,
+        completed_at: completedAt,
+      },
+    },
+  ]);
+}
+
+async function scheduleNextPoll(
+  admin: SupabaseClient,
+  execution: ExecutionRow,
+  leaseToken: string,
+  delaySeconds: number,
+  baseUrl?: string
+) {
+  const pollCount = execution.poll_count + 1;
+  const nextPollAt = new Date(Date.now() + delaySeconds * 1000).toISOString();
+  await updateExecutionByLease(admin, execution, leaseToken, {
+    poll_count: pollCount,
+    next_poll_at: nextPollAt,
+  });
+  const messageId = await publishExecutionProcessMessage({
+    executionId: execution.id,
+    pollCount,
+    delaySeconds,
+    baseUrl,
+  });
+  await updateExecutionByLease(admin, execution, leaseToken, {
+    queue_message_id: messageId,
+    lease_token: null,
+    lease_expires_at: null,
+    lease_until: null,
+  });
+}
+
+async function recoverOrTerminateStaleRunning(
+  admin: SupabaseClient,
+  execution: ExecutionRow,
+  reason: "stale_heartbeat" | "ttl"
+) {
+  const leaseToken = crypto.randomUUID();
+  const leaseExpiresAt = new Date(Date.now() + executionLeaseMs()).toISOString();
+  const { data: claimedRows, error: claimError } = await admin.rpc("claim_execution_lease", {
+    p_execution_id: execution.id,
+    p_lease_token: leaseToken,
+    p_lease_expires_at: leaseExpiresAt,
+  });
+
+  if (claimError) {
+    return;
+  }
+
+  const claimed = Array.isArray(claimedRows) ? (claimedRows[0] as ExecutionRow | undefined) : null;
+  if (!claimed || normalizeExecutionStatus(claimed.status) !== "running") {
+    return;
+  }
+
+  const context = await loadExecutionContext(admin, claimed);
+  if (!context.ok) {
+    await finalizeExecution(admin, claimed, leaseToken, "failed", context.error, null)
+      .catch(() => undefined);
+    return;
+  }
+
+  if (claimed.sandbox_id) {
+    const pollResult = await pollSandboxExecution({
+      sandboxId: claimed.sandbox_id,
+      pid: claimed.sandbox_pid,
+      stdoutOffset: claimed.stdout_offset,
+      stderrOffset: claimed.stderr_offset,
+    }).catch(() => null);
+
+    if (pollResult && pollResult.status !== "running") {
+      const eventInserts = await buildPollEventInserts(
+        admin,
+        claimed,
+        context.app,
+        context.version,
+        pollResult
+      );
+      if (pollResult.status === "succeeded") {
+        const validateOutput = ajv.compile(context.version.output_schema ?? {});
+        const outputValid = validateOutput(pollResult.output ?? {});
+        const runtimeSecrets = await resolveRuntimeSecrets(
+          admin,
+          context.version.secrets ?? [],
+          context.app.id,
+          context.app.owner_id
+        );
+        const redactedOutput = redactSecretOutput(context.version.output_schema ?? {}, pollResult.output ?? {});
+        const finalOutput = runtimeSecrets.ok
+          ? redactExactSecretValues(redactedOutput, Object.values(runtimeSecrets.envs))
+          : redactedOutput;
+        await finalizeExecution(
+          admin,
+          claimed,
+          leaseToken,
+          outputValid ? "succeeded" : "failed",
+          outputValid ? null : "Output validation failed",
+          outputValid ? finalOutput : null,
+          {
+            progress: pollResult.progress ?? claimed.progress,
+            stdout_offset: pollResult.stdoutOffset,
+            stderr_offset: pollResult.stderrOffset,
+          }
+        );
+      } else {
+        const terminalStatus = pollResult.status === "timed_out" ? "timed_out" : "failed";
+        await finalizeExecution(
+          admin,
+          claimed,
+          leaseToken,
+          terminalStatus,
+          pollResult.error ?? "App execution failed",
+          null,
+          {
+            progress: pollResult.progress ?? claimed.progress,
+            stdout_offset: pollResult.stdoutOffset,
+            stderr_offset: pollResult.stderrOffset,
+            timed_out_at: terminalStatus === "timed_out" ? new Date().toISOString() : claimed.timed_out_at,
+          }
+        );
+      }
+      await insertExecutionEvents(admin, eventInserts);
+      await killSandboxExecution(claimed.sandbox_id, claimed.sandbox_pid);
+      return;
+    }
+  }
+
+  await killSandboxExecution(claimed.sandbox_id, claimed.sandbox_pid);
+  if (reason === "ttl") {
+    await finalizeExecution(admin, claimed, leaseToken, "timed_out", "Execution exceeded SANDBOX_TIMEOUT_MS", null, {
+      timed_out_at: new Date().toISOString(),
+    }).catch(() => undefined);
+    return;
+  }
+
+  await finalizeExecution(admin, claimed, leaseToken, "timed_out", "Execution exceeded SANDBOX_TIMEOUT_MS", null, {
+    timed_out_at: new Date().toISOString(),
+  }).catch(() => undefined);
+}
+
+async function forceFinalizeExecution(
+  admin: SupabaseClient,
+  execution: ExecutionRow,
+  status: "succeeded" | "failed" | "timed_out" | "cancelled",
+  error: string | null,
+  output: unknown | null,
+  extra: Record<string, unknown> = {},
+  secretValues: readonly string[] = []
+) {
+  const completedAt = new Date().toISOString();
+  const publicError = error === null ? null : sanitizePublicError(error, undefined, secretValues);
+  const originalStatus = execution.status;
+  const originalLeaseToken = execution.lease_token;
+  let updateQuery = admin
+    .from("executions")
+    .update({
+      status,
+      output,
+      error: publicError,
+      completed_at: completedAt,
+      last_heartbeat_at: completedAt,
+      heartbeat_at: completedAt,
+      lease_token: null,
+      lease_expires_at: null,
+      lease_until: null,
+      next_poll_at: null,
+      ...extra,
+    })
+    .eq("id", execution.id)
+    .eq("status", originalStatus);
+
+  updateQuery = originalLeaseToken === null
+    ? updateQuery.is("lease_token", null)
+    : updateQuery.eq("lease_token", originalLeaseToken);
+
+  const { data, error: updateError } = await updateQuery
+    .select("*")
+    .maybeSingle<ExecutionRow>();
+
+  if (updateError || !data) {
+    return;
+  }
+
+  await insertExecutionEvents(admin, [
+    {
+      execution_id: execution.id,
+      kind: "status",
+      payload: { status, error: publicError, completed_at: completedAt },
+    },
+  ]).catch(() => undefined);
+}
+
+async function updateExecutionByLease(
+  admin: SupabaseClient,
+  execution: ExecutionRow,
+  leaseToken: string,
+  values: Record<string, unknown>
+) {
+  const { data, error } = await admin
+    .from("executions")
+    .update(values)
+    .eq("id", execution.id)
+    .eq("lease_token", leaseToken)
+    .gt("lease_expires_at", new Date().toISOString())
+    .in("status", ["queued", "running"])
+    .select("*")
+    .maybeSingle<ExecutionRow>();
+
+  if (error) {
+    throw new WorkerMutationError("Failed to update execution");
+  }
+  if (!data) {
+    throw new LeaseLostError();
+  }
+  return data;
+}
+
+async function insertExecutionEvents(admin: SupabaseClient, events: ExecutionEventInsert[]) {
+  if (events.length === 0) {
+    return;
+  }
+
+  const { error } = await admin.from("execution_events").insert(events);
+  if (error) {
+    throw new WorkerMutationError("Failed to append execution event");
+  }
+}
+
+async function buildPollEventInserts(
+  admin: SupabaseClient,
+  execution: ExecutionRow,
+  app: AppRow,
+  version: VersionRow,
+  pollResult: Awaited<ReturnType<typeof pollSandboxExecution>>
+) {
+  const eventInserts: ExecutionEventInsert[] = [];
+  const runtimeSecrets = await resolveRuntimeSecrets(
+    admin,
+    version.secrets ?? [],
+    app.id,
+    app.owner_id
+  );
+  const secretValues = runtimeSecrets.ok ? Object.values(runtimeSecrets.envs) : null;
+
+  if (pollResult.stdoutChunk && secretValues) {
+    eventInserts.push({
+      execution_id: execution.id,
+      kind: "stdout",
+      payload: { chunk: redactLogChunk(pollResult.stdoutChunk, secretValues) },
+    });
+  }
+  if (pollResult.stderrChunk && secretValues) {
+    eventInserts.push({
+      execution_id: execution.id,
+      kind: "stderr",
+      payload: { chunk: redactLogChunk(pollResult.stderrChunk, secretValues) },
+    });
+  }
+  if (pollResult.progress && JSON.stringify(pollResult.progress) !== JSON.stringify(execution.progress)) {
+    eventInserts.push({
+      execution_id: execution.id,
+      kind: "progress",
+      payload: { progress: pollResult.progress },
+    });
+  }
+
+  return eventInserts;
+}
+
+export function redactLogChunk(chunk: string, secretValues: string[]) {
+  const redacted = redactExactSecretValues(chunk, secretValues);
+  return typeof redacted === "string" ? redacted : "";
+}
+
+async function loadExecutionContext(admin: SupabaseClient, execution: ExecutionRow) {
+  const { data: app, error: appError } = await admin
+    .from("apps")
+    .select("id, owner_id, slug, public, runtime, entrypoint, handler, max_concurrency")
+    .eq("id", execution.app_id)
+    .maybeSingle<AppRow>();
+  if (appError || !app) {
+    return { ok: false as const, error: "App execution failed" };
+  }
+
+  const versionQuery = admin
+    .from("app_versions")
+    .select("id, app_id, bundle_path, input_schema, output_schema, dependencies, secrets")
+    .eq("app_id", app.id);
+  const { data: version, error: versionError } = execution.version_id
+    ? await versionQuery.eq("id", execution.version_id).maybeSingle<VersionRow>()
+    : await versionQuery.order("version", { ascending: false }).limit(1).maybeSingle<VersionRow>();
+
+  if (versionError || !version) {
+    return { ok: false as const, error: "App execution failed" };
+  }
+
+  return { ok: true as const, app, version };
+}
+
+async function loadBundle(admin: SupabaseClient, bundlePath: string) {
+  const { data, error } = await admin.storage.from("app-bundles").download(bundlePath);
+  if (error || !data) {
+    return { ok: false as const, error: "Failed to download app bundle" };
+  }
+
+  const source = await data.text();
+  if (Buffer.byteLength(source, "utf8") > MAX_SOURCE_BYTES) {
+    return { ok: false as const, error: "App source is too large" };
+  }
+
+  return { ok: true as const, source };
+}
+
+export async function executionSnapshotAfterWait(
+  admin: SupabaseClient,
+  executionId: string,
+  budgetMs: number
+) {
+  const deadline = Date.now() + budgetMs;
+  let last: ExecutionRow | null = null;
+  while (Date.now() < deadline) {
+    const { data } = await admin
+      .from("executions")
+      .select("*")
+      .eq("id", executionId)
+      .maybeSingle<ExecutionRow>();
+    if (data) {
+      last = data;
+      if (isTerminalExecutionStatus(data.status)) {
+        return { terminal: true, snapshot: formatExecutionSnapshot(data) };
+      }
+    }
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+  }
+
+  if (!last) {
+    return null;
+  }
+
+  return { terminal: false, snapshot: formatExecutionSnapshot(last) };
+}
