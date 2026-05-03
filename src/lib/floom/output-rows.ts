@@ -27,6 +27,21 @@ export function extractRows(output: unknown): TableRow[] | null {
 }
 
 // Union of all keys across all rows so heterogeneous shapes don't drop columns.
+// Key order is stable: first-appearance order across rows, ties broken alphabetically.
+// This prevents column order from varying on shareable-URL reload (where row order
+// from Supabase JSON differs from the initial in-memory render).
 export function unionKeys(rows: TableRow[]): string[] {
-  return Array.from(new Set(rows.flatMap((r) => Object.keys(r))));
+  const seen = new Map<string, number>(); // key → index of first appearance
+  let globalIdx = 0;
+  for (const row of rows) {
+    for (const key of Object.keys(row)) {
+      if (!seen.has(key)) {
+        seen.set(key, globalIdx++);
+      }
+    }
+  }
+  return Array.from(seen.keys()).sort((a, b) => {
+    const diff = (seen.get(a) ?? 0) - (seen.get(b) ?? 0);
+    return diff !== 0 ? diff : a.localeCompare(b);
+  });
 }
