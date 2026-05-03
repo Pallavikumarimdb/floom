@@ -3,43 +3,117 @@ import Link from "next/link";
 
 const SITE_URL = "https://floom.dev";
 
+// JSON-LD: marks the docs as an authoritative TechArticle so LLMs and search
+// engines understand this is structured developer documentation.
+const DOCS_STRUCTURED_DATA = {
+  "@context": "https://schema.org",
+  "@type": "TechArticle",
+  "@id": `${SITE_URL}/docs`,
+  name: "Floom Documentation",
+  headline: "Build and deploy small AI apps with Floom",
+  description:
+    "Complete reference for building, deploying, and running Floom apps: CLI, manifest, schemas, secrets, REST API, MCP, and examples.",
+  url: `${SITE_URL}/docs`,
+  inLanguage: "en",
+  isPartOf: { "@id": `${SITE_URL}#app` },
+  author: { "@type": "Organization", name: "Floom", url: SITE_URL },
+  publisher: { "@type": "Organization", name: "Floom", url: SITE_URL },
+  dateModified: "2026-05-04",
+  sameAs: [`${SITE_URL}/llms.txt`, `${SITE_URL}/llms-full.txt`],
+};
+
 export const metadata: Metadata = {
   title: "Docs",
-  description: "Build, publish, and run Floom apps: manifest reference, schemas, secrets, API, CLI, MCP, and examples.",
+  description:
+    "Build, publish, and run Floom apps: manifest reference, schemas, secrets, API, CLI, MCP, and examples.",
   alternates: { canonical: `${SITE_URL}/docs` },
   openGraph: {
     title: "Floom Docs",
-    description: "Everything you need to build and ship a Floom app: from CLI setup to MCP integration.",
+    description:
+      "Everything you need to build and ship a Floom app: from CLI setup to MCP integration.",
     url: `${SITE_URL}/docs`,
     images: [{ url: `${SITE_URL}/opengraph-image`, width: 1200, height: 630 }],
   },
 };
 
 const TOPIC_CARDS = [
-  { href: "/docs/quickstart", title: "Quick start", desc: "From zero to a running app in 60 seconds." },
-  { href: "/docs/manifest", title: "Manifest reference", desc: "Every field in floom.yaml explained." },
-  { href: "/docs/schemas", title: "Input / output schemas", desc: "JSON Schema: enum, min/max, pattern, oneOf." },
-  { href: "/docs/secrets", title: "Secrets", desc: "Encrypted secrets injected at run time." },
-  { href: "/docs/auth", title: "Authentication", desc: "Browser OAuth, CLI device flow, agent tokens." },
+  {
+    href: "/docs/quickstart",
+    title: "Quick start",
+    desc: "From zero to a running app in 60 seconds.",
+  },
+  {
+    href: "/docs/manifest",
+    title: "Manifest reference",
+    desc: "Every field in floom.yaml explained.",
+  },
+  {
+    href: "/docs/schemas",
+    title: "Input / output schemas",
+    desc: "JSON Schema: enum, min/max, pattern, oneOf.",
+  },
+  {
+    href: "/docs/secrets",
+    title: "Secrets",
+    desc: "Encrypted secrets injected at run time.",
+  },
+  {
+    href: "/docs/auth",
+    title: "Authentication",
+    desc: "Browser OAuth, CLI device flow, agent tokens.",
+  },
   { href: "/docs/api", title: "REST API", desc: "Run, poll, and publish via HTTP." },
-  { href: "/docs/mcp", title: "MCP for AI agents", desc: "All 15 tools: Claude Desktop, Cursor, and more." },
-  { href: "/docs/connections", title: "Connections", desc: "77 managed-auth providers via Composio." },
-  { href: "/docs/ci", title: "CI / automation", desc: "GitHub Actions snippet, programmatic deploy." },
-  { href: "/docs/examples", title: "Examples", desc: "5 working demo apps with run and source links." },
+  {
+    href: "/docs/mcp",
+    title: "MCP for AI agents",
+    desc: "All 15 tools: Claude Desktop, Cursor, and more.",
+  },
+  {
+    href: "/docs/connections",
+    title: "Connections",
+    desc: "77 managed-auth providers via Composio.",
+  },
+  {
+    href: "/docs/ci",
+    title: "CI / automation",
+    desc: "GitHub Actions snippet, programmatic deploy.",
+  },
+  {
+    href: "/docs/examples",
+    title: "Examples",
+    desc: "5 working demo apps with run and source links.",
+  },
   { href: "/docs/limits", title: "Limits", desc: "Sandbox timeout, rate limits, bundle caps." },
   { href: "/docs/faq", title: "FAQ", desc: "Common questions and troubleshooting." },
 ] as const;
 
 const QUICKSTART_STEPS = [
-  { n: 1, title: "Authenticate", desc: "Run floom setup once per machine. Opens a browser page to link your account." },
-  { n: 2, title: "Scaffold", desc: "Run floom init to generate floom.yaml, app.py, and requirements.txt." },
-  { n: 3, title: "Deploy", desc: "Run floom deploy to bundle and publish the app to your account." },
+  {
+    n: 1,
+    title: "Authenticate",
+    desc: "Run floom setup once per machine. Opens a browser page to link your account.",
+  },
+  {
+    n: 2,
+    title: "Scaffold",
+    desc: "Run floom init to generate floom.yaml, app.py, and requirements.txt.",
+  },
+  {
+    n: 3,
+    title: "Deploy",
+    desc: "Run floom deploy to bundle and publish the app to your account.",
+  },
   { n: 4, title: "Run it", desc: "Run floom run my-app or hit the live URL." },
 ] as const;
 
 export default function DocsOverviewPage() {
   return (
     <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(DOCS_STRUCTURED_DATA) }}
+      />
+
       {/* Hero */}
       <div className="max-w-3xl mb-12">
         <p className="mb-3 text-sm font-semibold text-emerald-700">Floom docs</p>
@@ -48,8 +122,11 @@ export default function DocsOverviewPage() {
         </h1>
         <p className="mt-4 text-lg text-neutral-600">
           Write a Python script, add a{" "}
-          <code className="rounded px-1.5 py-0.5 bg-[#f0ede6] border border-[#e0dbd0] text-[0.85em] font-mono text-[#2a2520]">floom.yaml</code>
-          , and deploy. Floom handles the sandbox, API endpoint, browser UI, MCP tool, and secrets. You own the code.
+          <code className="rounded px-1.5 py-0.5 bg-[#f0ede6] border border-[#e0dbd0] text-[0.85em] font-mono text-[#2a2520]">
+            floom.yaml
+          </code>
+          , and deploy. Floom handles the sandbox, API endpoint, browser UI, MCP tool, and secrets.
+          You own the code.
         </p>
         <div className="mt-6 flex flex-wrap gap-3">
           <Link
@@ -86,7 +163,10 @@ export default function DocsOverviewPage() {
           ))}
         </div>
         <div className="mt-3">
-          <Link href="/docs/quickstart" className="text-sm text-emerald-700 font-medium hover:underline">
+          <Link
+            href="/docs/quickstart"
+            className="text-sm text-emerald-700 font-medium hover:underline"
+          >
             Full quick start guide
           </Link>
         </div>
