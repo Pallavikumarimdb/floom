@@ -57,7 +57,10 @@ export async function GET(req: NextRequest) {
         `[composio/oauth/callback] CSRF mismatch for composio_account_id=${composioAccountId}: ` +
           `expected nonce (masked), got state=${returnedState ?? "(none)"}`
       );
-      return new NextResponse("Bad Request: OAuth state mismatch", { status: 400 });
+      return NextResponse.redirect(
+        `${origin}/connections?error=invalid_callback`,
+        { status: 302 }
+      );
     }
   }
 
@@ -72,7 +75,10 @@ export async function GET(req: NextRequest) {
       `[composio/oauth/callback] User mismatch for composio_account_id=${composioAccountId}: ` +
         `session user=${caller.userId}, connection owner=${pendingRow.user_id}`
     );
-    return new NextResponse("Bad Request: OAuth user mismatch", { status: 400 });
+    return NextResponse.redirect(
+      `${origin}/connections?error=invalid_callback`,
+      { status: 302 }
+    );
   }
 
   const isSuccess = rawStatus === "ACTIVE" || rawStatus === "" || rawStatus === "SUCCESS";
