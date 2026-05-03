@@ -32,7 +32,7 @@ import {
 } from "@/lib/floom/schema";
 import { executionSnapshotAfterWait } from "@/lib/floom/execution-worker";
 
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 const ajv = new Ajv({ strict: false });
 const DEFAULT_PUBLIC_RUN_RATE_LIMIT_MAX = 20;

@@ -5,7 +5,7 @@ import { isAsyncRuntimeEnabled } from "@/lib/floom/executions";
 import { verifyQstashRequest } from "@/lib/floom/queue";
 import { sweepExecutions } from "@/lib/floom/execution-worker";
 
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 export async function POST(req: NextRequest) {
   if (!isAsyncRuntimeEnabled()) {
