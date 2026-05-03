@@ -71,6 +71,11 @@ const nextConfig: NextConfig = {
   },
 };
 
+// TODO(Federico): generate Sentry auth token at https://sentry.io/settings/account/api/auth-tokens/
+// with scopes: project:releases, org:read. Add to Vercel prod env as SENTRY_AUTH_TOKEN.
+// Then set SENTRY_ORG (extract from DSN host, e.g. "openpaper" from oXXX.ingest.sentry.io)
+// and SENTRY_PROJECT (extract from DSN path, e.g. "floom-minimal" from /<projectId>).
+// Once these three are set, the next deploy will upload source maps automatically.
 export default withSentryConfig(nextConfig, {
   org: process.env.SENTRY_ORG,
   project: process.env.SENTRY_PROJECT,
