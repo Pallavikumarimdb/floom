@@ -44,7 +44,15 @@ type RunState =
   | { kind: 'idle' }
   | { kind: 'running' }
   | { kind: 'ok'; output: unknown; ms: number }
-  | { kind: 'error'; message: string };
+  | { kind: 'error'; message: string; phase?: string; detail?: string };
+
+type ApiRunError = {
+  phase?: string;
+  stderr_tail?: string;
+  exit_code?: number;
+  elapsed_ms?: number;
+  detail?: string;
+};
 
 function fieldsFromSchema(schema: InputSchema | undefined) {
   if (!schema?.properties) return [];
@@ -153,13 +161,24 @@ export function RunSurface({ app, initialRun, initialInputs, examplePrefillInput
         body: JSON.stringify({ inputs: payload }),
       });
       const data = (await res.json().catch(() => null)) as
-        | { execution_id?: string; status?: string; output?: unknown; error?: string }
+        | { execution_id?: string; status?: string; output?: unknown; error?: string | ApiRunError | null }
         | null;
       const ms = Math.round(performance.now() - t0);
-      if (!res.ok || !data || data.error) {
+      const structuredError =
+        data && typeof data.error === 'object' && data.error !== null ? data.error as ApiRunError : null;
+      if (!res.ok || !data || data.status === 'failed' || data.status === 'timed_out' || data.error) {
         setState({
           kind: 'error',
-          message: data?.error ?? `Run failed (HTTP ${res.status})`,
+          message:
+            structuredError?.detail ||
+            (typeof data?.error === 'string' ? data.error : null) ||
+            `Run failed (HTTP ${res.status})`,
+          phase: structuredError?.phase,
+          detail:
+            structuredError?.stderr_tail ||
+            (structuredError?.exit_code !== undefined
+              ? `exit code ${structuredError.exit_code}`
+              : undefined),
         });
         return;
       }
@@ -169,6 +188,7 @@ export function RunSurface({ app, initialRun, initialInputs, examplePrefillInput
       setState({
         kind: 'error',
         message: err instanceof Error ? err.message : 'Network error',
+        detail: undefined,
       });
     }
   }
@@ -497,6 +517,33 @@ export function RunSurface({ app, initialRun, initialInputs, examplePrefillInput
                   Try again
                 </button>
               </div>
+              {state.phase && (
+                <p style={{ fontSize: 11.5, color: '#7f1d1d', marginTop: 8, marginBottom: 0, fontFamily: "'JetBrains Mono', ui-monospace, monospace" }}>
+                  phase: {state.phase}
+                </p>
+              )}
+              {state.detail && (
+                <pre
+                  style={{
+                    marginTop: 8,
+                    marginBottom: 0,
+                    maxHeight: 220,
+                    overflow: 'auto',
+                    whiteSpace: 'pre-wrap',
+                    wordBreak: 'break-word',
+                    fontSize: 11.5,
+                    lineHeight: 1.5,
+                    fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+                    color: '#7f1d1d',
+                    background: '#fff7f7',
+                    border: '1px solid #fecaca',
+                    borderRadius: 6,
+                    padding: 10,
+                  }}
+                >
+                  {state.detail}
+                </pre>
+              )}
               <p style={{ fontSize: 11.5, color: '#9b1c1c', marginTop: 8, marginBottom: 0, opacity: 0.8 }}>
                 {/timeout|timed out|too long|slow/i.test(state.message)
                   ? 'Sandbox can be slow on first run — give it a moment.'

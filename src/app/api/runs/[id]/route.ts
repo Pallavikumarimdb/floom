@@ -7,10 +7,11 @@ type ExecutionRow = {
   id: string;
   app_id: string;
   caller_user_id: string | null;
-  input: Record<string, unknown>;
+  input: unknown;
   output: unknown;
   status: string;
   error: string | null;
+  error_detail: Record<string, unknown> | null;
   created_at: string;
   completed_at: string | null;
 };
@@ -43,7 +44,7 @@ export async function GET(
 
   const { data: execution, error: executionError } = await admin
     .from("executions")
-    .select("id, app_id, caller_user_id, input, output, status, error, created_at, completed_at")
+    .select("id, app_id, caller_user_id, input, output, status, error, error_detail, created_at, completed_at")
     .eq("id", id)
     .maybeSingle<ExecutionRow>();
 
@@ -84,6 +85,7 @@ export async function GET(
     inputs: execution.input,
     output: execution.output,
     error: execution.error,
+    error_detail: execution.error_detail,
     created_at: execution.created_at,
     completed_at: execution.completed_at,
   });

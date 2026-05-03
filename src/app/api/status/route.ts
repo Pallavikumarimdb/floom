@@ -25,6 +25,7 @@ const FLOOM_ORIGIN =
 interface ProbeOptions {
   timeoutMs?: number;
   headers?: HeadersInit;
+  okStatuses?: number[];
 }
 
 async function probe(name: string, url: string, options: ProbeOptions = {}): Promise<Check> {
@@ -41,12 +42,17 @@ async function probe(name: string, url: string, options: ProbeOptions = {}): Pro
     });
     clearTimeout(timer);
     const latency = Date.now() - t0;
-    if (res.ok) {
+    if (res.ok || options.okStatuses?.includes(res.status)) {
       return {
         name,
         status: latency > 1500 ? "degraded" : "ok",
         latency_ms: latency,
-        detail: latency > 1500 ? `slow (${latency}ms)` : `ok (${latency}ms)`,
+        detail:
+          res.ok
+            ? latency > 1500
+              ? `slow (${latency}ms)`
+              : `ok (${latency}ms)`
+            : `reachable (HTTP ${res.status}, ${latency}ms)`,
       };
     }
     return {
@@ -87,6 +93,7 @@ export async function GET() {
           apikey: SUPABASE_ANON_KEY,
           authorization: `Bearer ${SUPABASE_ANON_KEY}`,
         },
+        okStatuses: [401],
       }),
     );
   } else {

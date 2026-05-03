@@ -6,9 +6,13 @@ const HASHED_EXACT_PINNED_REQUIREMENT_LINE =
 
 export type RuntimeDependencies = {
   python_requirements?: string;
+  python_require_hashes?: boolean;
 };
 
-export function validatePythonRequirementsText(text: string): string {
+export function validatePythonRequirementsText(
+  text: string,
+  options: { requireHashes?: boolean } = {}
+): string {
   if (Buffer.byteLength(text, "utf8") > MAX_REQUIREMENTS_BYTES) {
     throw new Error("requirements.txt is too large");
   }
@@ -27,8 +31,14 @@ export function validatePythonRequirementsText(text: string): string {
   }
 
   for (const line of normalizedLines) {
-    if (UNSAFE_REQUIREMENT.test(line) || !HASHED_EXACT_PINNED_REQUIREMENT_LINE.test(line)) {
-      throw new Error("requirements.txt only supports exact package pins with sha256 hashes like package==1.2.3 --hash=sha256:<64 hex>");
+    if (UNSAFE_REQUIREMENT.test(line)) {
+      throw new Error("requirements.txt must not use URLs, local paths, git refs, or pip flags");
+    }
+
+    if (options.requireHashes && !HASHED_EXACT_PINNED_REQUIREMENT_LINE.test(line)) {
+      throw new Error(
+        "requirements.txt only supports exact package pins with sha256 hashes like package==1.2.3 --hash=sha256:<64 hex>"
+      );
     }
   }
 
@@ -40,10 +50,20 @@ export function readRuntimeDependencies(value: unknown): RuntimeDependencies {
     return {};
   }
 
-  const pythonRequirements = (value as Record<string, unknown>).python_requirements;
+  const record = value as Record<string, unknown>;
+  const pythonRequirements = record.python_requirements;
+  const pythonRequireHashes = record.python_require_hashes;
+
   if (typeof pythonRequirements !== "string" || pythonRequirements.trim() === "") {
-    return {};
+    return typeof pythonRequireHashes === "boolean"
+      ? { python_require_hashes: pythonRequireHashes }
+      : {};
   }
 
-  return { python_requirements: validatePythonRequirementsText(pythonRequirements) };
+  return {
+    python_requirements: validatePythonRequirementsText(pythonRequirements, {
+      requireHashes: pythonRequireHashes === true,
+    }),
+    python_require_hashes: pythonRequireHashes === true,
+  };
 }

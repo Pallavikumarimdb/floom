@@ -1,0 +1,5 @@
+name: Multi-file Python
+slug: multi-file-python
+public: true
+input_schema: ./input.schema.json
+output_schema: ./output.schema.json

@@ -1,0 +1,6 @@
+name: Node Fetch
+slug: node-fetch
+public: true
+command: node index.js
+input_schema: ./input.schema.json
+output_schema: ./output.schema.json

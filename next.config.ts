@@ -22,8 +22,24 @@ const securityHeaders = [
   { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
 ];
 
+const tracedServerExternalPackages = [
+  "./node_modules/tar/**/*",
+  "./node_modules/@isaacs/fs-minipass/**/*",
+  "./node_modules/chownr/**/*",
+  "./node_modules/minipass/**/*",
+  "./node_modules/minizlib/**/*",
+  "./node_modules/yallist/**/*",
+  "./node_modules/js-yaml/**/*",
+  "./node_modules/argparse/**/*",
+];
+
 const nextConfig: NextConfig = {
   output: "standalone",
+  serverExternalPackages: ["tar", "js-yaml"],
+  outputFileTracingIncludes: {
+    "/api/**/*": tracedServerExternalPackages,
+    "/mcp": tracedServerExternalPackages,
+  },
   async headers() {
     return [
       {
