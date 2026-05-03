@@ -50,10 +50,20 @@ export async function GET(
     return NextResponse.json({ error: "App not found" }, { status: 404 });
   }
 
-  const canReadPrivate =
+  const isOwner =
     caller?.userId === app.owner_id && (callerHasScope(caller, "read") || callerHasScope(caller, "run"));
-  if (!app.public && !canReadPrivate) {
+  if (!app.public && !isOwner) {
     return NextResponse.json({ error: "App not found" }, { status: 404 });
+  }
+
+  // Executions are always private: only the app owner can list runs.
+  // Authenticated non-owners receive an empty list rather than a 403 to avoid
+  // leaking whether the app has any runs.
+  if (!caller) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  if (!isOwner) {
+    return NextResponse.json({ runs: [] });
   }
 
   const { data, error } = await admin
