@@ -20,6 +20,7 @@ type Connection = {
 type Toolkit = {
   name: string;
   slug: string;
+  coming_soon: boolean;
   meta: {
     description: string;
     logo: string;
@@ -417,15 +418,34 @@ export default function ConnectionsPage() {
                       </div>
                     )}
                   </div>
-                  <button
-                    type="button"
-                    disabled={working === toolkit.slug}
-                    onClick={() => connect(toolkit.slug)}
-                    className="btn-primary sm"
-                    style={{ flexShrink: 0, opacity: working === toolkit.slug ? 0.6 : 1 }}
-                  >
-                    {working === toolkit.slug ? "..." : "Connect"}
-                  </button>
+                  {toolkit.coming_soon ? (
+                    <span
+                      style={{
+                        flexShrink: 0,
+                        display: "inline-block",
+                        borderRadius: 6,
+                        padding: "4px 10px",
+                        fontSize: 11.5,
+                        fontWeight: 600,
+                        color: "var(--muted)",
+                        background: "var(--line)",
+                        border: "1px solid var(--line)",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      Coming soon
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={working === toolkit.slug}
+                      onClick={() => connect(toolkit.slug)}
+                      className="btn-primary sm"
+                      style={{ flexShrink: 0, opacity: working === toolkit.slug ? 0.6 : 1 }}
+                    >
+                      {working === toolkit.slug ? "..." : "Connect"}
+                    </button>
+                  )}
                 </div>
               ))}
             </div>
