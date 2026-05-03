@@ -89,7 +89,46 @@ export default async function Page({ params }: Props) {
   // rather than a loading skeleton.
   const initialApp = await fetchInitialApp(slug);
 
-  return <AppPermalinkPage initialApp={initialApp ?? undefined} />;
+  // JSON-LD: describe each public app as a WebApplication hosted on the Floom
+  // platform. Helps LLMs understand "this is a deployable app on Floom" when
+  // they crawl https://floom.dev/p/<slug>.
+  const appJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    name: initialApp?.name ?? slug,
+    url: `${SITE_URL}/p/${slug}`,
+    applicationCategory: "DeveloperApplication",
+    operatingSystem: "Web",
+    isPartOf: { "@id": `${SITE_URL}#app` },
+    offers: {
+      "@type": "Offer",
+      price: "0",
+      priceCurrency: "USD",
+    },
+    // Point agents to the REST and MCP entry-points for this app.
+    potentialAction: [
+      {
+        "@type": "Action",
+        name: "Run via REST API",
+        target: `${SITE_URL}/api/apps/${slug}/run`,
+      },
+      {
+        "@type": "Action",
+        name: "Run via MCP (run_app tool)",
+        target: `${SITE_URL}/mcp`,
+      },
+    ],
+  };
+
+  return (
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(appJsonLd) }}
+      />
+      <AppPermalinkPage initialApp={initialApp ?? undefined} />
+    </>
+  );
 }
 
 async function fetchInitialApp(slug: string): Promise<PermalinkInitialApp | null> {
@@ -100,8 +139,9 @@ async function fetchInitialApp(slug: string): Promise<PermalinkInitialApp | null
         id: demoApp.id,
         slug: demoApp.slug,
         name: demoApp.name,
-        handler: (demoApp as Record<string, unknown>).handler as string ?? null,
-        input_schema: (demoApp as Record<string, unknown>).input_schema as Record<string, unknown> ?? null,
+        handler: ((demoApp as Record<string, unknown>).handler as string) ?? null,
+        input_schema:
+          ((demoApp as Record<string, unknown>).input_schema as Record<string, unknown>) ?? null,
         public: true,
       };
     }
@@ -120,13 +160,15 @@ async function fetchInitialApp(slug: string): Promise<PermalinkInitialApp | null
 
     if (error || !app) return null;
 
-    const latestVersion = (app.app_versions as Array<{ input_schema: Record<string, unknown> | null }>)?.[0];
+    const latestVersion = (
+      app.app_versions as Array<{ input_schema: Record<string, unknown> | null }>
+    )?.[0];
 
     return {
       id: app.id,
       slug: app.slug,
       name: app.name,
-      handler: app.handler as string | null ?? null,
+      handler: (app.handler as string | null) ?? null,
       input_schema: latestVersion?.input_schema ?? null,
       public: app.public as boolean,
     };
