@@ -128,10 +128,10 @@ export default function LegalPage() {
             </a>
             . For release notes and outage context, follow{" "}
             <a
-              href="https://github.com/floomhq/floom-minimal"
+              href="https://github.com/floomhq/floom"
               className="font-semibold text-[var(--accent)] underline underline-offset-2"
             >
-              floomhq/floom-minimal
+              floomhq/floom
             </a>{" "}
             on GitHub.
           </p>
@@ -142,7 +142,7 @@ export default function LegalPage() {
             For security reports, email{" "}
             <code>security@floom.dev</code>. See{" "}
             <a
-              href="https://github.com/floomhq/floom-minimal/blob/main/SECURITY.md"
+              href="https://github.com/floomhq/floom/blob/main/SECURITY.md"
               className="font-semibold text-[var(--accent)] underline underline-offset-2"
             >
               SECURITY.md

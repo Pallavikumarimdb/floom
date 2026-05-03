@@ -159,10 +159,10 @@ export default async function StatusPage() {
         <p style={{ marginTop: 28, fontSize: 13, color: "var(--muted)", lineHeight: 1.55 }}>
           For incident updates, follow{" "}
           <a
-            href="https://github.com/floomhq/floom-minimal"
+            href="https://github.com/floomhq/floom"
             style={{ fontWeight: 600, color: "var(--accent)", textDecoration: "underline", textUnderlineOffset: 2 }}
           >
-            floomhq/floom-minimal
+            floomhq/floom
           </a>{" "}
           on GitHub or watch our Discord. Programmatic monitoring can poll{" "}
           <code style={{ fontFamily: "'JetBrains Mono', ui-monospace, monospace", fontSize: 12, background: "var(--bg)", border: "1px solid var(--line)", borderRadius: 4, padding: "1px 5px" }}>

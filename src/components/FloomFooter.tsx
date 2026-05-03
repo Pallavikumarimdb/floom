@@ -99,7 +99,7 @@ export function FloomFooter() {
             Legal
           </a>
           <a
-            href="https://github.com/floomhq/floom-minimal"
+            href="https://github.com/floomhq/floom"
             target="_blank"
             rel="noreferrer"
             aria-label="GitHub"
