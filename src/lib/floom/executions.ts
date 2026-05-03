@@ -190,7 +190,7 @@ export function appQueueMax() {
 }
 
 export function syncWaitBudgetMs() {
-  const planBudget = readPositiveIntegerEnv("FLOOM_SYNC_WAIT_BUDGET_MS", 55_000);
+  const planBudget = readPositiveIntegerEnv("FLOOM_SYNC_WAIT_BUDGET_MS", 250_000);
   return Math.min(planBudget, sandboxTimeoutMs());
 }
 

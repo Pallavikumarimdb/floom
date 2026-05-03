@@ -13,7 +13,7 @@ import {
 } from "@/lib/floom/executions";
 import { publishExecutionProcessMessage } from "@/lib/floom/queue";
 
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 type EventRow = {
   id: number;
