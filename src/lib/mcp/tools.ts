@@ -49,6 +49,7 @@ export type McpToolContext = {
 type FloomToolName =
   | "auth_status"
   | "list_my_connections"
+  | "list_apps"
   | "get_app_contract"
   | "list_app_templates"
   | "get_app_template"
@@ -58,6 +59,7 @@ type FloomToolName =
   | "get_app"
   | "run_app"
   | "get_execution"
+  | "set_secret"
   | "start_device_flow"
   | "poll_device_flow";
 
@@ -286,6 +288,38 @@ export const floomTools: McpToolDefinition[] = [
       additionalProperties: false,
     },
   },
+  {
+    name: "list_apps",
+    description: "List Floom apps owned by the current user. Use this to check for existing slugs before publishing. Requires Authorization: Bearer <agent-token> with read scope.",
+    inputSchema: {
+      type: "object",
+      properties: {},
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "set_secret",
+    description: "Set or update a named secret value for a Floom app. The value is encrypted at rest and injected as an environment variable at run time. Requires Authorization: Bearer <agent-token> with publish scope.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        slug: {
+          type: "string",
+          description: "The Floom app slug.",
+        },
+        name: {
+          type: "string",
+          description: "Secret name — must be an uppercase environment variable name (e.g. OPENAI_API_KEY).",
+        },
+        value: {
+          type: "string",
+          description: "Secret value. Do not log or expose this. The MCP server forwards it encrypted over HTTPS and never returns it.",
+        },
+      },
+      required: ["slug", "name", "value"],
+      additionalProperties: false,
+    },
+  },
 ];
 
 export async function callFloomTool(
@@ -365,6 +399,14 @@ async function callFloomToolUnchecked(
 
   if (name === "poll_device_flow") {
     return pollDeviceFlow(args, context);
+  }
+
+  if (name === "list_apps") {
+    return listApps(context);
+  }
+
+  if (name === "set_secret") {
+    return setSecret(args, context);
   }
 
   return findCandidateApps(args);
@@ -453,10 +495,48 @@ async function getExecution(args: JsonObject, context: McpToolContext): Promise<
     return errorResult("execution_id must be a string");
   }
 
-  return proxyJson(`${context.baseUrl}/api/executions/${encodeURIComponent(executionId)}`, {
-    method: "GET",
-    headers: forwardedHeaders(context),
-  });
+  const headers = forwardedHeaders(context);
+
+  // Try the async-runtime executions endpoint first. When async runtime is
+  // disabled or the ID was produced by a sync run, fall back to /api/runs/[id]
+  // which serves all execution records regardless of async mode.
+  const asyncResult = await proxyJson(
+    `${context.baseUrl}/api/executions/${encodeURIComponent(executionId)}`,
+    { method: "GET", headers },
+  );
+
+  if (!asyncResult.isError) {
+    return asyncResult;
+  }
+
+  // The async endpoint returned an error (404 when async disabled, or 404 for
+  // sync run IDs). Fall back to the runs endpoint which covers all runs.
+  const runsResult = await proxyJson(
+    `${context.baseUrl}/api/runs/${encodeURIComponent(executionId)}`,
+    { method: "GET", headers },
+  );
+
+  // Normalise the runs envelope to match the executions envelope shape so
+  // callers get a consistent { execution_id, status, output, error } object.
+  if (!runsResult.isError) {
+    try {
+      const run = JSON.parse(runsResult.content[0]?.text ?? "{}") as Record<string, unknown>;
+      const normalised = {
+        execution_id: run.id ?? executionId,
+        status: run.status,
+        output: run.output ?? null,
+        error: run.error ?? null,
+        started_at: run.started_at ?? null,
+        completed_at: run.completed_at ?? null,
+        progress: run.progress ?? null,
+      };
+      return okResult(normalised);
+    } catch {
+      return runsResult;
+    }
+  }
+
+  return asyncResult;
 }
 
 async function authStatus(context: McpToolContext): Promise<McpToolResult> {
@@ -561,6 +641,53 @@ async function pollDeviceFlow(args: JsonObject, context: McpToolContext): Promis
   });
 }
 
+async function listApps(context: McpToolContext): Promise<McpToolResult> {
+  if (!context.authorization) {
+    return errorResult("list_apps requires an Authorization bearer token");
+  }
+
+  return proxyJson(`${context.baseUrl}/api/apps`, {
+    method: "GET",
+    headers: forwardedHeaders(context),
+  });
+}
+
+async function setSecret(args: JsonObject, context: McpToolContext): Promise<McpToolResult> {
+  if (!context.authorization) {
+    return errorResult("set_secret requires an Authorization bearer token");
+  }
+
+  const slug = requiredSlug(args);
+  if (!slug) {
+    return errorResult("slug must be lowercase letters, numbers, and hyphens");
+  }
+
+  const name = args.name;
+  if (typeof name !== "string" || !name.trim()) {
+    return errorResult("name must be a non-empty string");
+  }
+
+  if (!/^[A-Z][A-Z0-9_]*$/.test(name.trim())) {
+    return errorResult("Secret name must be an uppercase environment variable name (e.g. OPENAI_API_KEY)");
+  }
+
+  const value = args.value;
+  if (typeof value !== "string" || value === "") {
+    return errorResult("value must be a non-empty string");
+  }
+
+  const body = JSON.stringify({ name: name.trim(), value });
+
+  return proxyJson(`${context.baseUrl}/api/apps/${encodeURIComponent(slug)}/secrets`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      ...forwardedHeaders(context),
+    },
+    body,
+  });
+}
+
 function getAppContract(): McpToolResult {
   const asyncEnabled = isAsyncRuntimeEnabled();
   const supportedFeatures = [
@@ -575,7 +702,7 @@ function getAppContract(): McpToolResult {
     "public apps with public: true; private apps when public is omitted or false",
     "legacy v0.1 runtime: python + entrypoint + handler manifests remain supported",
     ...(asyncEnabled
-      ? ["async execution handles through POST /run, GET /api/executions/<id>, and MCP get_execution"]
+      ? ["async execution handles through POST /api/apps/:slug/run, GET /api/executions/<id>, and MCP get_execution"]
       : []),
   ];
   return okResult({
@@ -768,8 +895,8 @@ function getAppContract(): McpToolResult {
       name: "run_app",
       requires_authorization_for_private_apps: true,
       response_envelope: asyncEnabled
-        ? "By default MCP calls POST /run?wait=true for compatibility. Set async=true to receive { execution_id, status: 'queued' } immediately, then call get_execution until status is terminal. Read result.output for the app result; the top level contains execution_id, status, output, and error."
-        : "MCP calls POST /run?wait=true. Read result.output for the app result; the top level contains execution_id, status, output, and error.",
+        ? "By default MCP calls POST /api/apps/:slug/run?wait=true for compatibility. Set async=true to receive { execution_id, status: 'queued' } immediately, then call get_execution until status is terminal. Read result.output for the app result; the top level contains execution_id, status, output, and error."
+        : "MCP calls POST /api/apps/:slug/run?wait=true. Read result.output for the app result; the top level contains execution_id, status, output, and error.",
       ...(asyncEnabled ? { async_is_caller_side: true } : { async_note: "Async runtime is not enabled on this deployment. Omit async or set async=false." }),
       status_vocabulary: ["queued", "running", "succeeded", "failed", "timed_out", "cancelled"],
     },
@@ -1375,14 +1502,32 @@ function validateManifest(args: JsonObject): McpToolResult {
     return errorResult(outputSchemaResult.error);
   }
 
+  const publishErrors: string[] = [];
+
+  // Slug format — must match the publish API's own SLUG_RE check.
+  if (!SLUG_RE.test(manifestResult.manifest.slug)) {
+    publishErrors.push(`slug "${manifestResult.manifest.slug}" is invalid; must be 3-64 lowercase letters, numbers, or hyphens with no leading/trailing hyphens`);
+  }
+
+  // Secrets names — must be valid env var names to inject at runtime.
+  const secrets = manifestResult.manifest.secrets ?? [];
+  for (const secretName of secrets) {
+    if (typeof secretName !== "string" || !/^[A-Z][A-Z0-9_]*$/.test(secretName)) {
+      publishErrors.push(`secret name "${secretName}" is invalid; must be an uppercase environment variable name (e.g. OPENAI_API_KEY)`);
+    }
+  }
+
   const commandDetectionError = detectManifestCommandError(manifestResult.manifest, filesHintResult?.files);
   if (commandDetectionError) {
+    publishErrors.push(commandDetectionError);
+  }
+
+  if (publishErrors.length > 0) {
     return okResult({
       valid: false,
-      scope: "manifest_and_optional_json_schemas_only",
-      full_check: "Use publish_app to validate source, required schemas, declared requirements, auth, and the publish API path.",
-      errors: [commandDetectionError],
-      unsupported_reason: commandDetectionError,
+      scope: "manifest_schemas_and_publish_time_checks",
+      full_check: "Use publish_app to run the full publish pipeline including auth, bundle upload, and version creation.",
+      errors: publishErrors,
       ...(runtimeCoaching.length > 0 ? { runtime_coaching: runtimeCoaching } : {}),
       manifest: manifestResult.manifest,
       schemas: {
@@ -1394,8 +1539,8 @@ function validateManifest(args: JsonObject): McpToolResult {
 
   return okResult({
     valid: true,
-    scope: "manifest_and_optional_json_schemas_only",
-    full_check: "Use publish_app to validate source, required schemas, declared requirements, auth, and the publish API path.",
+    scope: "manifest_schemas_and_publish_time_checks",
+    full_check: "Use publish_app to run the full publish pipeline including auth, bundle upload, and version creation.",
     ...(runtimeCoaching.length > 0 ? { runtime_coaching: runtimeCoaching } : {}),
     manifest: manifestResult.manifest,
     schemas: {
