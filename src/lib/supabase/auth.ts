@@ -25,6 +25,8 @@ export function getBearerToken(req: NextRequest) {
   return token.length > 0 ? token : null;
 }
 
+const AUTH_RESOLVE_TIMEOUT_MS = 8000;
+
 export async function resolveAuthCaller(
   req: NextRequest,
   admin: SupabaseClient
@@ -34,8 +36,25 @@ export async function resolveAuthCaller(
     return null;
   }
 
-  const { data: userData } = await admin.auth.getUser(token);
-  if (userData.user) {
+  // Supabase auth.getUser() makes an HTTP call to the auth service.
+  // Wrap it in a timeout to prevent hung requests from stalling the route
+  // handler when the auth service is slow or the JWT is malformed.
+  let userData: { user: { id: string } | null } | null = null;
+  try {
+    const result = await Promise.race([
+      admin.auth.getUser(token),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("auth_timeout")), AUTH_RESOLVE_TIMEOUT_MS)
+      ),
+    ]);
+    userData = result.data ?? null;
+  } catch {
+    // Timeout or network error — treat as unresolvable.
+    // Return null so the caller sees bearerToken + null => 401.
+    return null;
+  }
+
+  if (userData?.user) {
     return {
       kind: "user",
       userId: userData.user.id,
