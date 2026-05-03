@@ -27,14 +27,19 @@ export async function getAuthConfigIdForProvider(
     }
 
     const data = await response.json() as {
-      items?: Array<{ id: string; is_composio_managed?: boolean; status?: string }>;
+      items?: Array<{ id: string; is_composio_managed?: boolean; status?: string; toolkit?: { slug?: string } }>;
     };
 
+    // The Composio API may ignore toolkit_slug filter and return configs for other toolkits.
+    // Validate that the returned config's toolkit slug matches the requested provider.
     const item = data.items?.find(
-      (entry) => entry.is_composio_managed !== false && entry.status !== "DISABLED"
-    ) ?? data.items?.[0];
+      (entry) =>
+        entry.toolkit?.slug === provider &&
+        entry.is_composio_managed !== false &&
+        entry.status !== "DISABLED"
+    ) ?? data.items?.find((entry) => entry.toolkit?.slug === provider) ?? null;
 
-    if (!item?.id) {
+    if (!item || !item.id) {
       return null;
     }
 
