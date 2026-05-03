@@ -45,6 +45,11 @@ export type McpToolResult = {
 export type McpToolContext = {
   baseUrl: string;
   authorization?: string;
+  /** Caller IP headers forwarded from the original MCP HTTP request.
+   * Used by run_app to pass the real client IP through to the REST rate-limit
+   * check so all 30 parallel anon callers aren't collapsed onto one key. */
+  callerIp?: string;
+  callerUserAgent?: string;
 };
 
 type FloomToolName =
@@ -2110,7 +2115,20 @@ async function proxyJson(url: string, init: RequestInit): Promise<McpToolResult>
 }
 
 function forwardedHeaders(context: McpToolContext): HeadersInit {
-  return context.authorization ? { Authorization: context.authorization } : {};
+  const headers: Record<string, string> = {};
+  if (context.authorization) {
+    headers["Authorization"] = context.authorization;
+  }
+  // Forward the original caller's IP so the REST rate-limit check uses the
+  // real client identity, not the MCP server's internal address.
+  if (context.callerIp) {
+    headers["X-Forwarded-For"] = context.callerIp;
+    headers["X-Real-IP"] = context.callerIp;
+  }
+  if (context.callerUserAgent) {
+    headers["User-Agent"] = context.callerUserAgent;
+  }
+  return headers;
 }
 
 function parseManifestArgument(

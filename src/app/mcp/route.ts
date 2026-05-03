@@ -37,9 +37,19 @@ export async function POST(req: NextRequest) {
 
   let response: Awaited<ReturnType<typeof handleMcpRequest>>;
   try {
+    // Resolve the real caller IP: prefer cf-connecting-ip (Cloudflare), then
+    // the first hop of x-forwarded-for, then x-real-ip. This is forwarded
+    // through to any proxy requests (e.g. run_app) so rate limits apply per
+    // actual client, not per MCP server internal address.
+    const cfIp = req.headers.get("cf-connecting-ip");
+    const forwardedFor = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
+    const realIp = req.headers.get("x-real-ip");
+    const callerIp = cfIp || forwardedFor || realIp || undefined;
     response = await handleMcpRequest(payload, {
       baseUrl: resolveMcpForwardOrigin(req.url) ?? "",
       authorization: req.headers.get("authorization") ?? undefined,
+      callerIp,
+      callerUserAgent: req.headers.get("user-agent") ?? undefined,
     });
   } catch {
     return NextResponse.json({
