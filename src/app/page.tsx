@@ -111,7 +111,7 @@ function MvpHeroInstall() {
           fontFamily: "'Inter', system-ui, sans-serif",
         }}
       >
-        CLI for developers &mdash; free &amp; open-source, ~30s setup
+        CLI for developers, free &amp; open-source, ~30s setup
       </div>
       {/* Install card: secondary — for builders who want to ship */}
       <div

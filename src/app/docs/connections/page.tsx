@@ -8,16 +8,16 @@ export const metadata: Metadata = {
 };
 
 const composioExample = `# 1. Connect Gmail in your Floom settings (one-time browser OAuth)
-# 2. Add the connection ID as a secret:
+# 2. Set the connection ID as an app secret:
 npx @floomhq/cli@latest secrets set my-app COMPOSIO_CONNECTION_ID --value-stdin
 
-# 3. Use it in your Python app:
+# 3. Use it in your Python app — injected as an env var at runtime:
 import os
 from composio import ComposioToolSet
 
-toolset = ComposioToolSet()
+toolset = ComposioToolSet(entity_id=os.environ["COMPOSIO_CONNECTION_ID"])
 tools = toolset.get_tools(actions=["GMAIL_SEND_EMAIL"])
-# connection_id is read from COMPOSIO_CONNECTION_ID automatically`;
+# TODO: auto-injection from active connection is on the roadmap`;
 
 const PROVIDERS = [
   "Gmail", "Slack", "GitHub", "Notion", "Linear", "Google Calendar",

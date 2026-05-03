@@ -132,8 +132,6 @@ export function SiteHeader({ compact = false, onStudioMenuOpen }: Props = {}) {
   const isSignUpRoute = pathname === '/signup';
   const isAppPermalinkRoute = pathname?.startsWith('/p/') ?? false;
 
-  const isStudio = pathname?.startsWith('/studio');
-
   useEffect(() => {
     function onClick(e: MouseEvent) {
       if (dropRef.current && !dropRef.current.contains(e.target as Node)) {
@@ -188,7 +186,7 @@ export function SiteHeader({ compact = false, onStudioMenuOpen }: Props = {}) {
     <>
       <header
         className="topbar"
-        data-context={isStudio ? 'studio' : 'store'}
+        data-context="store"
         data-compact={compact ? 'true' : 'false'}
         style={compact ? { height: 40, top: 0 } : undefined}
       >
@@ -212,7 +210,7 @@ export function SiteHeader({ compact = false, onStudioMenuOpen }: Props = {}) {
               color: INK,
               flexShrink: 0,
             }}
-            aria-label="floom — home"
+            aria-label="floom home"
           >
             <FloomLogoMark size={compact ? MARK_SIZE_COMPACT : MARK_SIZE_DEFAULT} />
             <span
