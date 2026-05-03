@@ -9,7 +9,7 @@ const securityHeaders = [
       "base-uri 'self'",
       "object-src 'none'",
       "frame-ancestors 'none'",
-      "img-src 'self' data: blob: https://*.googleusercontent.com",
+      "img-src 'self' data: blob: https://*.googleusercontent.com https://logos.composio.dev",
       "font-src 'self' data:",
       "style-src 'self' 'unsafe-inline'",
       "script-src 'self' 'unsafe-inline' 'unsafe-eval'",

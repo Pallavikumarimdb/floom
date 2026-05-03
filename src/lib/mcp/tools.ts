@@ -48,6 +48,7 @@ export type McpToolContext = {
 
 type FloomToolName =
   | "auth_status"
+  | "list_my_connections"
   | "get_app_contract"
   | "list_app_templates"
   | "get_app_template"
@@ -67,6 +68,15 @@ export const floomTools: McpToolDefinition[] = [
   {
     name: "auth_status",
     description: "Report whether the current Authorization bearer token resolves to a Floom user or agent token.",
+    inputSchema: {
+      type: "object",
+      properties: {},
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "list_my_connections",
+    description: "List Composio provider connections owned by the current Floom user. Requires Authorization: Bearer <agent-token> with read scope.",
     inputSchema: {
       type: "object",
       properties: {},
@@ -297,6 +307,10 @@ async function callFloomToolUnchecked(
     return authStatus(context);
   }
 
+  if (name === "list_my_connections") {
+    return listMyConnections(context);
+  }
+
   if (name === "get_app_contract") {
     return getAppContract();
   }
@@ -457,6 +471,17 @@ async function authStatus(context: McpToolContext): Promise<McpToolResult> {
       caller.kind === "agent_token"
         ? caller.scopes
         : ["read", "run", "publish"],
+  });
+}
+
+async function listMyConnections(context: McpToolContext): Promise<McpToolResult> {
+  if (!context.authorization) {
+    return errorResult("list_my_connections requires an Authorization bearer token");
+  }
+
+  return proxyJson(`${context.baseUrl}/api/composio/connections`, {
+    method: "GET",
+    headers: forwardedHeaders(context),
   });
 }
 
