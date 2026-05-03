@@ -576,6 +576,8 @@ async function authStatus(context: McpToolContext): Promise<McpToolResult> {
       authenticated: false,
       authorization: "present",
       supabase_configured: true,
+      reason: "token_not_found",
+      next: "Token not recognized on this environment. Mint a new token via the start_device_flow MCP tool, or run: npx @floomhq/cli@latest setup",
     });
   }
 

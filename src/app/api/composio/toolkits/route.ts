@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getAvailableToolkits } from "@/lib/composio/auth-configs";
+import { getAvailableToolkitsWithReadiness } from "@/lib/composio/auth-configs";
 
 export const revalidate = 3600; // 1 hour cache at the edge
 
@@ -9,6 +9,6 @@ export async function GET() {
     return NextResponse.json({ toolkits: [] });
   }
 
-  const toolkits = await getAvailableToolkits(apiKey);
+  const toolkits = await getAvailableToolkitsWithReadiness(apiKey);
   return NextResponse.json({ toolkits });
 }
