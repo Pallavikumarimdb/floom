@@ -18,6 +18,8 @@ import {
 import { validatePythonRequirementsText } from "@/lib/floom/requirements";
 import { parseAndValidateJsonSchemaText } from "@/lib/floom/schema";
 import { resolveMcpForwardOrigin } from "@/lib/mcp/origin";
+import { sendEmail } from "@/lib/email/send";
+import { renderAppPublishedEmail } from "@/lib/email/templates";
 
 export async function GET(req: NextRequest) {
   if (!hasSupabaseConfig()) {
@@ -268,15 +270,59 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Failed to create app version" }, { status: 500 });
   }
 
+  const appUrl = new URL(
+    `/p/${app.slug}`,
+    resolveMcpForwardOrigin(req.url) || req.url,
+  ).toString();
+
+  // Fire app-published email. Best-effort: never fail the publish response.
+  void fireAppPublishedEmail(admin, ownerId, app.name, appUrl, req);
+
   return NextResponse.json({
     app: {
       id: app.id,
       slug: app.slug,
       name: app.name,
       public: app.public,
-      url: new URL(`/p/${app.slug}`, resolveMcpForwardOrigin(req.url) || req.url).toString(),
+      url: appUrl,
     },
   });
+}
+
+async function fireAppPublishedEmail(
+  admin: ReturnType<typeof createAdminClient>,
+  ownerId: string,
+  appName: string,
+  appUrl: string,
+  req: NextRequest,
+): Promise<void> {
+  try {
+    const { data: userData } = await admin.auth.admin.getUserById(ownerId);
+    const email = userData?.user?.email;
+    if (!email) return;
+
+    const name =
+      (userData.user?.user_metadata?.full_name as string | undefined) ??
+      (userData.user?.user_metadata?.name as string | undefined) ??
+      null;
+
+    const publicUrl =
+      process.env.FLOOM_ORIGIN ??
+      process.env.NEXT_PUBLIC_FLOOM_ORIGIN ??
+      process.env.NEXT_PUBLIC_APP_URL ??
+      new URL(req.url).origin;
+
+    const { subject, html, text } = renderAppPublishedEmail({
+      name,
+      appName,
+      appUrl,
+      publicUrl,
+    });
+
+    await sendEmail({ to: email, subject, html, text });
+  } catch (err) {
+    console.error("[apps:publish] notification email error:", err);
+  }
 }
 
 async function rollbackPublish(
