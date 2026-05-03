@@ -57,7 +57,7 @@ const STRUCTURED_DATA = {
       url: SITE_URL,
       logo: `${SITE_URL}/floom-mark.svg`,
       sameAs: [
-        "https://github.com/floomhq/floom-minimal",
+        "https://github.com/floomhq/floom",
         "https://discord.gg/8fXGXjxcRz",
       ],
     },
