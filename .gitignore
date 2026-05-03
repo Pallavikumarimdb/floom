@@ -79,3 +79,10 @@ templates/meeting-action-items/__pycache__/
 __pycache__/
 *.py[cod]
 ESCALATIONS.md
+SESSION_LOG.md
+WORKPLAN-*.md
+TODO-*.md
+*-internal.md
+*.bak
+*.orig
+*.tmp
