@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse, after } from "next/server";
 import type { EmailOtpType } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { sendEmail } from "@/lib/email/send";
 import { renderWelcomeEmail } from "@/lib/email/templates";
 
@@ -88,6 +89,10 @@ async function fireWelcomeEmail(
 // For OAuth provider signups (Google, GitHub, etc.) the callback arrives via
 // the code-exchange path without type=signup. Detect first-time signups by
 // checking whether the user's created_at is within the last 30 seconds.
+//
+// Idempotency: once the email is sent, write welcome_email_sent_at into
+// user_metadata so re-bounces through OAuth within the 30s window don't
+// fire a second email.
 async function maybeFireOAuthWelcomeEmail(
   supabase: Awaited<ReturnType<typeof createClient>>,
   publicOrigin: string,
@@ -97,6 +102,9 @@ async function maybeFireOAuthWelcomeEmail(
       data: { user },
     } = await supabase.auth.getUser();
     if (!user?.email || !user.created_at) return;
+
+    // Idempotency guard: skip if we already sent the welcome email.
+    if (user.user_metadata?.welcome_email_sent_at) return;
 
     const createdMs = new Date(user.created_at).getTime();
     const isNewUser = Date.now() - createdMs < 30_000;
@@ -113,6 +121,15 @@ async function maybeFireOAuthWelcomeEmail(
     });
 
     await sendEmail({ to: user.email, subject, html, text });
+
+    // Mark as sent so re-bounces within the 30s window don't re-fire.
+    const admin = createAdminClient();
+    await admin.auth.admin.updateUserById(user.id, {
+      user_metadata: {
+        ...user.user_metadata,
+        welcome_email_sent_at: new Date().toISOString(),
+      },
+    });
   } catch (err) {
     console.error("[auth:callback] oauth welcome email error:", err);
   }
