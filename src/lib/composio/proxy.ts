@@ -100,6 +100,22 @@ export async function getActiveConnectionForUser(
   return data;
 }
 
+async function fetchComposioEntityId(accountId: string, apiKey: string, fallbackUserId: string): Promise<string> {
+  try {
+    const res = await fetch(
+      `${composioApiBase()}/api/v3/connected_accounts/${encodeURIComponent(accountId)}`,
+      { headers: { "x-api-key": apiKey }, cache: "no-store" }
+    );
+    if (res.ok) {
+      const data = await res.json() as { user_id?: string };
+      if (data.user_id) return data.user_id;
+    }
+  } catch {
+    // fall through to fallback
+  }
+  return fallbackUserId;
+}
+
 async function callComposioTool(
   connection: ComposioConnectionRow,
   execution: ComposioProxyExecution
@@ -109,9 +125,14 @@ async function callComposioTool(
     throw new ComposioProxyConfigError("COMPOSIO_API_KEY is not configured");
   }
 
+  // Resolve the entity ID that Composio actually stored for this account.
+  // The v3 connected_accounts create endpoint ignores the user_id we send and
+  // stores its own entity (e.g. "default"), so we must look it up before executing.
+  const entityId = await fetchComposioEntityId(connection.composio_account_id, apiKey, composioUserId(execution.userId));
+
   const body: Record<string, unknown> = {
     connected_account_id: connection.composio_account_id,
-    user_id: composioUserId(execution.userId),
+    user_id: entityId,
   };
 
   if (execution.version) {
