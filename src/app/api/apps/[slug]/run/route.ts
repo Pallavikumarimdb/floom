@@ -53,7 +53,17 @@ export async function POST(
     return NextResponse.json({ error: "Request is too large" }, { status: 413 });
   }
 
-  const body = await req.json().catch(() => ({}));
+  let body: unknown;
+  try {
+    const rawBody = await req.text();
+    if (rawBody.trim() !== "") {
+      body = JSON.parse(rawBody);
+    } else {
+      body = {};
+    }
+  } catch {
+    return NextResponse.json({ error: "Request body must be valid JSON" }, { status: 400 });
+  }
   const inputs = (body as { inputs?: unknown }).inputs;
 
   const inputBytes = inputs === undefined ? 0 : Buffer.byteLength(JSON.stringify(inputs), "utf8");
