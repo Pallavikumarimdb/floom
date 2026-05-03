@@ -50,10 +50,13 @@ export async function POST(req: NextRequest) {
   const stateNonce = randomBytes(32).toString("hex");
 
   // Determine the callback URL (preview vs production)
+  // Embed the CSRF nonce as a query param in the callback URL so we can verify it
+  // on return. We do NOT pass it in Composio's connection.state field because the
+  // Composio v3 API requires state to be an object ({ authScheme }) not a plain string.
   const origin = req.headers.get("origin") || req.nextUrl.origin;
-  const callbackUrl = `${origin}/api/composio/oauth/callback`;
+  const callbackUrl = `${origin}/api/composio/oauth/callback?nonce=${stateNonce}`;
 
-  // Create the connected account in Composio, passing state nonce for CSRF
+  // Create the connected account in Composio
   let composioResponse: Response;
   try {
     composioResponse = await fetch(`${COMPOSIO_API_BASE}/api/v3/connected_accounts`, {
@@ -66,8 +69,7 @@ export async function POST(req: NextRequest) {
         user_id: `user:${caller.userId}`,
         auth_config: { id: authConfigId },
         connection: {
-          redirect_url: callbackUrl,
-          state: stateNonce,
+          callback_url: callbackUrl,
         },
       }),
       cache: "no-store",
