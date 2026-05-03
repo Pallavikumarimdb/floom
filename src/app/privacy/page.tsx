@@ -7,7 +7,7 @@ const SITE_URL = "https://floom.dev";
 export const metadata: Metadata = {
   title: "Privacy Policy · Floom",
   description:
-    "Privacy policy under GDPR Art. 13 for Floom — what data we process, on what legal basis, and your rights.",
+    "Privacy Policy for Floom, Inc. — what data we collect, how we use it, and your rights.",
   alternates: { canonical: `${SITE_URL}/privacy` },
 };
 
@@ -27,7 +27,7 @@ export default function PrivacyPage() {
         <p
           style={{ fontSize: "12px", fontWeight: 600, color: "var(--accent)", marginBottom: "12px" }}
         >
-          GDPR Art. 13
+          Last updated: 2026-05-03
         </p>
         <h1
           style={{ fontSize: "32px", fontWeight: 800, letterSpacing: "-0.025em", marginBottom: "16px" }}
@@ -35,56 +35,48 @@ export default function PrivacyPage() {
           Privacy Policy
         </h1>
         <p style={{ color: "var(--muted)", marginBottom: "8px" }}>
-          Deutsche Version:{" "}
-          <a href="/datenschutz" style={{ color: "var(--accent)" }}>
-            /datenschutz
-          </a>
+          This Privacy Policy describes how Floom, Inc. (&ldquo;Floom&rdquo;, &ldquo;we&rdquo;,
+          &ldquo;us&rdquo;, or &ldquo;our&rdquo;) collects, uses, and shares information when you
+          use floom.dev and related services (collectively, the &ldquo;Service&rdquo;).
         </p>
 
         {/* ── 1. Controller ── */}
         <section style={{ borderTop: "1px solid var(--line)", paddingTop: "32px", marginTop: "32px" }}>
           <h2 style={{ fontSize: "20px", fontWeight: 700, marginBottom: "12px" }}>
-            1. Controller
+            1. Who we are
           </h2>
-          <p style={{ marginBottom: "8px" }}>
-            The controller under GDPR is:
-          </p>
-          <p style={{ marginBottom: "4px" }}>Federico De Ponte</p>
-          <p style={{ marginBottom: "4px" }}>Mansteinstraße 27, 20253 Hamburg, Germany</p>
-          <p>
-            Email:{" "}
+          <p style={{ color: "var(--muted)" }}>
+            The Service is operated by <strong>Floom, Inc.</strong>, a United States corporation.
+            Contact us at{" "}
             <a href="mailto:team@floom.dev" style={{ color: "var(--accent)" }}>
               team@floom.dev
             </a>
+            .
           </p>
         </section>
 
-        {/* ── 2. Data processed ── */}
+        {/* ── 2. Data collected ── */}
         <section style={{ borderTop: "1px solid var(--line)", paddingTop: "32px", marginTop: "32px" }}>
           <h2 style={{ fontSize: "20px", fontWeight: 700, marginBottom: "16px" }}>
-            2. Data processed, purpose, and legal basis
+            2. Information we collect
           </h2>
 
           <h3 style={{ fontSize: "16px", fontWeight: 600, marginBottom: "8px" }}>
-            a) Account data (email address, display name)
+            a) Account data
           </h3>
           <p style={{ marginBottom: "16px", color: "var(--muted)" }}>
             When you sign in via Google OAuth, Google provides your email address and display name.
-            These are stored to create your account and provide the service.
+            We store these to create and identify your account.
             <br />
-            <strong>Legal basis:</strong> Art. 6(1)(b) GDPR (performance of a contract).
-            <br />
-            <strong>Retention:</strong> Until account deletion.
+            <strong>Retention:</strong> Until you delete your account.
           </p>
 
           <h3 style={{ fontSize: "16px", fontWeight: 600, marginBottom: "8px" }}>
-            b) App inputs and outputs (execution data)
+            b) App run inputs and outputs
           </h3>
           <p style={{ marginBottom: "16px", color: "var(--muted)" }}>
             When you run an app, inputs and outputs are stored as an execution record for run
             history and debugging.
-            <br />
-            <strong>Legal basis:</strong> Art. 6(1)(b) GDPR.
             <br />
             <strong>Retention:</strong> Until you delete the app, or 2 years from execution,
             whichever comes first.
@@ -97,8 +89,6 @@ export default function PrivacyPage() {
             Agent tokens are stored as cryptographic hashes. The plaintext token is shown once at
             creation and never stored.
             <br />
-            <strong>Legal basis:</strong> Art. 6(1)(b) GDPR.
-            <br />
             <strong>Retention:</strong> Until you delete the token.
           </p>
 
@@ -108,8 +98,6 @@ export default function PrivacyPage() {
           <p style={{ marginBottom: "16px", color: "var(--muted)" }}>
             Secrets you store for your apps are encrypted at rest.
             <br />
-            <strong>Legal basis:</strong> Art. 6(1)(b) GDPR.
-            <br />
             <strong>Retention:</strong> Until you delete the app.
           </p>
 
@@ -117,56 +105,73 @@ export default function PrivacyPage() {
             e) OAuth connections (Composio integrations)
           </h3>
           <p style={{ marginBottom: "16px", color: "var(--muted)" }}>
-            If you voluntarily connect an integration (e.g. Google Drive), your OAuth tokens are
-            encrypted in our database and forwarded to Composio Inc. as a data processor.
-            <br />
-            <strong>Legal basis:</strong> Art. 6(1)(b) GDPR (only when you actively connect).
+            If you choose to connect an external integration (e.g. Google Drive), your OAuth tokens
+            are encrypted in our database and forwarded to Composio Inc. as a sub-processor.
+            This is opt-in only.
             <br />
             <strong>Retention:</strong> Until you disconnect.
           </p>
 
           <h3 style={{ fontSize: "16px", fontWeight: 600, marginBottom: "8px" }}>
-            f) IP address (rate limiting)
+            f) IP address
           </h3>
           <p style={{ marginBottom: "16px", color: "var(--muted)" }}>
-            IP addresses are used for abuse prevention and rate limiting. They are not retained
-            long-term.
-            <br />
-            <strong>Legal basis:</strong> Art. 6(1)(f) GDPR (legitimate interest: service
-            security).
+            IP addresses are used for rate limiting and abuse prevention. They are not retained
+            long-term and are not associated with your account record.
           </p>
 
           <h3 style={{ fontSize: "16px", fontWeight: 600, marginBottom: "8px" }}>
-            g) Sentry error reports
+            g) Error reports
           </h3>
           <p style={{ marginBottom: "16px", color: "var(--muted)" }}>
-            Errors are sent to Sentry including IP address, user agent, and minimal stack trace,
-            to diagnose and fix bugs.
-            <br />
-            <strong>Legal basis:</strong> Art. 6(1)(f) GDPR (legitimate interest: service
-            stability).
+            Errors are sent to Sentry including IP address, user agent, and minimal stack trace to
+            diagnose bugs.
             <br />
             <strong>Retention:</strong> 30 days.
           </p>
 
           <h3 style={{ fontSize: "16px", fontWeight: 600, marginBottom: "8px" }}>
-            h) Vercel Analytics — page view statistics
+            h) Aggregate analytics
           </h3>
-          <p style={{ marginBottom: "16px", color: "var(--muted)" }}>
+          <p style={{ marginBottom: "0", color: "var(--muted)" }}>
             We use Vercel Analytics in its cookie-free, anonymised mode for aggregate page-view
-            counts. No personal data is collected.
-            <br />
-            <strong>Legal basis:</strong> Art. 6(1)(f) GDPR.
+            counts. No personal data is collected through analytics.
           </p>
         </section>
 
-        {/* ── 3. Data processors ── */}
+        {/* ── 3. How we use information ── */}
+        <section style={{ borderTop: "1px solid var(--line)", paddingTop: "32px", marginTop: "32px" }}>
+          <h2 style={{ fontSize: "20px", fontWeight: 700, marginBottom: "12px" }}>
+            3. How we use your information
+          </h2>
+          <ul
+            style={{
+              paddingLeft: "20px",
+              color: "var(--muted)",
+              display: "flex",
+              flexDirection: "column",
+              gap: "8px",
+            }}
+          >
+            <li>To provide, maintain, and improve the Service</li>
+            <li>To authenticate you and secure your account</li>
+            <li>To detect abuse and enforce rate limits</li>
+            <li>To send transactional emails (account, service notices)</li>
+            <li>To diagnose and fix errors</li>
+          </ul>
+          <p style={{ marginTop: "16px", color: "var(--muted)" }}>
+            We do not sell your personal information to third parties. We do not use your data for
+            advertising.
+          </p>
+        </section>
+
+        {/* ── 4. Sub-processors ── */}
         <section style={{ borderTop: "1px solid var(--line)", paddingTop: "32px", marginTop: "32px" }}>
           <h2 style={{ fontSize: "20px", fontWeight: 700, marginBottom: "16px" }}>
-            3. Data processors (Art. 28 GDPR)
+            4. Service providers
           </h2>
           <p style={{ marginBottom: "16px", color: "var(--muted)" }}>
-            We engage the following service providers under data processing agreements (DPAs):
+            We share information with the following providers solely to operate the Service:
           </p>
           <table
             style={{
@@ -180,60 +185,56 @@ export default function PrivacyPage() {
               <tr style={{ borderBottom: "1px solid var(--line)" }}>
                 <th style={{ textAlign: "left", padding: "8px 0", fontWeight: 600 }}>Provider</th>
                 <th style={{ textAlign: "left", padding: "8px 0", fontWeight: 600 }}>Purpose</th>
-                <th style={{ textAlign: "left", padding: "8px 0", fontWeight: 600 }}>Country / Safeguard</th>
+                <th style={{ textAlign: "left", padding: "8px 0", fontWeight: 600 }}>Country</th>
               </tr>
             </thead>
             <tbody style={{ color: "var(--muted)" }}>
               <tr style={{ borderBottom: "1px solid var(--line)" }}>
                 <td style={{ padding: "8px 0" }}>Vercel Inc.</td>
                 <td style={{ padding: "8px 0" }}>Hosting, CDN, edge functions</td>
-                <td style={{ padding: "8px 0" }}>USA – US-DPF / SCCs</td>
+                <td style={{ padding: "8px 0" }}>United States</td>
               </tr>
               <tr style={{ borderBottom: "1px solid var(--line)" }}>
                 <td style={{ padding: "8px 0" }}>Supabase Inc.</td>
-                <td style={{ padding: "8px 0" }}>Database, auth</td>
-                <td style={{ padding: "8px 0" }}>USA (EU region) – SCCs</td>
+                <td style={{ padding: "8px 0" }}>Database, authentication</td>
+                <td style={{ padding: "8px 0" }}>United States (EU region)</td>
               </tr>
               <tr style={{ borderBottom: "1px solid var(--line)" }}>
                 <td style={{ padding: "8px 0" }}>Resend Inc.</td>
                 <td style={{ padding: "8px 0" }}>Transactional email</td>
-                <td style={{ padding: "8px 0" }}>USA – SCCs</td>
+                <td style={{ padding: "8px 0" }}>United States</td>
               </tr>
               <tr style={{ borderBottom: "1px solid var(--line)" }}>
                 <td style={{ padding: "8px 0" }}>Sentry</td>
                 <td style={{ padding: "8px 0" }}>Error monitoring</td>
-                <td style={{ padding: "8px 0" }}>USA – SCCs</td>
+                <td style={{ padding: "8px 0" }}>United States</td>
               </tr>
               <tr style={{ borderBottom: "1px solid var(--line)" }}>
                 <td style={{ padding: "8px 0" }}>Composio Inc.</td>
-                <td style={{ padding: "8px 0" }}>OAuth proxying for integrations</td>
-                <td style={{ padding: "8px 0" }}>USA – SCCs (only for active connections)</td>
+                <td style={{ padding: "8px 0" }}>OAuth proxying for integrations (opt-in)</td>
+                <td style={{ padding: "8px 0" }}>United States</td>
               </tr>
               <tr style={{ borderBottom: "1px solid var(--line)" }}>
                 <td style={{ padding: "8px 0" }}>E2B Inc.</td>
                 <td style={{ padding: "8px 0" }}>Sandbox runtime for app execution</td>
-                <td style={{ padding: "8px 0" }}>USA – SCCs</td>
+                <td style={{ padding: "8px 0" }}>United States</td>
               </tr>
               <tr>
                 <td style={{ padding: "8px 0" }}>Google LLC</td>
-                <td style={{ padding: "8px 0" }}>Gemini API (for demo apps using Gemini)</td>
-                <td style={{ padding: "8px 0" }}>USA – US-DPF / SCCs</td>
+                <td style={{ padding: "8px 0" }}>Gemini API (demo apps)</td>
+                <td style={{ padding: "8px 0" }}>United States</td>
               </tr>
             </tbody>
           </table>
-          <p style={{ color: "var(--muted)", fontSize: "13px" }}>
-            EU → USA transfers are based on Standard Contractual Clauses (SCCs) under Art. 46(2)(c)
-            GDPR and, where applicable, the EU-US Data Privacy Framework (US-DPF).
-          </p>
         </section>
 
-        {/* ── 4. Your rights ── */}
+        {/* ── 5. CCPA ── */}
         <section style={{ borderTop: "1px solid var(--line)", paddingTop: "32px", marginTop: "32px" }}>
-          <h2 style={{ fontSize: "20px", fontWeight: 700, marginBottom: "16px" }}>
-            4. Your rights (Art. 15–22 GDPR)
+          <h2 style={{ fontSize: "20px", fontWeight: 700, marginBottom: "12px" }}>
+            5. California consumer rights (CCPA)
           </h2>
           <p style={{ marginBottom: "12px", color: "var(--muted)" }}>
-            You have the right to:
+            If you are a California resident, you have the right to:
           </p>
           <ul
             style={{
@@ -245,28 +246,14 @@ export default function PrivacyPage() {
               marginBottom: "16px",
             }}
           >
-            <li>
-              <strong>Access</strong> (Art. 15) — which data we hold about you
-            </li>
-            <li>
-              <strong>Rectification</strong> (Art. 16) — correction of inaccurate data
-            </li>
-            <li>
-              <strong>Erasure</strong> (Art. 17) — deletion of your data (&ldquo;right to be forgotten&rdquo;)
-            </li>
-            <li>
-              <strong>Restriction of processing</strong> (Art. 18)
-            </li>
-            <li>
-              <strong>Data portability</strong> (Art. 20) — export your data in machine-readable
-              format
-            </li>
-            <li>
-              <strong>Objection</strong> (Art. 21) — to processing based on legitimate interest
-            </li>
+            <li><strong>Know</strong> — what personal information we collect and how we use it</li>
+            <li><strong>Access</strong> — a copy of your personal information</li>
+            <li><strong>Delete</strong> — your personal information, subject to certain exceptions</li>
+            <li><strong>Opt out of sale</strong> — we do not sell personal information</li>
+            <li><strong>Non-discrimination</strong> — we will not penalize you for exercising these rights</li>
           </ul>
           <p style={{ color: "var(--muted)" }}>
-            Send requests to{" "}
+            To exercise any of these rights, email{" "}
             <a href="mailto:team@floom.dev" style={{ color: "var(--accent)" }}>
               team@floom.dev
             </a>
@@ -274,48 +261,57 @@ export default function PrivacyPage() {
           </p>
         </section>
 
-        {/* ── 5. Supervisory authority ── */}
+        {/* ── 6. Your rights ── */}
         <section style={{ borderTop: "1px solid var(--line)", paddingTop: "32px", marginTop: "32px" }}>
           <h2 style={{ fontSize: "20px", fontWeight: 700, marginBottom: "12px" }}>
-            5. Right to lodge a complaint
+            6. Data access and deletion
           </h2>
           <p style={{ color: "var(--muted)" }}>
-            You have the right to lodge a complaint with a supervisory authority. The competent
-            authority for Hamburg, Germany is the{" "}
-            <a
-              href="https://datenschutz.hamburg.de"
-              rel="noopener noreferrer"
-              target="_blank"
-              style={{ color: "var(--accent)" }}
-            >
-              Hamburgische Beauftragte für Datenschutz und Informationsfreiheit
+            You may request access to, correction of, or deletion of your data at any time by
+            emailing{" "}
+            <a href="mailto:team@floom.dev" style={{ color: "var(--accent)" }}>
+              team@floom.dev
             </a>
-            , Ludwig-Erhard-Str. 22, 20459 Hamburg.
+            . Account deletion removes your profile, app records, and run history.
           </p>
         </section>
 
-        {/* ── 6. Mandatory data ── */}
+        {/* ── 7. Cookies ── */}
         <section style={{ borderTop: "1px solid var(--line)", paddingTop: "32px", marginTop: "32px" }}>
           <h2 style={{ fontSize: "20px", fontWeight: 700, marginBottom: "12px" }}>
-            6. Mandatory data
+            7. Cookies
           </h2>
           <p style={{ color: "var(--muted)" }}>
-            Providing your email address is required to create an account and use the service.
-            Without it, no account can be created. All other data (e.g. OAuth connections) is
-            voluntary.
+            Floom sets a session cookie after sign-in for authentication. We do not use advertising
+            cookies. Vercel Analytics is cookie-free.
           </p>
         </section>
 
-        <p
-          style={{
-            marginTop: "56px",
-            fontSize: "12px",
-            color: "var(--muted)",
-            opacity: 0.7,
-          }}
-        >
-          Last updated: 2026-05-03
-        </p>
+        {/* ── 8. Changes ── */}
+        <section style={{ borderTop: "1px solid var(--line)", paddingTop: "32px", marginTop: "32px" }}>
+          <h2 style={{ fontSize: "20px", fontWeight: 700, marginBottom: "12px" }}>
+            8. Changes to this policy
+          </h2>
+          <p style={{ color: "var(--muted)" }}>
+            We may update this policy from time to time. We will update the &ldquo;Last
+            updated&rdquo; date at the top. Continued use of the Service after changes constitutes
+            acceptance of the revised policy.
+          </p>
+        </section>
+
+        {/* ── 9. Contact ── */}
+        <section style={{ borderTop: "1px solid var(--line)", paddingTop: "32px", marginTop: "32px" }}>
+          <h2 style={{ fontSize: "20px", fontWeight: 700, marginBottom: "12px" }}>
+            9. Contact
+          </h2>
+          <p style={{ color: "var(--muted)" }}>
+            For privacy questions or requests, contact us at{" "}
+            <a href="mailto:team@floom.dev" style={{ color: "var(--accent)" }}>
+              team@floom.dev
+            </a>
+            .
+          </p>
+        </section>
       </article>
       <FloomFooter />
     </main>

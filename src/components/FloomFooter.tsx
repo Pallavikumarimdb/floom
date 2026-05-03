@@ -95,14 +95,11 @@ export function FloomFooter() {
           <a href="/status" style={ICON_LINK}>
             Status
           </a>
-          <a href="/impressum" style={ICON_LINK}>
-            Impressum
-          </a>
-          <a href="/datenschutz" style={ICON_LINK}>
-            Datenschutz
-          </a>
           <a href="/privacy" style={ICON_LINK}>
             Privacy
+          </a>
+          <a href="/terms" style={ICON_LINK}>
+            Terms
           </a>
           <a
             href="https://github.com/floomhq/floom"
