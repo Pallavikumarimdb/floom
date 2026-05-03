@@ -46,6 +46,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     // Fall back to slug + generic description.
   }
 
+  // If no description was found from any source, emit a minimal fallback so
+  // OG/Twitter cards are never blank.
+  if (!appDescription) {
+    appDescription = `${appName} on Floom`;
+  }
+
   // Title is bare app name; layout.tsx metadata.title.template adds " · Floom".
   const title = appName;
   const fullTitle = `${appName} · Floom`;
