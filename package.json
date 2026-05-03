@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "next dev",
+    "prebuild": "node scripts/build-docs-index.mjs",
     "build": "next build",
     "postbuild": "node scripts/prepare-vercel-function-package.mjs",
     "start": "next start",
