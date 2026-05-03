@@ -80,7 +80,7 @@ async function fetchAllToolkits(apiKey: string): Promise<ToolkitItem[]> {
   try {
     // Fetch only toolkits that have composio-managed auth (the ones users can connect via OAuth)
     const response = await fetch(
-      `${COMPOSIO_API_BASE}/api/v3/toolkits?limit=100`,
+      `${COMPOSIO_API_BASE}/api/v3/toolkits?limit=200`,
       {
         headers: { "x-api-key": apiKey },
         cache: "no-store",
@@ -123,7 +123,7 @@ async function fetchProvisionedSlugs(apiKey: string): Promise<Set<string>> {
   try {
     // Fetch all provisioned auth configs in one call (no toolkit_slug filter)
     const response = await fetch(
-      `${COMPOSIO_API_BASE}/api/v3/auth_configs?limit=100`,
+      `${COMPOSIO_API_BASE}/api/v3/auth_configs?limit=200`,
       {
         headers: { "x-api-key": apiKey },
         cache: "no-store",
