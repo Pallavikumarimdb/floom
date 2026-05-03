@@ -95,6 +95,9 @@ export function FloomFooter() {
           <a href="/status" style={ICON_LINK}>
             Status
           </a>
+          <a href="/legal" style={ICON_LINK}>
+            Legal
+          </a>
           <a href="/privacy" style={ICON_LINK}>
             Privacy
           </a>

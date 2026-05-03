@@ -1,7 +1,7 @@
 /**
- * Regression tests for batch-6 fixes (2026-05-03).
+ * Regression tests for batch-6/10a fixes (2026-05-03).
  * Covers:
- *   Fix-1  Hero "Sign up with Google" CTA present in page.tsx for anon users
+ *   Fix-1  Hero CTAs: "Try the live demo" present; Google CTA removed (batch-10a)
  *   Fix-2  Mobile tab bar CSS wraps at ≤479px
  *   Fix-3  unionKeys — stable first-appearance column ordering
  */
@@ -11,30 +11,27 @@ import { readFileSync } from "fs";
 import { resolve } from "path";
 import { unionKeys, type TableRow } from "@/lib/floom/output-rows";
 
-// ── Fix-1: Hero "Sign up with Google" CTA ────────────────────────────────────
-describe("page.tsx — hero Sign up with Google CTA", () => {
-  it("hero includes Sign up with Google button", () => {
+// ── Fix-1: Hero CTAs (updated batch-10a 2026-05-03) ──────────────────────────
+describe("page.tsx — hero CTAs", () => {
+  it("hero includes Try the live demo button", () => {
     const src = readFileSync(resolve("src/app/page.tsx"), "utf-8");
-    expect(src).toContain("Sign up with Google");
+    expect(src).toContain("Try the live demo");
   });
 
-  it("hero CTA uses Supabase OAuth signInWithOAuth with Google provider", () => {
+  it("Google Sign up button has been removed from hero", () => {
     const src = readFileSync(resolve("src/app/page.tsx"), "utf-8");
-    expect(src).toContain("signInWithOAuth");
-    expect(src).toContain("provider: 'google'");
+    expect(src).not.toContain("Sign up with Google");
+    expect(src).not.toContain("hero-signup-google");
   });
 
-  it("hero CTA is gated behind !isAuthenticated (not shown to logged-in users)", () => {
+  it("CLI box has developer framing label", () => {
     const src = readFileSync(resolve("src/app/page.tsx"), "utf-8");
-    // The button must be wrapped in a conditional that hides it for authed users
-    expect(src).toContain("!isAuthenticated");
-    // The hero-signup-google testid must exist
-    expect(src).toContain("hero-signup-google");
+    expect(src).toContain("Build your own");
   });
 
-  it("page imports createClient from supabase/client", () => {
+  it("page does not import createClient (Google OAuth removed)", () => {
     const src = readFileSync(resolve("src/app/page.tsx"), "utf-8");
-    expect(src).toContain("@/lib/supabase/client");
+    expect(src).not.toContain("@/lib/supabase/client");
   });
 });
 
