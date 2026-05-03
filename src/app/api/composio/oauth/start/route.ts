@@ -69,7 +69,7 @@ export async function POST(req: NextRequest) {
         user_id: `user:${caller.userId}`,
         auth_config: { id: authConfigId },
         connection: {
-          redirect_url: callbackUrl,
+          callback_url: callbackUrl,
         },
       }),
       cache: "no-store",
