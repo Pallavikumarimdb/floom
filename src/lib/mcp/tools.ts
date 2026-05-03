@@ -824,7 +824,7 @@ function getAppContract(): McpToolResult {
     response_shapes: {
       run_app: {
         execution_id: "string",
-        status: "queued | running | succeeded | failed | timed_out | cancelled | success | failed | timed_out",
+        status: "queued | running | succeeded | failed | timed_out | cancelled",
         output: "validated JSON when output_schema is declared, parsed JSON when stdout last line is JSON, otherwise { stdout, exit_code }",
         error: "string | null | { phase, stderr_tail, exit_code?, elapsed_ms?, detail? }",
       },
@@ -866,9 +866,10 @@ function getAppContract(): McpToolResult {
       header: "Authorization: Bearer <agent-token>",
       public_apps: "public: true apps allow anonymous metadata and runs, including secret-backed runs, with per-caller and per-app rate limits.",
       private_apps: "public omitted or false apps require the owner session or owner agent token for get_app and run_app.",
-      secrets: "MCP can publish and run apps that declare secret names in floom.yaml, but it does not set raw secret values today. Set values through the CLI or REST /api/apps/:slug/secrets route. Runtime injects them as env vars, exact secret values are redacted from output, and MCP never returns raw secret values.",
+      secrets: "Use the set_secret MCP tool to set or update a named secret value for an app (requires Authorization bearer token with publish scope). Secret values are encrypted at rest and injected as environment variables at run time. Exact secret values are redacted from output, and MCP never returns raw secret values. Alternatively, use the CLI (`npx @floomhq/cli@latest secrets set <app-slug> SECRET_NAME --value-stdin`) or REST /api/apps/:slug/secrets.",
       hardcoded_credentials:
         "Credential-looking string guidance: if source or docs contain a hardcoded token, key, password, private key, or similar value, replace it with a declared secret name such as OPENAI_API_KEY and read os.environ['OPENAI_API_KEY'] at runtime. Set the value with `npx @floomhq/cli@latest secrets set <app-slug> OPENAI_API_KEY --value-stdin` or the REST /api/apps/:slug/secrets route. Do not paste raw secret values into MCP tool arguments.",
+      connections: "Floom supports Composio-backed OAuth connections (Gmail, Slack, GitHub, Notion, and 40+ others). Use list_my_connections to see which services the owner has already authorized. To authorize a new service, direct the user to https://floom.dev/connections and have them click Connect next to the desired provider. Once authorized, the connection ID is available as COMPOSIO_CONNECTION_ID in the app environment — read it with os.environ.get('COMPOSIO_CONNECTION_ID') and pass it to Composio SDK calls. Connections are per-user and persist across app runs.",
     },
     setup_commands: [
       "npx @floomhq/cli@latest setup",

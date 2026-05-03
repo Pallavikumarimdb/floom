@@ -282,6 +282,7 @@ export async function POST(
     );
   }
 
+  const syncStartedAt = new Date().toISOString();
   const { data: execution, error: execError } = await admin
     .from("executions")
     .insert({
@@ -291,6 +292,7 @@ export async function POST(
       caller_agent_token_id: caller?.kind === "agent_token" ? caller.agentTokenId : null,
       input: redactedInputs ?? {},
       status: "running",
+      started_at: syncStartedAt,
     })
     .select()
     .single();
@@ -443,7 +445,7 @@ export async function POST(
   await admin
     .from("executions")
     .update({
-      status: "success",
+      status: "succeeded",
       output: redactedOutput,
       error: null,
       error_detail: null,
@@ -453,7 +455,7 @@ export async function POST(
 
   return NextResponse.json({
     execution_id: execution.id,
-    status: "success",
+    status: "succeeded",
     output: redactedOutput,
     error: null,
   });

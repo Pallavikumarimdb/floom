@@ -70,6 +70,7 @@ export default function AppPermalinkPage() { // exported as default so the serve
 
   const runIdFromUrl = searchParams?.get('run') ?? null;
   const rerunIdFromUrl = searchParams?.get('rerun') ?? null;
+  const isDevMode = searchParams?.get('dev') === '1';
   const { data: session } = useSession();
   const sessionUserId = session?.user?.id ?? null;
 
@@ -571,7 +572,7 @@ export default function AppPermalinkPage() { // exported as default so the serve
       }
     }
     const rt = (app.runtime && app.runtime.trim()) || (typeof m.runtime === 'string' ? m.runtime.trim() : '');
-    if (rt) {
+    if (rt && isDevMode) {
       add('runtime', `Runtime: ${rt}`);
     }
     for (const s of app.manifest.secrets_needed ?? []) {
@@ -585,7 +586,7 @@ export default function AppPermalinkPage() { // exported as default so the serve
     }
     if (app.renderer) add('custom-renderer', 'Custom output UI');
     return out;
-  }, [app]);
+  }, [app, isDevMode]);
 
   if (loading) {
     return (
