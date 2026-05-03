@@ -1,6 +1,8 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
+import { sendEmail } from "@/lib/email/send";
+import { renderAppPublishedEmail } from "@/lib/email/templates";
 import yaml from "js-yaml";
 import { v4 as uuidv4 } from "uuid";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -295,12 +297,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Failed to create app version" }, { status: 500 });
     }
 
+    const appUrl = new URL(`/p/${app.slug}`, resolveMcpForwardOrigin(req.url) || req.url).toString();
+
+    // Fire app-published email. after() keeps the serverless function alive
+    // until the promise settles without blocking the publish response.
+    after(fireAppPublishedEmail(admin, app.owner_id, app.name, appUrl, req));
+
     return NextResponse.json({
       app: {
         id: app.id,
         slug: app.slug,
         name: app.name,
-        url: new URL(`/p/${app.slug}`, resolveMcpForwardOrigin(req.url) || req.url).toString(),
+        url: appUrl,
       },
       warnings: validated.warnings,
     });
@@ -386,4 +394,40 @@ function looksLikeTarball(bundleFile: File, buffer: Buffer) {
     bundleFile.type === "application/gzip" ||
     (buffer.length >= 2 && buffer[0] === 0x1f && buffer[1] === 0x8b)
   );
+}
+
+async function fireAppPublishedEmail(
+  admin: ReturnType<typeof createAdminClient>,
+  ownerId: string,
+  appName: string,
+  appUrl: string,
+  req: NextRequest,
+): Promise<void> {
+  try {
+    const { data: userData } = await admin.auth.admin.getUserById(ownerId);
+    const email = userData?.user?.email;
+    if (!email) return;
+
+    const name =
+      (userData.user?.user_metadata?.full_name as string | undefined) ??
+      (userData.user?.user_metadata?.name as string | undefined) ??
+      null;
+
+    const publicUrl =
+      process.env.FLOOM_ORIGIN ??
+      process.env.NEXT_PUBLIC_FLOOM_ORIGIN ??
+      process.env.NEXT_PUBLIC_APP_URL ??
+      new URL(req.url).origin;
+
+    const { subject, html, text } = renderAppPublishedEmail({
+      name,
+      appName,
+      appUrl,
+      publicUrl,
+    });
+
+    await sendEmail({ to: email, subject, html, text });
+  } catch (error) {
+    console.error("[email] failed to send app-published email", error);
+  }
 }
