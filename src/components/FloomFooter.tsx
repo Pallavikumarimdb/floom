@@ -95,8 +95,14 @@ export function FloomFooter() {
           <a href="/status" style={ICON_LINK}>
             Status
           </a>
-          <a href="/legal" style={ICON_LINK}>
-            Legal
+          <a href="/impressum" style={ICON_LINK}>
+            Impressum
+          </a>
+          <a href="/datenschutz" style={ICON_LINK}>
+            Datenschutz
+          </a>
+          <a href="/privacy" style={ICON_LINK}>
+            Privacy
           </a>
           <a
             href="https://github.com/floomhq/floom"
@@ -118,7 +124,8 @@ export function FloomFooter() {
             <IconDiscordFooter />
             Discord
           </a>
-          <span style={{ fontSize: 12.5, color: 'var(--muted)', opacity: 0.7 }}>© 2026 Floom</span>
+          {/* contrast: was opacity 0.7 (3.54:1 on card), raised to 0.80 (4.52:1) — WCAG AA 4.5:1 */}
+          <span style={{ fontSize: 12.5, color: 'var(--muted)', opacity: 0.80 }}>© 2026 Floom</span>
         </div>
       </div>
     </footer>
