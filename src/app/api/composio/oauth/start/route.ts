@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { randomBytes } from "crypto";
 import { hasAgentTokenConfig } from "@/lib/demo-app";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { resolveAuthCaller } from "@/lib/supabase/auth";
@@ -45,11 +46,14 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // Generate a CSRF state nonce (32 random bytes = 64 hex chars)
+  const stateNonce = randomBytes(32).toString("hex");
+
   // Determine the callback URL (preview vs production)
   const origin = req.headers.get("origin") || req.nextUrl.origin;
   const callbackUrl = `${origin}/api/composio/oauth/callback`;
 
-  // Create the connected account in Composio
+  // Create the connected account in Composio, passing state nonce for CSRF
   let composioResponse: Response;
   try {
     composioResponse = await fetch(`${COMPOSIO_API_BASE}/api/v3/connected_accounts`, {
@@ -63,6 +67,7 @@ export async function POST(req: NextRequest) {
         auth_config: { id: authConfigId },
         connection: {
           redirect_url: callbackUrl,
+          state: stateNonce,
         },
       }),
       cache: "no-store",
@@ -89,7 +94,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Composio did not return a redirect URL" }, { status: 502 });
   }
 
-  // Insert a pending composio_connections row
+  // Insert a pending composio_connections row with the state nonce
   const now = new Date().toISOString();
   const { data: connectionRow, error: insertError } = await admin
     .from("composio_connections")
@@ -99,6 +104,7 @@ export async function POST(req: NextRequest) {
       composio_account_id: composioData.id,
       scopes: [],
       status: "pending",
+      state_nonce: stateNonce,
       created_at: now,
       updated_at: now,
       revoked_at: null,

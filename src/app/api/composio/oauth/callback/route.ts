@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { resolveAuthCaller } from "@/lib/supabase/auth";
 
 // Composio redirects here after the user completes (or cancels) OAuth.
-// Query params from Composio: connectedAccountId (the composio account id), status
+// Query params from Composio: connectedAccountId (the composio account id), status, state (nonce)
 // We match by composio_account_id and update the row accordingly.
 export async function GET(req: NextRequest) {
   const { searchParams, origin } = req.nextUrl;
@@ -14,6 +15,7 @@ export async function GET(req: NextRequest) {
     searchParams.get("connectionId") ??
     searchParams.get("id");
 
+  const returnedState = searchParams.get("state") ?? null;
   const rawStatus = (searchParams.get("status") ?? "").toUpperCase();
 
   if (!composioAccountId) {
@@ -23,10 +25,55 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const isSuccess = rawStatus === "ACTIVE" || rawStatus === "" || rawStatus === "SUCCESS";
-
   const admin = createAdminClient();
   const now = new Date().toISOString();
+
+  // Load the pending connection row to verify state_nonce and user_id
+  const { data: pendingRow, error: lookupError } = await admin
+    .from("composio_connections")
+    .select("id, user_id, state_nonce")
+    .eq("composio_account_id", composioAccountId)
+    .eq("status", "pending")
+    .maybeSingle();
+
+  if (lookupError || !pendingRow) {
+    return NextResponse.redirect(
+      `${origin}/connections?error=invalid_callback`,
+      { status: 302 }
+    );
+  }
+
+  // Verify CSRF state nonce when it was set on the pending row
+  if (pendingRow.state_nonce !== null && pendingRow.state_nonce !== undefined) {
+    if (!returnedState || returnedState !== pendingRow.state_nonce) {
+      // Delete the pending row to prevent reuse and log the attempt
+      await admin
+        .from("composio_connections")
+        .delete()
+        .eq("id", pendingRow.id);
+      console.error(
+        `[composio/oauth/callback] CSRF mismatch for composio_account_id=${composioAccountId}: ` +
+          `expected nonce (masked), got state=${returnedState ?? "(none)"}`
+      );
+      return new NextResponse("Bad Request: OAuth state mismatch", { status: 400 });
+    }
+  }
+
+  // Verify the session user matches the connection owner (when a session is available)
+  const caller = await resolveAuthCaller(req, admin);
+  if (caller && caller.kind === "user" && caller.userId !== pendingRow.user_id) {
+    await admin
+      .from("composio_connections")
+      .delete()
+      .eq("id", pendingRow.id);
+    console.error(
+      `[composio/oauth/callback] User mismatch for composio_account_id=${composioAccountId}: ` +
+        `session user=${caller.userId}, connection owner=${pendingRow.user_id}`
+    );
+    return new NextResponse("Bad Request: OAuth user mismatch", { status: 400 });
+  }
+
+  const isSuccess = rawStatus === "ACTIVE" || rawStatus === "" || rawStatus === "SUCCESS";
 
   if (isSuccess) {
     // Verify with Composio that the account is actually active
@@ -68,7 +115,7 @@ export async function GET(req: NextRequest) {
         revoked_at: null,
         updated_at: now,
       })
-      .eq("composio_account_id", composioAccountId);
+      .eq("id", pendingRow.id);
 
     if (error) {
       return NextResponse.redirect(
@@ -98,7 +145,7 @@ export async function GET(req: NextRequest) {
       status: "failed",
       updated_at: now,
     })
-    .eq("composio_account_id", composioAccountId);
+    .eq("id", pendingRow.id);
 
   if (error) {
     return NextResponse.redirect(

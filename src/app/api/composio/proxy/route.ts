@@ -7,10 +7,21 @@ import {
 } from "@/lib/composio/proxy";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { callerHasScope, resolveAuthCaller } from "@/lib/supabase/auth";
+import {
+  getComposioProxyTokenRateLimitKey,
+  getComposioProxyUserDayRateLimitKey,
+} from "@/lib/floom/rate-limit";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const TOOL_SLUG_RE = /^[A-Za-z0-9_.:-]{1,160}$/;
 const MAX_PROXY_BODY_BYTES = 128 * 1024;
+
+// Defaults: 60 req/min per agent token, 1000 req/day per user.
+// Override via env: COMPOSIO_PROXY_TOKEN_RATE_LIMIT_MAX, COMPOSIO_PROXY_USER_DAY_RATE_LIMIT_MAX
+const DEFAULT_TOKEN_RATE_LIMIT_MAX = 60;
+const DEFAULT_TOKEN_RATE_LIMIT_WINDOW_SECONDS = 60;
+const DEFAULT_USER_DAY_RATE_LIMIT_MAX = 1000;
+const DEFAULT_USER_DAY_RATE_LIMIT_WINDOW_SECONDS = 86400;
 
 export async function POST(req: NextRequest) {
   if (!hasAgentTokenConfig()) {
@@ -28,6 +39,47 @@ export async function POST(req: NextRequest) {
 
   if (caller.kind !== "agent_token" || !callerHasScope(caller, "run")) {
     return NextResponse.json({ error: "Agent token with run scope required" }, { status: 403 });
+  }
+
+  // Rate limiting: per-token (60/min) and per-user/day (1000/day)
+  const tokenLimit = readPositiveIntegerEnv("COMPOSIO_PROXY_TOKEN_RATE_LIMIT_MAX", DEFAULT_TOKEN_RATE_LIMIT_MAX);
+  const tokenWindow = readPositiveIntegerEnv("COMPOSIO_PROXY_TOKEN_RATE_LIMIT_WINDOW_SECONDS", DEFAULT_TOKEN_RATE_LIMIT_WINDOW_SECONDS);
+  const userDayLimit = readPositiveIntegerEnv("COMPOSIO_PROXY_USER_DAY_RATE_LIMIT_MAX", DEFAULT_USER_DAY_RATE_LIMIT_MAX);
+
+  const rateLimitChecks = [
+    {
+      key: getComposioProxyTokenRateLimitKey(caller.agentTokenId),
+      limit: tokenLimit,
+      windowSeconds: tokenWindow,
+    },
+    {
+      key: getComposioProxyUserDayRateLimitKey(caller.userId),
+      limit: userDayLimit,
+      windowSeconds: DEFAULT_USER_DAY_RATE_LIMIT_WINDOW_SECONDS,
+    },
+  ];
+
+  for (const check of rateLimitChecks) {
+    const { data, error: rlError } = await admin.rpc("check_public_run_rate_limit", {
+      p_rate_key: check.key,
+      p_limit: check.limit,
+      p_window_seconds: check.windowSeconds,
+    });
+
+    if (rlError) {
+      return NextResponse.json({ error: "Rate limit check failed" }, { status: 503 });
+    }
+
+    if (data !== true) {
+      const retryAfter = check.windowSeconds;
+      return NextResponse.json(
+        { error: "Composio proxy rate limit exceeded" },
+        {
+          status: 429,
+          headers: { "Retry-After": String(retryAfter) },
+        }
+      );
+    }
   }
 
   const rawBody = await req.text();
@@ -72,6 +124,11 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ error: "Composio proxy request failed" }, { status: 500 });
   }
+}
+
+function readPositiveIntegerEnv(name: string, fallback: number) {
+  const value = Number(process.env[name]);
+  return Number.isInteger(value) && value > 0 ? value : fallback;
 }
 
 function parseJsonObject(rawBody: string) {

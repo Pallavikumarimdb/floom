@@ -4,6 +4,16 @@ import type { AuthCaller } from "@/lib/supabase/auth";
 const PUBLIC_ANONYMOUS_RATE_LIMIT_ID = "anonymous";
 const RATE_LIMIT_KEY_PART_RE = /[^a-zA-Z0-9_-]/g;
 
+// Composio proxy rate limit keys
+export function getComposioProxyTokenRateLimitKey(agentTokenId: string) {
+  return `composio-proxy-token:${safeRateLimitPart(agentTokenId)}`;
+}
+
+export function getComposioProxyUserDayRateLimitKey(userId: string) {
+  const day = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+  return `composio-proxy-user-day:${safeRateLimitPart(userId)}:${day}`;
+}
+
 export function getPublicRunRateLimitKey(appId: string, callerKey = PUBLIC_ANONYMOUS_RATE_LIMIT_ID) {
   return `public-run:${safeRateLimitPart(appId)}:${safeRateLimitPart(callerKey)}`;
 }
