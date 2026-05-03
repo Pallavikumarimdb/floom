@@ -31,6 +31,7 @@ type SchemaProperty = {
   title?: string;
   description?: string;
   format?: string;
+  multiline?: boolean;
   enum?: ReadonlyArray<string>;
   default?: unknown;
 };
@@ -83,10 +84,26 @@ function fieldsFromSchema(schema: InputSchema | undefined) {
     title: prop.title ?? name,
     description: prop.description ?? '',
     type: prop.type ?? 'string',
+    format: prop.format ?? '',
+    multiline: prop.multiline ?? false,
     required: schema.required?.includes(name) ?? false,
     enum: prop.enum,
     defaultValue: prop.default,
   }));
+}
+
+function isMultilineField(f: ReturnType<typeof fieldsFromSchema>[number]): boolean {
+  if (f.format === 'textarea') return true;
+  if (f.multiline) return true;
+  if (f.title.toLowerCase().includes('pitch')) return true;
+  if (f.description.length > 40) return true;
+  // Detect multiline intent from default value or field name
+  if (typeof f.defaultValue === 'string' && f.defaultValue.includes('\n')) return true;
+  const lname = f.name.toLowerCase();
+  const ltitle = f.title.toLowerCase();
+  if (lname.includes('transcript') || lname.includes('notes') || lname.includes('text') ||
+      ltitle.includes('transcript') || ltitle.includes('notes') || ltitle.includes('paste')) return true;
+  return false;
 }
 
 type RunField = ReturnType<typeof fieldsFromSchema>[number];
@@ -319,13 +336,13 @@ export function RunSurface({ app, initialRun, initialInputs, examplePrefillInput
               </option>
             ))}
           </select>
-        ) : f.type === 'string' && (f.title.toLowerCase().includes('pitch') || f.description.length > 40) ? (
+        ) : f.type === 'string' && isMultilineField(f) ? (
           <textarea
             value={values[f.name] ?? ''}
             onChange={(e) =>
               setValues((v) => ({ ...v, [f.name]: e.target.value }))
             }
-            rows={4}
+            rows={5}
             style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit' }}
           />
         ) : (
@@ -718,7 +735,7 @@ function statusColor(status: ExecutionStatus) {
 
 function ProgressView({ progress }: { progress: unknown }) {
   if (!progress || typeof progress !== 'object' || Array.isArray(progress)) {
-    return <p style={{ fontSize: 13, color: '#b45309', margin: 0 }}>Running your app...</p>;
+    return <p style={{ fontSize: 13, color: '#b45309', margin: 0 }}>Working on it…</p>;
   }
   const p = progress as {
     kind?: string;

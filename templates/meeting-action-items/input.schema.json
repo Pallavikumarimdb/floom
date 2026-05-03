@@ -4,6 +4,7 @@
   "properties": {
     "transcript": {
       "type": "string",
+      "format": "textarea",
       "title": "Meeting notes",
       "default": "Action: Sarah sends launch notes by Friday\nMike owns beta checklist tomorrow\nPriya will run demo QA before launch"
     },
