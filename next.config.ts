@@ -67,6 +67,18 @@ const nextConfig: NextConfig = {
       // The canonical demo migrated from pitch-coach to meeting-action-items.
       // Old links keep working.
       { source: "/p/pitch-coach", destination: "/p/meeting-action-items", permanent: false },
+      // Old single-page docs anchor links — redirect to new sub-pages.
+      // Next.js redirects don't support hash fragments on the source side (browsers don't send
+      // hashes to the server). These redirect to the closest sub-page. Users landing via
+      // /docs#manifest-reference will hit /docs and the sidebar makes the new URL obvious.
+      { source: "/docs/getting-started", destination: "/docs/quickstart", permanent: true },
+      { source: "/docs/what-is-a-floom-app", destination: "/docs/quickstart", permanent: true },
+      { source: "/docs/manifest-reference", destination: "/docs/manifest", permanent: true },
+      { source: "/docs/input-output-schemas", destination: "/docs/schemas", permanent: true },
+      { source: "/docs/run-through-api", destination: "/docs/api", permanent: true },
+      { source: "/docs/async-runs", destination: "/docs/api", permanent: true },
+      { source: "/docs/mcp-for-ai-agents", destination: "/docs/mcp", permanent: true },
+      { source: "/docs/ci-automation", destination: "/docs/ci", permanent: true },
     ];
   },
 };

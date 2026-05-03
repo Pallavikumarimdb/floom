@@ -1,0 +1,62 @@
+export type DocsIndexEntry = {
+  title: string;
+  description?: string;
+  url: string;
+  kind: "page" | "section" | "example" | "cli-cmd";
+};
+
+/** Static index used by CommandPalette at runtime (loaded from /docs-index.json). */
+export const DOCS_INDEX: DocsIndexEntry[] = [
+  // Pages
+  { kind: "page", title: "Docs overview", description: "What is Floom, quick start, topic cards", url: "/docs" },
+  { kind: "page", title: "Quick start", description: "From zero to a running app in 60 seconds", url: "/docs/quickstart" },
+  { kind: "page", title: "Manifest reference", description: "floom.yaml — all fields and their meaning", url: "/docs/manifest" },
+  { kind: "page", title: "Input / output schemas", description: "JSON Schema for inputs and outputs, enum/min/max/pattern/oneOf", url: "/docs/schemas" },
+  { kind: "page", title: "Secrets", description: "Encrypted secrets injected as env vars at run time", url: "/docs/secrets" },
+  { kind: "page", title: "Authentication", description: "Browser, CLI device flow, and agent tokens", url: "/docs/auth" },
+  { kind: "page", title: "REST API", description: "POST /api/apps/:slug/run, sync vs async, response envelope", url: "/docs/api" },
+  { kind: "page", title: "MCP for AI agents", description: "All 15 MCP tools, Claude Desktop config", url: "/docs/mcp" },
+  { kind: "page", title: "CI / automation", description: "GitHub Actions snippet, programmatic deploy", url: "/docs/ci" },
+  { kind: "page", title: "Connections (Composio)", description: "77 managed-auth providers — Gmail, Slack, GitHub, Notion...", url: "/docs/connections" },
+  { kind: "page", title: "Examples", description: "5 demo apps with run and source links", url: "/docs/examples" },
+  { kind: "page", title: "Limits", description: "Sandbox timeout, rate limits, bundle size caps", url: "/docs/limits" },
+  { kind: "page", title: "FAQ", description: "Common questions about Floom apps and troubleshooting", url: "/docs/faq" },
+
+  // Key sections
+  { kind: "section", title: "What is a Floom app?", description: "Bundle + floom.yaml + E2B sandbox", url: "/docs#what-is-a-floom-app" },
+  { kind: "section", title: "Async runs", description: "Fire-and-forget with polling — POST without ?wait=true", url: "/docs/api#async-runs" },
+  { kind: "section", title: "Sync run (?wait=true)", description: "Blocking call with up to 250s budget", url: "/docs/api#sync-runs" },
+  { kind: "section", title: "Agent tokens", description: "Create at floom.dev/tokens — scopes: read, run, publish", url: "/docs/auth#agent-tokens" },
+  { kind: "section", title: "Browser sign-in", description: "Google OAuth at floom.dev/login", url: "/docs/auth#browser-sign-in" },
+  { kind: "section", title: "CLI device flow", description: "floom setup — opens browser, polls until approved", url: "/docs/auth#device-flow" },
+  { kind: "section", title: "Legacy v0.1 manifest", description: "runtime/entrypoint/handler format — still supported", url: "/docs/manifest#legacy" },
+  { kind: "section", title: "x-floom-format extension", description: "textarea or file — controls browser UI rendering", url: "/docs/schemas#extensions" },
+  { kind: "section", title: "Schema constraints", description: "enum, minimum/maximum, pattern, oneOf", url: "/docs/schemas#constraints" },
+  { kind: "section", title: "Output behaviour", description: "stdout JSON, /home/user/output.json, or plain stdout", url: "/docs/schemas#output" },
+  { kind: "section", title: "Composio usage in Python", description: "ComposioToolSet — connection ID as env var", url: "/docs/connections#usage" },
+  { kind: "section", title: "All 15 MCP tools", description: "Auth, discovery, apps, execution, connections", url: "/docs/mcp#tools" },
+  { kind: "section", title: "Secrets — set via CLI", description: "floom secrets set ... --value-stdin", url: "/docs/secrets#cli" },
+  { kind: "section", title: "Secrets — set via REST", description: "PUT /api/apps/:slug/secrets", url: "/docs/secrets#rest" },
+  { kind: "section", title: "System packages (apt-get)", description: "Install ffmpeg, pandoc etc. in command", url: "/docs/faq#system-packages" },
+  { kind: "section", title: "Limits table", description: "290s cap, rate limits, bundle sizes", url: "/docs/limits#table" },
+
+  // Examples
+  { kind: "example", title: "Meeting action items", description: "Transcript to action items + summary. Uses Gemini.", url: "/p/meeting-action-items" },
+  { kind: "example", title: "Invoice calculator", description: "Line items + hourly rates to formatted invoice total", url: "/p/invoice-calculator" },
+  { kind: "example", title: "UTM URL builder", description: "Generate UTM-tagged URLs from campaign params", url: "/p/utm-url-builder" },
+  { kind: "example", title: "CSV stats", description: "Upload CSV, get column types + stats", url: "/p/csv-stats" },
+  { kind: "example", title: "Multi-file Python template", description: "Starter: helpers, shared logic, requirements.txt", url: "/p/multi-file-python" },
+
+  // CLI commands
+  { kind: "cli-cmd", title: "floom setup", description: "Authenticate — opens browser, saves token", url: "/docs/quickstart#setup" },
+  { kind: "cli-cmd", title: "floom init", description: "Scaffold floom.yaml + app.py + requirements.txt", url: "/docs/quickstart#init" },
+  { kind: "cli-cmd", title: "floom deploy", description: "Bundle directory and publish app", url: "/docs/quickstart#deploy" },
+  { kind: "cli-cmd", title: "floom run", description: "Run app by slug, wait for output, print JSON", url: "/docs/quickstart#run" },
+  { kind: "cli-cmd", title: "floom secrets set", description: "Set encrypted secret via --value-stdin", url: "/docs/secrets#cli" },
+
+  // Common API endpoints
+  { kind: "section", title: "POST /api/apps/:slug/run", description: "Run any public or owned app", url: "/docs/api#run" },
+  { kind: "section", title: "GET /api/executions/:id", description: "Poll async execution status + output", url: "/docs/api#poll" },
+  { kind: "section", title: "POST /api/apps/publish", description: "Programmatic deploy via multipart/form-data", url: "/docs/ci#publish-api" },
+  { kind: "section", title: "DELETE /api/apps/:slug/secrets/:name", description: "Remove a secret from an app", url: "/docs/secrets#delete" },
+];
