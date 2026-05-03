@@ -131,6 +131,9 @@ export async function sweepExecutions(admin: SupabaseClient, baseUrl?: string) {
   const queuedBefore = new Date(now - queueTtlMs()).toISOString();
   const staleBefore = new Date(now - staleRunningMs()).toISOString();
   const ttlBefore = new Date(now - executionTtlMs()).toISOString();
+  // Catch-all: any running execution whose effective start time exceeds 1.5x
+  // sandboxTimeoutMs is definitively stuck — the sandbox cannot still be alive.
+  const hardDeadlineBefore = new Date(now - Math.floor(sandboxTimeoutMs() * 1.5)).toISOString();
 
   const { data: staleQueued } = await admin
     .from("executions")
@@ -146,12 +149,16 @@ export async function sweepExecutions(admin: SupabaseClient, baseUrl?: string) {
     });
   }
 
+  // Rows with a stale last_heartbeat_at (heartbeat was set but stopped updating).
+  // The `.or` guard excludes rows already covered by the TTL sweep below so we
+  // don't double-process the same execution in both loops.
   const { data: heartbeatStaleRunning } = await admin
     .from("executions")
     .select("*")
     .eq("status", "running")
     .lt("last_heartbeat_at", staleBefore)
-    .or(`started_at.is.null,started_at.gte.${ttlBefore}`)
+    .not("last_heartbeat_at", "is", null)
+    .gte("started_at", ttlBefore)
     .limit(50)
     .returns<ExecutionRow[]>();
 
@@ -169,6 +176,50 @@ export async function sweepExecutions(admin: SupabaseClient, baseUrl?: string) {
 
   for (const execution of ttlRunning ?? []) {
     await recoverOrTerminateStaleRunning(admin, execution, "ttl");
+  }
+
+  // Workers that died before ever setting last_heartbeat_at.
+  // These fall through both heartbeatStaleRunning and ttlRunning because NULL
+  // comparisons evaluate to false/NULL in SQL.  Match on NULL heartbeat +
+  // coalesce(started_at, created_at) older than staleRunningMs.
+  const { data: noHeartbeatRunning } = await admin
+    .from("executions")
+    .select("*")
+    .eq("status", "running")
+    .is("last_heartbeat_at", null)
+    .or(`started_at.lt.${staleBefore},and(started_at.is.null,created_at.lt.${staleBefore})`)
+    .limit(50)
+    .returns<ExecutionRow[]>();
+
+  for (const execution of noHeartbeatRunning ?? []) {
+    await recoverOrTerminateStaleRunning(admin, execution, "stale_heartbeat");
+  }
+
+  // Hard catch-all: any running row whose effective age exceeds 1.5x
+  // sandboxTimeoutMs is force-transitioned to timed_out regardless of heartbeat
+  // or lease state.  This ensures the UI never shows a permanently-stuck run.
+  const { data: hardDeadlineRunning } = await admin
+    .from("executions")
+    .select("*")
+    .eq("status", "running")
+    .or(
+      `started_at.lt.${hardDeadlineBefore},and(started_at.is.null,created_at.lt.${hardDeadlineBefore})`
+    )
+    .limit(50)
+    .returns<ExecutionRow[]>();
+
+  for (const execution of hardDeadlineRunning ?? []) {
+    await forceFinalizeExecution(
+      admin,
+      execution,
+      "timed_out",
+      "execution stuck — sandbox unresponsive",
+      null,
+      { timed_out_at: new Date().toISOString(), error_phase: "sweep" }
+    );
+    if (execution.sandbox_id) {
+      await killSandboxExecution(execution.sandbox_id, execution.sandbox_pid).catch(() => undefined);
+    }
   }
 
   const { data: staleLeases } = await admin
@@ -197,7 +248,11 @@ export async function sweepExecutions(admin: SupabaseClient, baseUrl?: string) {
 
   return {
     stale_queued: staleQueued?.length ?? 0,
-    stale_running: (heartbeatStaleRunning?.length ?? 0) + (ttlRunning?.length ?? 0),
+    stale_running:
+      (heartbeatStaleRunning?.length ?? 0) +
+      (ttlRunning?.length ?? 0) +
+      (noHeartbeatRunning?.length ?? 0),
+    hard_deadline: hardDeadlineRunning?.length ?? 0,
     stale_leases: staleLeases?.length ?? 0,
   };
 }
