@@ -304,6 +304,12 @@ async function inspectTarball(tarballPath: string, compressedBytes: number) {
       const entryPath = normalizeBundlePath(entry.path);
       const type = entry.type;
 
+      // Skip directory entries — the root "." normalises to "" after stripping "./",
+      // which would otherwise trigger the invalid-path guard below.
+      if (type === "Directory") {
+        return;
+      }
+
       if (!entryPath || entryPath.includes("..") || path.isAbsolute(entryPath)) {
         validationError = new BundleValidationError("invalid_manifest", `invalid bundle path: ${entry.path}`);
         return;
@@ -323,7 +329,7 @@ async function inspectTarball(tarballPath: string, compressedBytes: number) {
         return;
       }
 
-      if (type !== "Directory") {
+      {
         fileCount += 1;
         unpackedBytes += entry.size;
         if (fileCount > MAX_BUNDLE_FILE_COUNT) {
