@@ -15,7 +15,9 @@ export async function GET(req: NextRequest) {
     searchParams.get("connectionId") ??
     searchParams.get("id");
 
-  const returnedState = searchParams.get("state") ?? null;
+  // The CSRF nonce is carried as ?nonce= in our callback URL (not via Composio's state param,
+  // which requires a specific object format in the v3 API).
+  const returnedState = searchParams.get("nonce") ?? searchParams.get("state") ?? null;
   const rawStatus = (searchParams.get("status") ?? "").toUpperCase();
 
   if (!composioAccountId) {
