@@ -266,12 +266,7 @@ export const floomTools: McpToolDefinition[] = [
       "Start the CLI device authorization flow. Returns a verification URL the user opens in their browser to approve, plus a device_code the agent polls with poll_device_flow. Use this when the caller has no agent token yet. Note: MCP cannot complete the browser step — present the verification_uri_complete to the user and instruct them to open it.",
     inputSchema: {
       type: "object",
-      properties: {
-        label: {
-          type: "string",
-          description: "Optional label for the resulting agent token (e.g. the IDE or project name).",
-        },
-      },
+      properties: {},
       additionalProperties: false,
     },
   },
@@ -526,21 +521,12 @@ async function listMyConnections(context: McpToolContext): Promise<McpToolResult
   });
 }
 
-async function startDeviceFlow(args: JsonObject, context: McpToolContext): Promise<McpToolResult> {
-  const label = args.label !== undefined ? args.label : undefined;
-  if (label !== undefined && typeof label !== "string") {
-    return errorResult("label must be a string");
-  }
-
-  const body: JsonObject = {};
-  if (typeof label === "string" && label.trim()) {
-    body.label = label.trim();
-  }
-
+async function startDeviceFlow(_args: JsonObject, context: McpToolContext): Promise<McpToolResult> {
+  // The CLI device-start route currently doesn't read a request body and the
+  // device_authorizations table has no label column. Don't pretend to support
+  // labelling here — the schema in floomTools omits the param accordingly.
   const result = await proxyJson(`${context.baseUrl}/api/cli/device/start`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
   });
 
   if (result.isError) {
