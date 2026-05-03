@@ -57,7 +57,9 @@ type FloomToolName =
   | "find_candidate_apps"
   | "get_app"
   | "run_app"
-  | "get_execution";
+  | "get_execution"
+  | "start_device_flow"
+  | "poll_device_flow";
 
 const SLUG_RE = /^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$/;
 const MAX_MCP_FILE_COUNT = 500;
@@ -258,6 +260,37 @@ export const floomTools: McpToolDefinition[] = [
       additionalProperties: false,
     },
   },
+  {
+    name: "start_device_flow",
+    description:
+      "Start the CLI device authorization flow. Returns a verification URL the user opens in their browser to approve, plus a device_code the agent polls with poll_device_flow. Use this when the caller has no agent token yet. Note: MCP cannot complete the browser step — present the verification_uri_complete to the user and instruct them to open it.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        label: {
+          type: "string",
+          description: "Optional label for the resulting agent token (e.g. the IDE or project name).",
+        },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "poll_device_flow",
+    description:
+      "Poll the CLI device authorization flow. Call this every few seconds after start_device_flow until status is 'approved' (token ready) or 'expired'. On 'approved', save the returned token as Authorization: Bearer <token> for future calls.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        device_code: {
+          type: "string",
+          description: "The device_code returned by start_device_flow.",
+        },
+      },
+      required: ["device_code"],
+      additionalProperties: false,
+    },
+  },
 ];
 
 export async function callFloomTool(
@@ -329,6 +362,14 @@ async function callFloomToolUnchecked(
 
   if (name === "publish_app") {
     return publishApp(args, context);
+  }
+
+  if (name === "start_device_flow") {
+    return startDeviceFlow(args, context);
+  }
+
+  if (name === "poll_device_flow") {
+    return pollDeviceFlow(args, context);
   }
 
   return findCandidateApps(args);
@@ -485,25 +526,78 @@ async function listMyConnections(context: McpToolContext): Promise<McpToolResult
   });
 }
 
+async function startDeviceFlow(args: JsonObject, context: McpToolContext): Promise<McpToolResult> {
+  const label = args.label !== undefined ? args.label : undefined;
+  if (label !== undefined && typeof label !== "string") {
+    return errorResult("label must be a string");
+  }
+
+  const body: JsonObject = {};
+  if (typeof label === "string" && label.trim()) {
+    body.label = label.trim();
+  }
+
+  const result = await proxyJson(`${context.baseUrl}/api/cli/device/start`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+  if (result.isError) {
+    return result;
+  }
+
+  // Annotate the result with a usage hint — MCP cannot open a browser for the user.
+  try {
+    const parsed = JSON.parse(result.content[0]?.text ?? "{}");
+    const annotated = {
+      ...parsed,
+      _instructions:
+        "Present 'verification_uri_complete' to the user and ask them to open it in their browser to approve. Then poll with poll_device_flow(device_code) every few seconds until status is 'approved'.",
+    };
+    return okResult(annotated);
+  } catch {
+    return result;
+  }
+}
+
+async function pollDeviceFlow(args: JsonObject, context: McpToolContext): Promise<McpToolResult> {
+  const deviceCode = args.device_code;
+  if (typeof deviceCode !== "string" || !deviceCode.trim()) {
+    return errorResult("device_code must be a non-empty string");
+  }
+
+  const url = new URL(`${context.baseUrl}/api/cli/device/poll`);
+  url.searchParams.set("device_code", deviceCode.trim());
+
+  return proxyJson(url.toString(), {
+    method: "GET",
+  });
+}
+
 function getAppContract(): McpToolResult {
+  const asyncEnabled = isAsyncRuntimeEnabled();
+  const supportedFeatures = [
+    "tarball bundle of the whole app directory rooted at floom.yaml",
+    "stock E2B base runtimes such as Python and Node when your command can run there",
+    "multi-file projects",
+    "single-file Python (legacy v0.1 mode: runtime + entrypoint + handler)",
+    "optional input_schema and optional output_schema",
+    "requirements.txt auto-install when present; npm install when package.json is present",
+    "stdin plus FLOOM_INPUTS env injection for the same JSON inputs",
+    "manifest-declared secret names with owner-managed encrypted secret values; never hardcode credential-looking strings in source, manifests, docs, MCP prompts, or reports",
+    "public apps with public: true; private apps when public is omitted or false",
+    "legacy v0.1 runtime: python + entrypoint + handler manifests remain supported",
+    ...(asyncEnabled
+      ? ["async execution handles through POST /run, GET /api/executions/<id>, and MCP get_execution"]
+      : []),
+  ];
   return okResult({
     version: "v0.x-stock-e2b",
     use_this_first:
       "Before generating files, call get_app_contract. Before publishing, call auth_status. For existing repos, call find_candidate_apps. For a starter, call list_app_templates then get_app_template.",
     preferred_mode: "stock_e2b",
-    supported: [
-      "tarball bundle of the whole app directory rooted at floom.yaml",
-      "stock E2B base runtimes such as Python and Node when your command can run there",
-      "multi-file projects",
-      "single-file Python (legacy v0.1 mode: runtime + entrypoint + handler)",
-      "optional input_schema and optional output_schema",
-      "requirements.txt auto-install when present; npm install when package.json is present",
-      "stdin plus FLOOM_INPUTS env injection for the same JSON inputs",
-      "async execution handles through POST /run, GET /api/executions/<id>, and MCP get_execution",
-      "manifest-declared secret names with owner-managed encrypted secret values; never hardcode credential-looking strings in source, manifests, docs, MCP prompts, or reports",
-      "public apps with public: true; private apps when public is omitted or false",
-      "legacy v0.1 runtime: python + entrypoint + handler manifests remain supported",
-    ],
+    supported: supportedFeatures,
     unsupported: [
       {
         case: "bundle larger than 5 MB compressed or 25 MB unpacked",
@@ -687,8 +781,10 @@ function getAppContract(): McpToolResult {
     run_tool: {
       name: "run_app",
       requires_authorization_for_private_apps: true,
-      response_envelope: "By default MCP calls POST /run?wait=true for compatibility. Set async=true to receive { execution_id, status: 'queued' } immediately, then call get_execution until status is terminal. Read result.output for the app result; the top level contains execution_id, status, output, and error.",
-      async_is_caller_side: true,
+      response_envelope: asyncEnabled
+        ? "By default MCP calls POST /run?wait=true for compatibility. Set async=true to receive { execution_id, status: 'queued' } immediately, then call get_execution until status is terminal. Read result.output for the app result; the top level contains execution_id, status, output, and error."
+        : "MCP calls POST /run?wait=true. Read result.output for the app result; the top level contains execution_id, status, output, and error.",
+      ...(asyncEnabled ? { async_is_caller_side: true } : { async_note: "Async runtime is not enabled on this deployment. Omit async or set async=false." }),
       status_vocabulary: ["queued", "running", "succeeded", "failed", "timed_out", "cancelled"],
     },
     execution_tool: {
