@@ -45,22 +45,22 @@ export default function NotFound() {
             color: "var(--ink)",
           }}
         >
-          Page not found
+          Page not found — or this app is private.
         </h1>
         <p
           style={{
             fontSize: 16,
             color: "var(--muted)",
-            maxWidth: 420,
+            maxWidth: 460,
             lineHeight: 1.55,
             margin: "0 0 28px",
           }}
         >
-          {"The page you're looking for doesn't exist or has moved. Try the live demo, or jump back home."}
+          {"If you own this app, sign in to access it. Otherwise, browse public apps on the home page."}
         </p>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "center" }}>
           <Link
-            href="/"
+            href="/login"
             style={{
               padding: "10px 20px",
               background: "var(--accent)",
@@ -71,10 +71,10 @@ export default function NotFound() {
               textDecoration: "none",
             }}
           >
-            Back home
+            Sign in
           </Link>
           <Link
-            href="/p/meeting-action-items"
+            href="/"
             style={{
               padding: "10px 20px",
               background: "var(--card)",
@@ -86,7 +86,7 @@ export default function NotFound() {
               textDecoration: "none",
             }}
           >
-            Try the live demo &rarr;
+            Browse public apps &rarr;
           </Link>
         </div>
       </main>
