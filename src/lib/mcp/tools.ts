@@ -1848,15 +1848,26 @@ function detectManifestCommandError(
   manifest: FloomManifest,
   files: Record<string, string> | undefined
 ) {
-  if (!files || isLegacyPythonManifest(manifest) || manifest.command) {
+  // Legacy manifests (entrypoint/handler/runtime fields) are always valid
+  // regardless of whether command: is present.
+  if (isLegacyPythonManifest(manifest)) {
     return null;
   }
 
-  const manifestPath = Object.keys(files).find((filePath) => basename(filePath) === "floom.yaml");
-  const appDir = manifestPath ? dirname(manifestPath) : "";
-  const detectedCommand = detectCommandFromFileMap(appDir, files);
-  if (detectedCommand && !detectedCommand.ok) {
-    return detectedCommand.error;
+  // Require command: for stock-E2B manifests regardless of whether files were
+  // supplied. An MCP-only caller validating just a manifest string must still
+  // get a rejection if command: is absent.
+  if (!manifest.command) {
+    if (!files) {
+      return "manifest missing required `command:` field (e.g., `command: python app.py`)";
+    }
+    // files supplied — attempt auto-detection from the file map.
+    const manifestPath = Object.keys(files).find((filePath) => basename(filePath) === "floom.yaml");
+    const appDir = manifestPath ? dirname(manifestPath) : "";
+    const detectedCommand = detectCommandFromFileMap(appDir, files);
+    if (detectedCommand && !detectedCommand.ok) {
+      return detectedCommand.error;
+    }
   }
 
   return null;
