@@ -6,6 +6,7 @@ import { hasAgentTokenConfig } from "@/lib/demo-app";
 
 const MAX_AGENT_TOKEN_NAME_LENGTH = 80;
 const DEFAULT_MAX_ACTIVE_AGENT_TOKENS_PER_USER = 10;
+const ALLOWED_SCOPES = ["read", "run", "publish"] as const;
 
 export async function GET(req: NextRequest) {
   if (!hasAgentTokenConfig()) {
@@ -57,6 +58,25 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // Scope validation: default to full scopes (backward-compatible); reject unknowns.
+  let scopes: string[];
+  if (Array.isArray(body.scopes)) {
+    const invalid = (body.scopes as unknown[]).filter(
+      (s) => !ALLOWED_SCOPES.includes(s as (typeof ALLOWED_SCOPES)[number])
+    );
+    if (invalid.length > 0) {
+      return NextResponse.json(
+        {
+          error: `Invalid scope(s): ${invalid.join(", ")}. Allowed: ${ALLOWED_SCOPES.join(", ")}`,
+        },
+        { status: 400 }
+      );
+    }
+    scopes = body.scopes as string[];
+  } else {
+    scopes = ["read", "run", "publish"];
+  }
+
   const activeTokenLimit = readPositiveIntegerEnv(
     "FLOOM_MAX_ACTIVE_AGENT_TOKENS_PER_USER",
     DEFAULT_MAX_ACTIVE_AGENT_TOKENS_PER_USER
@@ -79,7 +99,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { token, record } = await createAgentToken(admin, caller.userId, name);
+  const { token, record } = await createAgentToken(admin, caller.userId, name, scopes);
 
   return NextResponse.json({
     token,
