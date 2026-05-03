@@ -118,7 +118,7 @@ ${body}
 
 <tr><td style="padding:24px 4px 4px;font-family:${SANS};font-size:12px;line-height:1.6;color:${EMAIL_MUTED};">
 <strong style="color:${EMAIL_INK};font-weight:600;">Floom</strong>: the runtime for agentic work.<br>
-<a href="https://floom.dev" style="color:${EMAIL_MUTED};text-decoration:underline;">floom.dev</a> &middot; Floom<br>
+<a href="https://floom.dev" style="color:${EMAIL_MUTED};text-decoration:underline;">floom.dev</a><br>
 Questions? Just reply to this email, or write <a href="mailto:team@floom.dev" style="color:${EMAIL_MUTED};text-decoration:underline;">team@floom.dev</a>.${unsubscribeBlock}
 </td></tr>
 

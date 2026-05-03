@@ -390,6 +390,11 @@ export default function LoginPage() {
       fallback={
         <div className="min-h-screen bg-[#faf9f5]">
           <SiteHeader />
+          <main style={{ display: 'flex', justifyContent: 'center', padding: '80px 24px' }}>
+            <h1 style={{ fontSize: 26, fontWeight: 800, letterSpacing: '-0.025em', margin: '0 0 8px', color: 'var(--ink)' }}>
+              Sign in
+            </h1>
+          </main>
         </div>
       }
     >

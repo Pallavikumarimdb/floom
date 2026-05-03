@@ -228,7 +228,7 @@ function CodeBlock({ children, label }: { children: string; label?: string }) {
       </pre>
       <button
         onClick={copy}
-        className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity rounded-md border border-[#ddd8cc] bg-white px-2 py-1 text-xs font-medium text-neutral-500 hover:text-neutral-800 hover:border-neutral-400"
+        className="absolute top-3 right-3 opacity-40 group-hover:opacity-100 transition-opacity rounded-md border border-[#ddd8cc] bg-white px-2 py-1 text-xs font-medium text-neutral-500 hover:text-neutral-800 hover:border-neutral-400"
         aria-label="Copy code"
       >
         {copied ? "Copied" : "Copy"}

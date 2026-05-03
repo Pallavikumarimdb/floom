@@ -81,15 +81,19 @@ export async function GET(
     return NextResponse.json({ error: "Run not found" }, { status: 404 });
   }
 
-  // isOwner: authenticated caller who owns the app or submitted this run.
-  // Used both to gate private-app access AND to decide whether to include
-  // inputs/error_detail in the response. Anonymous callers on public apps
-  // can see status/output (shareable-run UX) but not the submitter's inputs.
-  const isOwner =
+  // canAccess: caller who owns the app or submitted this run (gates visibility).
+  // isRunner: caller is the person who submitted this specific run (gates inputs/error_detail).
+  // App owners see traffic metadata only — never another user's inputs or error_detail.
+  // Runners (submitters) see their own runs in full.
+  const canAccess =
     callerHasScope(caller, "read") &&
     (caller?.userId === app.owner_id || caller?.userId === execution.caller_user_id);
 
-  if (!app.public && !isOwner) {
+  const isRunner =
+    callerHasScope(caller, "read") &&
+    caller?.userId === execution.caller_user_id;
+
+  if (!app.public && !canAccess) {
     return NextResponse.json({ error: "Run not found" }, { status: 404 });
   }
 
@@ -97,10 +101,10 @@ export async function GET(
     id: execution.id,
     app_slug: app.slug,
     status: normalizeExecutionStatus(execution.status),
-    ...(isOwner ? { inputs: execution.input } : {}),
+    ...(isRunner ? { inputs: execution.input } : {}),
     output: execution.output,
     error: execution.error,
-    ...(isOwner ? { error_detail: execution.error_detail } : {}),
+    ...(isRunner ? { error_detail: execution.error_detail } : {}),
     created_at: execution.created_at,
     started_at: execution.started_at,
     completed_at: execution.completed_at,

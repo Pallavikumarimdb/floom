@@ -120,11 +120,15 @@ export function RunSurface({ app, initialRun, initialInputs, examplePrefillInput
     for (const f of fields) {
       const fromInitial = initialInputs?.[f.name];
       if (fromInitial !== undefined && fromInitial !== null) {
-        seed[f.name] = String(fromInitial);
+        seed[f.name] = typeof fromInitial === 'object'
+          ? JSON.stringify(fromInitial, null, 2)
+          : String(fromInitial);
       } else if (f.defaultValue !== undefined) {
-        seed[f.name] = String(f.defaultValue);
+        seed[f.name] = typeof f.defaultValue === 'object'
+          ? JSON.stringify(f.defaultValue, null, 2)
+          : String(f.defaultValue);
       } else {
-        seed[f.name] = '';
+        seed[f.name] = f.type === 'array' ? '[]' : '';
       }
     }
     return seed;
@@ -240,6 +244,12 @@ export function RunSurface({ app, initialRun, initialInputs, examplePrefillInput
           payload[f.name] = Number.isFinite(n) ? n : raw;
         } else if (f.type === 'boolean') {
           payload[f.name] = raw === 'true';
+        } else if (f.type === 'array' || f.type === 'object') {
+          try {
+            payload[f.name] = JSON.parse(raw);
+          } catch {
+            payload[f.name] = raw;
+          }
         } else {
           payload[f.name] = raw;
         }
@@ -336,6 +346,19 @@ export function RunSurface({ app, initialRun, initialInputs, examplePrefillInput
               </option>
             ))}
           </select>
+        ) : f.type === 'array' || f.type === 'object' ? (
+          <>
+            <textarea
+              value={values[f.name] ?? (f.type === 'array' ? '[]' : '{}')}
+              onChange={(e) =>
+                setValues((v) => ({ ...v, [f.name]: e.target.value }))
+              }
+              rows={5}
+              style={{ ...inputStyle, resize: 'vertical', fontFamily: "'JetBrains Mono', ui-monospace, monospace", fontSize: 12 }}
+              placeholder={f.type === 'array' ? '[\n  ...\n]' : '{\n  ...\n}'}
+            />
+            <span style={{ fontSize: 11, color: 'var(--muted)' }}>JSON {f.type}</span>
+          </>
         ) : f.type === 'string' && isMultilineField(f) ? (
           <textarea
             value={values[f.name] ?? ''}

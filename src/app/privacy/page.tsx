@@ -5,7 +5,7 @@ import { FloomFooter } from "@/components/FloomFooter";
 const SITE_URL = "https://floom.dev";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy · Floom",
+  title: "Privacy Policy",
   description:
     "Privacy Policy for Floom, Inc. — what data we collect, how we use it, and your rights.",
   alternates: { canonical: `${SITE_URL}/privacy` },

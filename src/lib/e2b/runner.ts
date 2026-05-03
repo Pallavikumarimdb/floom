@@ -381,7 +381,7 @@ export async function runInSandbox(config: RunnerConfig): Promise<RunnerResult> 
     }
 
     const command = config.command?.trim() || await detectCommandInSandbox(sandbox, deadlineAt);
-    const runResult = await runCommand(sandbox, command, config.inputs, "/home/user/app", config.secrets, deadlineAt);
+    const runResult = await runCommand(sandbox, command, config.inputs, "/home/user/app", config.secrets, deadlineAt, SANDBOX_TIMEOUT_MS);
     const elapsedMs = Date.now() - startedAt;
 
     if (runResult.kind !== "success") {
@@ -607,7 +607,8 @@ async function runLegacyHandler(
     undefined,
     "/home/user",
     config.secrets,
-    deadlineAt
+    deadlineAt,
+    SANDBOX_TIMEOUT_MS
   );
   const elapsedMs = Date.now() - startedAt;
   if (runResult.kind !== "success") {
@@ -733,7 +734,8 @@ async function runCommand(
   inputs?: unknown,
   cwd?: string,
   envs: RuntimeSecrets = {},
-  deadlineAt?: number
+  deadlineAt?: number,
+  maxTimeoutMs: number = COMMAND_TIMEOUT_MS
 ): Promise<
   | {
       kind: "success";
@@ -748,9 +750,9 @@ async function runCommand(
       error: RunnerErrorDetail;
     }
 > {
-  const timeoutOptions = deadlineAt ? commandTimeoutOptions(deadlineAt) : {
-    timeoutMs: COMMAND_TIMEOUT_MS,
-    requestTimeoutMs: REQUEST_TIMEOUT_MS,
+  const timeoutOptions = deadlineAt ? deadlineTimeoutOptions(deadlineAt, maxTimeoutMs) : {
+    timeoutMs: maxTimeoutMs,
+    requestTimeoutMs: Math.max(1, Math.min(REQUEST_TIMEOUT_MS, maxTimeoutMs)),
   };
   if (deadlineAt && deadlineAt <= Date.now()) {
     return {

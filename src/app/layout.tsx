@@ -4,7 +4,7 @@ import "./globals.css";
 import { SkipLink } from "@/components/SkipLink";
 
 const SITE_NAME = "Floom";
-const SITE_TAGLINE = "Localhost to live and secure in 60 seconds";
+const SITE_TAGLINE = "Localhost to live in 60 seconds";
 const SITE_DESCRIPTION =
   "Publish small AI apps from anywhere. Public URL, REST API, MCP for agents.";
 const SITE_URL = "https://floom.dev";

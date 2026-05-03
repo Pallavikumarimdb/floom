@@ -136,8 +136,8 @@ describe("unionKeys — covers all columns across heterogeneous rows", () => {
 // ── F1: anonymous read must not receive inputs / error_detail ───────────────
 // The route handler requires Next.js runtime + Supabase; we verify the
 // structural guarantee by checking that the cherry-picked code uses
-// conditional spreads keyed on isOwner.
-describe("GET /api/runs/[id] — privacy: inputs/error_detail gated on isOwner", () => {
+// conditional spreads keyed on isRunner (runner-only: inputs/error_detail never shown to app owners).
+describe("GET /api/runs/[id] — privacy: inputs/error_detail gated on isRunner", () => {
   it("route source uses conditional spread for inputs (not unconditional)", async () => {
     // Read source to verify structural guarantee without invoking the handler (needs Supabase).
     const { readFileSync } = await import("fs");
@@ -146,8 +146,8 @@ describe("GET /api/runs/[id] — privacy: inputs/error_detail gated on isOwner",
 
     // Must NOT have unconditional `inputs: execution.input`
     expect(src).not.toMatch(/^\s+inputs:\s+execution\.input,/m);
-    // Must have the conditional spread pattern (isOwner guard)
-    expect(src).toContain("isOwner");
+    // Must have the conditional spread pattern (isRunner guard — runner sees own inputs, owner sees traffic only)
+    expect(src).toContain("isRunner");
     expect(src).toContain("execution.input");
     // Same for error_detail
     expect(src).not.toMatch(/^\s+error_detail:\s+execution\.error_detail,/m);
