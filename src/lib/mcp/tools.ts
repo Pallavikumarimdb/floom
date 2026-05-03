@@ -18,6 +18,7 @@ import {
   type FloomManifest,
 } from "@/lib/floom/manifest";
 import { validatePythonRequirementsText } from "@/lib/floom/requirements";
+import { SECRET_NAME_RE } from "@/lib/floom/runtime-secrets";
 import { validateJsonSchemaValue } from "@/lib/floom/schema";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { resolveAuthCaller } from "@/lib/supabase/auth";
@@ -667,8 +668,8 @@ async function setSecret(args: JsonObject, context: McpToolContext): Promise<Mcp
     return errorResult("name must be a non-empty string");
   }
 
-  if (!/^[A-Z][A-Z0-9_]*$/.test(name.trim())) {
-    return errorResult("Secret name must be an uppercase environment variable name (e.g. OPENAI_API_KEY)");
+  if (!SECRET_NAME_RE.test(name.trim())) {
+    return errorResult("Secret name must be an uppercase environment variable name of 2-64 characters (e.g. OPENAI_API_KEY)");
   }
 
   const value = args.value;
@@ -1544,8 +1545,8 @@ function validateManifest(args: JsonObject): McpToolResult {
   // Secrets names — must be valid env var names to inject at runtime.
   const secrets = manifestResult.manifest.secrets ?? [];
   for (const secretName of secrets) {
-    if (typeof secretName !== "string" || !/^[A-Z][A-Z0-9_]*$/.test(secretName)) {
-      publishErrors.push(`secret name "${secretName}" is invalid; must be an uppercase environment variable name (e.g. OPENAI_API_KEY)`);
+    if (typeof secretName !== "string" || !SECRET_NAME_RE.test(secretName)) {
+      publishErrors.push(`secret name "${secretName}" is invalid; must be an uppercase environment variable name of 2-64 characters (e.g. OPENAI_API_KEY)`);
     }
   }
 
