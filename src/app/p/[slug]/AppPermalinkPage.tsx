@@ -276,11 +276,7 @@ export default function AppPermalinkPage() { // exported as default so the serve
           });
           return;
         }
-        if (['success', 'error', 'timeout'].includes(run.status)) {
-          setInitialRun(run);
-        } else {
-          setInitialRun(null);
-        }
+        setInitialRun(run);
       })
       .catch((err) => {
         if (cancelled) return;
@@ -349,6 +345,16 @@ export default function AppPermalinkPage() { // exported as default so the serve
     updateSearchParams((prev) => {
       const next = new URLSearchParams(prev);
       next.delete('run');
+      return next;
+    });
+  }, [updateSearchParams]);
+
+  const handleRunResult = useCallback((result: { runId?: string }) => {
+    if (!result.runId) return;
+    updateSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set('run', result.runId!);
+      next.set('tab', 'run');
       return next;
     });
   }, [updateSearchParams]);
@@ -1138,6 +1144,7 @@ export default function AppPermalinkPage() { // exported as default so the serve
                   examplePrefillInputs={samplePrefillInputs ?? undefined}
                   onResetInitialRun={handleResetInitialRun}
                   onShare={openShareModal}
+                  onResult={handleRunResult}
                 />
                 {/* v11: privacy note — tighter, info-icon style */}
                 <div
@@ -1607,10 +1614,9 @@ export default function AppPermalinkPage() { // exported as default so the serve
 
 /* ----------------- TabBar with sliding underline ----------------- */
 
-// History tab hidden until run-history is wired (today it renders a 'coming
-// in v0.1' stub which is just noise). 4 tabs read cleaner on mobile too.
 const TABS: Array<{ id: 'run' | 'about' | 'install' | 'source' | 'runs'; label: string }> = [
   { id: 'run', label: 'Run' },
+  { id: 'runs', label: 'Runs' },
   { id: 'about', label: 'About' },
   { id: 'install', label: 'Install' },
   { id: 'source', label: 'Source' },

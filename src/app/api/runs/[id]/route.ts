@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { callerHasScope, getBearerToken, resolveAuthCaller } from "@/lib/supabase/auth";
 import { hasSupabaseConfig } from "@/lib/demo-app";
+import { normalizeExecutionStatus } from "@/lib/floom/executions";
 
 type ExecutionRow = {
   id: string;
@@ -13,7 +14,9 @@ type ExecutionRow = {
   error: string | null;
   error_detail: Record<string, unknown> | null;
   created_at: string;
+  started_at: string | null;
   completed_at: string | null;
+  progress: unknown | null;
 };
 
 type AppRow = {
@@ -44,7 +47,7 @@ export async function GET(
 
   const { data: execution, error: executionError } = await admin
     .from("executions")
-    .select("id, app_id, caller_user_id, input, output, status, error, error_detail, created_at, completed_at")
+    .select("id, app_id, caller_user_id, input, output, status, error, error_detail, created_at, started_at, completed_at, progress")
     .eq("id", id)
     .maybeSingle<ExecutionRow>();
 
@@ -81,12 +84,14 @@ export async function GET(
   return NextResponse.json({
     id: execution.id,
     app_slug: app.slug,
-    status: execution.status,
+    status: normalizeExecutionStatus(execution.status),
     inputs: execution.input,
     output: execution.output,
     error: execution.error,
     error_detail: execution.error_detail,
     created_at: execution.created_at,
+    started_at: execution.started_at,
     completed_at: execution.completed_at,
+    progress: execution.progress,
   });
 }

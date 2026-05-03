@@ -5,7 +5,7 @@
 // terminal, no output toolbar, no run history) — but it actually runs
 // the app, which the stub did not.
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { AppDetail, RunRecord } from '@/lib/types';
 import { createClient } from '@/lib/supabase/client';
 
@@ -42,7 +42,16 @@ type InputSchema = {
 
 type RunState =
   | { kind: 'idle' }
-  | { kind: 'running' }
+  | {
+      kind: 'active';
+      executionId: string;
+      status: ExecutionStatus;
+      progress?: unknown | null;
+      startedAt?: string | null;
+      completedAt?: string | null;
+      cancelRequested?: boolean;
+      submittedAt: number;
+    }
   | { kind: 'ok'; output: unknown; ms: number }
   | { kind: 'error'; message: string; phase?: string; detail?: string };
 
@@ -52,6 +61,18 @@ type ApiRunError = {
   exit_code?: number;
   elapsed_ms?: number;
   detail?: string;
+};
+
+type ExecutionStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'timed_out' | 'cancelled';
+
+type ExecutionSnapshot = {
+  execution_id: string;
+  status: ExecutionStatus | 'success' | 'error' | 'timeout';
+  output?: unknown | null;
+  error?: string | null;
+  started_at?: string | null;
+  completed_at?: string | null;
+  progress?: unknown | null;
 };
 
 function fieldsFromSchema(schema: InputSchema | undefined) {
@@ -106,8 +127,68 @@ export function RunSurface({ app, initialRun, initialInputs, examplePrefillInput
     if (initialRun?.output) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setState({ kind: 'ok', output: initialRun.output, ms: 0 });
+    } else if (initialRun?.id && ['queued', 'running'].includes(normalizeClientStatus(initialRun.status))) {
+      setState({
+        kind: 'active',
+        executionId: initialRun.id,
+        status: normalizeClientStatus(initialRun.status),
+        progress: initialRun.progress,
+        startedAt: initialRun.started_at,
+        completedAt: initialRun.completed_at,
+        submittedAt: performance.now(),
+      });
+    } else if (initialRun?.error) {
+      setState({ kind: 'error', message: initialRun.error });
     }
   }, [initialRun]);
+
+  const applyExecutionSnapshot = useCallback((data: ExecutionSnapshot, ms: number) => {
+    const status = normalizeClientStatus(data.status);
+    if (status === 'succeeded') {
+      setState({ kind: 'ok', output: data.output, ms });
+      onResult?.({ runId: data.execution_id, status, output: data.output });
+      return;
+    }
+    if (status === 'failed' || status === 'timed_out' || status === 'cancelled') {
+      setState({ kind: 'error', message: data.error ?? terminalMessage(status) });
+      onResult?.({ runId: data.execution_id, status, output: data.output });
+      return;
+    }
+    setState({
+      kind: 'active',
+      executionId: data.execution_id,
+      status,
+      progress: data.progress,
+      startedAt: data.started_at,
+      completedAt: data.completed_at,
+        submittedAt: performance.now() - ms,
+    });
+    onResult?.({ runId: data.execution_id, status, output: data.output });
+  }, [onResult]);
+
+  useEffect(() => {
+    if (state.kind !== 'active') return;
+    if (!state.executionId) return;
+    if (isTerminalStatus(state.status)) return;
+    let cancelled = false;
+    const elapsed = performance.now() - state.submittedAt;
+    const delay = elapsed < 30_000 ? 1000 : 3000;
+    const timer = window.setTimeout(async () => {
+      try {
+        const headers = await authHeaders();
+        const res = await fetch(`/api/executions/${state.executionId}`, { headers });
+        const data = (await res.json().catch(() => null)) as ExecutionSnapshot | null;
+        if (cancelled || !res.ok || !data) return;
+        applyExecutionSnapshot(data, Math.round(performance.now() - state.submittedAt));
+      } catch {
+        // Keep the current status visible; the next poll will retry.
+      }
+    }, delay);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [applyExecutionSnapshot, state]);
 
   const canRun = fields.every((f) => !f.required || (values[f.name] && values[f.name].trim() !== ''));
 
@@ -128,7 +209,7 @@ export function RunSurface({ app, initialRun, initialInputs, examplePrefillInput
   }
 
   async function run() {
-    setState({ kind: 'running' });
+    setState({ kind: 'active', executionId: '', status: 'queued', submittedAt: performance.now() });
     const t0 = performance.now();
     try {
       // Coerce to types the schema declares (numbers, booleans).
@@ -145,15 +226,10 @@ export function RunSurface({ app, initialRun, initialInputs, examplePrefillInput
           payload[f.name] = raw;
         }
       }
-      const headers: Record<string, string> = { 'content-type': 'application/json' };
-      try {
-        const { data } = await createClient().auth.getSession();
-        if (data.session?.access_token) {
-          headers.Authorization = `Bearer ${data.session.access_token}`;
-        }
-      } catch {
-        // Public app runs still work without a browser session.
-      }
+      const headers: Record<string, string> = {
+        'content-type': 'application/json',
+        ...(await authHeaders()),
+      };
 
       const res = await fetch(`/api/apps/${app.slug}/run`, {
         method: 'POST',
@@ -161,12 +237,12 @@ export function RunSurface({ app, initialRun, initialInputs, examplePrefillInput
         body: JSON.stringify({ inputs: payload }),
       });
       const data = (await res.json().catch(() => null)) as
-        | { execution_id?: string; status?: string; output?: unknown; error?: string | ApiRunError | null }
+        | ExecutionSnapshot
         | null;
       const ms = Math.round(performance.now() - t0);
       const structuredError =
         data && typeof data.error === 'object' && data.error !== null ? data.error as ApiRunError : null;
-      if (!res.ok || !data || data.status === 'failed' || data.status === 'timed_out' || data.error) {
+      if (!res.ok || !data) {
         setState({
           kind: 'error',
           message:
@@ -182,14 +258,24 @@ export function RunSurface({ app, initialRun, initialInputs, examplePrefillInput
         });
         return;
       }
-      setState({ kind: 'ok', output: data.output, ms });
-      onResult?.({ runId: data.execution_id, status: data.status, output: data.output });
+      applyExecutionSnapshot(data, ms);
     } catch (err) {
       setState({
         kind: 'error',
         message: err instanceof Error ? err.message : 'Network error',
         detail: undefined,
       });
+    }
+  }
+
+  async function cancelRun() {
+    if (state.kind !== 'active' || !state.executionId || isTerminalStatus(state.status)) return;
+    setState({ ...state, cancelRequested: true });
+    try {
+      const headers = await authHeaders();
+      await fetch(`/api/executions/${state.executionId}`, { method: 'DELETE', headers });
+    } catch {
+      setState({ ...state, cancelRequested: false });
     }
   }
 
@@ -376,7 +462,7 @@ export function RunSurface({ app, initialRun, initialInputs, examplePrefillInput
             <button
               type="button"
               onClick={() => void run()}
-              disabled={state.kind === 'running' || !canRun}
+              disabled={state.kind === 'active' || !canRun}
               style={{
                 padding: '9px 18px',
                 background: 'var(--accent)',
@@ -385,12 +471,12 @@ export function RunSurface({ app, initialRun, initialInputs, examplePrefillInput
                 borderRadius: 8,
                 fontSize: 13,
                 fontWeight: 600,
-                cursor: state.kind === 'running' || !canRun ? 'not-allowed' : 'pointer',
-                opacity: state.kind === 'running' || !canRun ? 0.55 : 1,
+                cursor: state.kind === 'active' || !canRun ? 'not-allowed' : 'pointer',
+                opacity: state.kind === 'active' || !canRun ? 0.55 : 1,
                 fontFamily: 'inherit',
               }}
             >
-              {state.kind === 'running' ? 'Running…' : 'Run'}
+              {state.kind === 'active' ? 'Running...' : 'Run'}
             </button>
             <button
               type="button"
@@ -409,7 +495,26 @@ export function RunSurface({ app, initialRun, initialInputs, examplePrefillInput
             >
               Reset
             </button>
-            {/* v11: "Try with example" is now a chip ABOVE the first field — removed here */}
+            {state.kind === 'active' && state.executionId && !isTerminalStatus(state.status) && (
+              <button
+                type="button"
+                onClick={() => void cancelRun()}
+                disabled={state.cancelRequested}
+                style={{
+                  padding: '9px 14px',
+                  background: '#fff',
+                  color: '#6b7280',
+                  border: '1px solid var(--line)',
+                  borderRadius: 8,
+                  fontSize: 13,
+                  fontWeight: 500,
+                  cursor: state.cancelRequested ? 'not-allowed' : 'pointer',
+                  fontFamily: 'inherit',
+                }}
+              >
+                {state.cancelRequested ? 'Cancelling...' : 'Cancel run'}
+              </button>
+            )}
           </div>
         </div>
 
@@ -449,8 +554,16 @@ export function RunSurface({ app, initialRun, initialInputs, examplePrefillInput
               Press <span style={{ fontStyle: 'normal', fontFamily: 'monospace' }}>Run</span> to see the response.
             </p>
           )}
-          {state.kind === 'running' && (
-            <p style={{ fontSize: 13, color: '#b45309' }}>Talking to the sandbox…</p>
+          {state.kind === 'active' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <StatusPill status={state.status} />
+                <span style={{ fontSize: 12, color: 'var(--muted)' }}>
+                  {state.executionId ? `Execution ${state.executionId.slice(0, 8)}` : 'Submitting'}
+                </span>
+              </div>
+              <ProgressView progress={state.progress} />
+            </div>
           )}
           {state.kind === 'ok' && (
             <pre
@@ -557,6 +670,118 @@ export function RunSurface({ app, initialRun, initialInputs, examplePrefillInput
       </div>
     </div>
   );
+}
+
+async function authHeaders() {
+  const headers: Record<string, string> = {};
+  try {
+    const { data } = await createClient().auth.getSession();
+    if (data.session?.access_token) {
+      headers.Authorization = `Bearer ${data.session.access_token}`;
+    }
+  } catch {
+    // Public app runs still work without a browser session.
+  }
+  return headers;
+}
+
+function normalizeClientStatus(status: string): ExecutionStatus {
+  if (status === 'success') return 'succeeded';
+  if (status === 'error') return 'failed';
+  if (status === 'timeout') return 'timed_out';
+  if (['queued', 'running', 'succeeded', 'failed', 'timed_out', 'cancelled'].includes(status)) {
+    return status as ExecutionStatus;
+  }
+  return 'failed';
+}
+
+function isTerminalStatus(status: string) {
+  return ['succeeded', 'failed', 'timed_out', 'cancelled', 'success', 'error', 'timeout'].includes(status);
+}
+
+function terminalMessage(status: ExecutionStatus) {
+  if (status === 'timed_out') return 'Execution exceeded SANDBOX_TIMEOUT_MS';
+  if (status === 'cancelled') return 'Execution was cancelled';
+  return 'App execution failed';
+}
+
+function StatusPill({ status }: { status: ExecutionStatus }) {
+  const color = statusColor(status);
+  return (
+    <span
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        borderRadius: 999,
+        padding: '3px 9px',
+        fontSize: 11,
+        fontWeight: 700,
+        color: color.text,
+        background: color.bg,
+        border: `1px solid ${color.border}`,
+        textTransform: 'capitalize',
+      }}
+    >
+      {status.replace('_', ' ')}
+    </span>
+  );
+}
+
+function statusColor(status: ExecutionStatus) {
+  if (status === 'succeeded') return { text: '#047857', bg: '#ecfdf5', border: '#a7f3d0' };
+  if (status === 'running') return { text: '#b45309', bg: '#fffbeb', border: '#fde68a' };
+  if (status === 'failed' || status === 'timed_out') return { text: '#b91c1c', bg: '#fef2f2', border: '#fecaca' };
+  if (status === 'cancelled') return { text: '#4b5563', bg: '#f9fafb', border: '#d1d5db' };
+  return { text: '#475569', bg: '#f8fafc', border: '#cbd5e1' };
+}
+
+function ProgressView({ progress }: { progress: unknown }) {
+  if (!progress || typeof progress !== 'object' || Array.isArray(progress)) {
+    return <p style={{ fontSize: 13, color: '#b45309', margin: 0 }}>Talking to the sandbox...</p>;
+  }
+  const p = progress as {
+    kind?: string;
+    percent?: number;
+    label?: string;
+    stages?: Array<{ key?: string; label?: string; status?: string }>;
+  };
+  if (p.kind === 'percent') {
+    const percent = typeof p.percent === 'number' ? Math.max(0, Math.min(100, p.percent)) : 0;
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <span style={{ fontSize: 13, color: 'var(--ink)' }}>{p.label ?? 'Running'}</span>
+        <div style={{ height: 8, background: 'var(--line)', borderRadius: 999, overflow: 'hidden' }}>
+          <div style={{ width: `${percent}%`, height: '100%', background: 'var(--accent)' }} />
+        </div>
+        <span style={{ fontSize: 11, color: 'var(--muted)' }}>{percent}%</span>
+      </div>
+    );
+  }
+  if (p.kind === 'stages' && Array.isArray(p.stages)) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <span style={{ fontSize: 13, color: 'var(--ink)' }}>{p.label ?? 'Running'}</span>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {p.stages.map((stage, index) => (
+            <span
+              key={stage.key ?? index}
+              style={{
+                fontSize: 11,
+                borderRadius: 999,
+                padding: '2px 7px',
+                background: stage.status === 'running' ? '#fffbeb' : '#f8fafc',
+                color: stage.status === 'done' ? '#047857' : 'var(--muted)',
+                border: '1px solid var(--line)',
+              }}
+            >
+              {stage.label ?? stage.key ?? `Stage ${index + 1}`}
+            </span>
+          ))}
+        </div>
+      </div>
+    );
+  }
+  return <p style={{ fontSize: 13, color: '#b45309', margin: 0 }}>Running...</p>;
 }
 
 // ── Output actions: copy + download .json + download .csv (when applicable) ──
@@ -689,12 +914,77 @@ interface PastRunsDisclosureProps {
 }
 
 export function PastRunsDisclosure({ appSlug }: PastRunsDisclosureProps) {
+  const [runs, setRuns] = useState<Array<{
+    id: string;
+    status: ExecutionStatus;
+    created_at: string;
+    started_at: string | null;
+    completed_at: string | null;
+    error: string | null;
+  }>>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadRuns() {
+      setLoading(true);
+      try {
+        const headers = await authHeaders();
+        const res = await fetch(`/api/apps/${appSlug}/runs`, { headers });
+        const data = await res.json().catch(() => null) as { runs?: typeof runs } | null;
+        if (!cancelled && res.ok) {
+          setRuns(data?.runs ?? []);
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    void loadRuns();
+    const interval = window.setInterval(() => void loadRuns(), 5000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [appSlug]);
+
+  if (loading && runs.length === 0) {
+    return <div style={{ fontSize: 13, color: 'var(--muted)', padding: '8px 0' }}>Loading runs...</div>;
+  }
+
+  if (runs.length === 0) {
+    return <div style={{ fontSize: 13, color: 'var(--muted)', padding: '8px 0' }}>No runs yet.</div>;
+  }
+
   return (
-    <div style={{ fontSize: 13, color: 'var(--muted)', padding: '8px 0' }}>
-      {/* TODO: Wire PastRunsDisclosure — paginated run list. v0
-          ships without per-user run history; this is fed by /api/apps/<slug>/runs
-          which doesn't exist yet on floom-minimal. */}
-      Run history for <code style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11 }}>{appSlug}</code> coming in v0.1.
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '8px 0' }}>
+      {runs.map((run) => (
+        <a
+          key={run.id}
+          href={`/p/${appSlug}?tab=run&run=${run.id}`}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 12,
+            padding: '10px 12px',
+            border: '1px solid var(--line)',
+            borderRadius: 8,
+            color: 'inherit',
+            textDecoration: 'none',
+            background: 'var(--card)',
+          }}
+        >
+          <span style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+            <StatusPill status={run.status} />
+            <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11, color: 'var(--muted)' }}>
+              {run.id.slice(0, 8)}
+            </span>
+          </span>
+          <span style={{ fontSize: 12, color: 'var(--muted)', whiteSpace: 'nowrap' }}>
+            {new Date(run.created_at).toLocaleString()}
+          </span>
+        </a>
+      ))}
     </div>
   );
 }

@@ -45,12 +45,15 @@ export interface AppDetail {
 export interface RunRecord {
   id: string;
   app_slug?: string;
-  status: 'pending' | 'running' | 'success' | 'failed' | 'timed_out' | 'error' | 'timeout';
-  inputs?: unknown;
+  status: 'queued' | 'running' | 'succeeded' | 'failed' | 'timed_out' | 'cancelled' | 'pending' | 'success' | 'error' | 'timeout';
+  inputs?: Record<string, unknown>;
   output?: unknown;
   error?: string | null;
   error_detail?: Record<string, unknown> | null;
   created_at?: string;
+  started_at?: string | null;
+  completed_at?: string | null;
+  progress?: unknown | null;
 }
 
 export interface ReviewSummary {

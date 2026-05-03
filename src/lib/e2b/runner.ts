@@ -1,10 +1,11 @@
-import { Sandbox } from "e2b";
+import { FileNotFoundError, Sandbox, SandboxNotFoundError } from "e2b";
 import { isSafePythonEntrypoint, isSafePythonIdentifier } from "../floom/manifest";
 import type { RuntimeDependencies } from "../floom/requirements";
 import type { RuntimeSecrets } from "../floom/runtime-secrets";
 import {
   COMMAND_TIMEOUT_MS,
   MAX_OUTPUT_BYTES,
+  MAX_SOURCE_BYTES,
   MAX_STDERR_TAIL_BYTES,
   MAX_STDOUT_TAIL_BYTES,
   REQUEST_TIMEOUT_MS,
@@ -64,7 +65,261 @@ export type RunnerConfig = {
   deadlineAt?: number;
 };
 
+export type SandboxStartResult = {
+  sandboxId: string;
+  pid: number;
+};
+
+export type SandboxPollResult = {
+  status: "running" | "succeeded" | "failed" | "timed_out";
+  output?: Record<string, unknown>;
+  error?: string;
+  progress?: unknown | null;
+  stdoutChunk: string;
+  stderrChunk: string;
+  stdoutOffset: number;
+  stderrOffset: number;
+};
+
 type SandboxRunner = typeof runInSandbox;
+
+type StartSandboxExecutionArgs = {
+  source: string;
+  inputs: Record<string, unknown>;
+  runtime: "python";
+  entrypoint: string;
+  handler: string;
+  dependencies?: RuntimeDependencies;
+  secrets?: RuntimeSecrets;
+};
+
+type PollSandboxExecutionArgs = {
+  sandboxId: string;
+  pid: number | null;
+  stdoutOffset?: number;
+  stderrOffset?: number;
+};
+
+export async function startSandboxExecution({
+  source,
+  inputs,
+  runtime,
+  entrypoint,
+  handler,
+  dependencies = {},
+  secrets = {},
+}: StartSandboxExecutionArgs): Promise<SandboxStartResult> {
+  if (!process.env.E2B_API_KEY) {
+    if (!isExplicitFakeMode()) {
+      throw new Error("E2B execution is not configured");
+    }
+
+    return { sandboxId: `fake:${Date.now()}`, pid: 0 };
+  }
+
+  if (runtime !== "python") {
+    throw new Error("v0.1 only supports runtime: python");
+  }
+
+  if (!isSafePythonEntrypoint(entrypoint) || !isSafePythonIdentifier(handler)) {
+    throw new Error("Invalid app entrypoint or handler");
+  }
+
+  if (Buffer.byteLength(source, "utf8") > MAX_SOURCE_BYTES) {
+    throw new Error("App source is too large");
+  }
+
+  const hasPythonRequirements = Boolean(dependencies.python_requirements?.trim());
+  const hasRuntimeSecrets = Object.keys(secrets).length > 0;
+  let installSbx: Awaited<ReturnType<typeof Sandbox.create>> | null = null;
+  let runSbx: Awaited<ReturnType<typeof Sandbox.create>> | null = null;
+
+  try {
+    let dependencyArchive: Uint8Array | null = null;
+    if (hasPythonRequirements && hasRuntimeSecrets && dependencies.python_requirements) {
+      installSbx = await Sandbox.create("base", sandboxOptions({ allowInternetAccess: true }));
+      await installSbx.files.write("/home/user/requirements.txt", dependencies.python_requirements);
+      await installSbx.commands.run(
+        "python3 -m pip install --disable-pip-version-check --no-input --require-hashes --target /home/user/.deps -r /home/user/requirements.txt",
+        {
+          timeoutMs: COMMAND_TIMEOUT_MS,
+          requestTimeoutMs: REQUEST_TIMEOUT_MS,
+        }
+      );
+      await installSbx.commands.run("tar -C /home/user -czf /home/user/deps.tgz .deps", {
+        timeoutMs: COMMAND_TIMEOUT_MS,
+        requestTimeoutMs: REQUEST_TIMEOUT_MS,
+      });
+      dependencyArchive = await installSbx.files.read("/home/user/deps.tgz", {
+        format: "bytes",
+        requestTimeoutMs: REQUEST_TIMEOUT_MS,
+      });
+    }
+
+    runSbx = await Sandbox.create("base", sandboxOptions({ allowInternetAccess: true }));
+    await prepareSandboxFiles(runSbx, source, inputs, entrypoint, handler, dependencies, dependencyArchive);
+
+    const handle = await runSbx.commands.run(
+      "python3 /home/user/runner.py > /home/user/stdout.log 2> /home/user/stderr.log",
+      {
+        background: true,
+        timeoutMs: SANDBOX_TIMEOUT_MS,
+        requestTimeoutMs: REQUEST_TIMEOUT_MS,
+        envs: {
+          ...secrets,
+          FLOOM_PROGRESS_PATH: "/home/user/progress.json",
+        },
+      }
+    );
+
+    return { sandboxId: runSbx.sandboxId, pid: handle.pid };
+  } catch (error) {
+    await runSbx?.kill().catch(() => undefined);
+    throw error;
+  } finally {
+    await installSbx?.kill().catch(() => undefined);
+  }
+}
+
+export async function pollSandboxExecution({
+  sandboxId,
+  pid,
+  stdoutOffset = 0,
+  stderrOffset = 0,
+}: PollSandboxExecutionArgs): Promise<SandboxPollResult> {
+  if (sandboxId.startsWith("fake:")) {
+    return {
+      status: "succeeded",
+      output: { result: "hello from fake mode" },
+      stdoutChunk: "",
+      stderrChunk: "",
+      stdoutOffset,
+      stderrOffset,
+      progress: null,
+    };
+  }
+
+  let sbx: Awaited<ReturnType<typeof Sandbox.connect>>;
+  try {
+    sbx = await Sandbox.connect(sandboxId, sandboxConnectOptions());
+  } catch (error) {
+    if (error instanceof SandboxNotFoundError) {
+      return {
+        status: "failed",
+        error: "App execution failed",
+        stdoutChunk: "",
+        stderrChunk: "",
+        stdoutOffset,
+        stderrOffset,
+        progress: null,
+      };
+    }
+    throw error;
+  }
+
+  const { chunk: stdoutChunk, offset: nextStdoutOffset } = await readIncrementalText(
+    sbx,
+    "/home/user/stdout.log",
+    stdoutOffset
+  );
+  const { chunk: stderrChunk, offset: nextStderrOffset } = await readIncrementalText(
+    sbx,
+    "/home/user/stderr.log",
+    stderrOffset
+  );
+  const progress = await readJsonFile(sbx, "/home/user/progress.json");
+  const result = await readJsonFile(sbx, "/home/user/result.json");
+
+  if (result && typeof result === "object" && !Array.isArray(result)) {
+    const parsed = result as { ok?: unknown; output?: unknown; error?: unknown };
+    if (parsed.ok === true) {
+      if (!parsed.output || typeof parsed.output !== "object" || Array.isArray(parsed.output)) {
+        return {
+          status: "failed",
+          error: "App output must be a JSON object",
+          stdoutChunk,
+          stderrChunk,
+          stdoutOffset: nextStdoutOffset,
+          stderrOffset: nextStderrOffset,
+          progress,
+        };
+      }
+
+      const outputText = JSON.stringify(parsed.output);
+      if (Buffer.byteLength(outputText, "utf8") > MAX_OUTPUT_BYTES) {
+        return {
+          status: "failed",
+          error: "App output is too large",
+          stdoutChunk,
+          stderrChunk,
+          stdoutOffset: nextStdoutOffset,
+          stderrOffset: nextStderrOffset,
+          progress,
+        };
+      }
+
+      return {
+        status: "succeeded",
+        output: parsed.output as Record<string, unknown>,
+        stdoutChunk,
+        stderrChunk,
+        stdoutOffset: nextStdoutOffset,
+        stderrOffset: nextStderrOffset,
+        progress,
+      };
+    }
+
+    return {
+      status: "failed",
+      error: typeof parsed.error === "string" ? parsed.error : "App execution failed",
+      stdoutChunk,
+      stderrChunk,
+      stdoutOffset: nextStdoutOffset,
+      stderrOffset: nextStderrOffset,
+      progress,
+    };
+  }
+
+  if (pid !== null) {
+    const running = await isCommandRunning(sbx, pid);
+    if (!running) {
+      return {
+        status: "failed",
+        error: "App execution failed",
+        stdoutChunk,
+        stderrChunk,
+        stdoutOffset: nextStdoutOffset,
+        stderrOffset: nextStderrOffset,
+        progress,
+      };
+    }
+  }
+
+  return {
+    status: "running",
+    stdoutChunk,
+    stderrChunk,
+    stdoutOffset: nextStdoutOffset,
+    stderrOffset: nextStderrOffset,
+    progress,
+  };
+}
+
+export async function killSandboxExecution(sandboxId: string | null, pid?: number | null) {
+  if (!sandboxId || sandboxId.startsWith("fake:")) {
+    return;
+  }
+
+  try {
+    const sbx = await Sandbox.connect(sandboxId, sandboxConnectOptions());
+    if (pid !== null && pid !== undefined) {
+      await sbx.commands.kill(pid, { requestTimeoutMs: REQUEST_TIMEOUT_MS }).catch(() => undefined);
+    }
+    await sbx.kill().catch(() => undefined);
+  } catch {
+    return;
+  }
+}
 
 export async function runInSandbox(config: RunnerConfig): Promise<RunnerResult> {
   if (!process.env.E2B_API_KEY) {
@@ -633,6 +888,113 @@ function tailBytes(text: string, maxBytes: number) {
   return buffer.subarray(buffer.byteLength - maxBytes).toString("utf8");
 }
 
+function sandboxConnectOptions() {
+  return {
+    apiKey: process.env.E2B_API_KEY,
+    requestTimeoutMs: REQUEST_TIMEOUT_MS,
+  } as const;
+}
+
+async function prepareSandboxFiles(
+  sbx: Awaited<ReturnType<typeof Sandbox.create>>,
+  source: string,
+  inputs: Record<string, unknown>,
+  entrypoint: string,
+  handler: string,
+  dependencies: RuntimeDependencies,
+  dependencyArchive: Uint8Array | null
+) {
+  await sbx.files.write(`/home/user/${entrypoint}`, source);
+  if (dependencyArchive) {
+    await sbx.files.write("/home/user/deps.tgz", toArrayBuffer(dependencyArchive));
+    await sbx.commands.run("tar -C /home/user -xzf /home/user/deps.tgz", {
+      timeoutMs: COMMAND_TIMEOUT_MS,
+      requestTimeoutMs: REQUEST_TIMEOUT_MS,
+    });
+  } else if (dependencies.python_requirements?.trim()) {
+    await sbx.files.write("/home/user/requirements.txt", dependencies.python_requirements);
+    await sbx.commands.run(
+      "python3 -m pip install --disable-pip-version-check --no-input --require-hashes --target /home/user/.deps -r /home/user/requirements.txt",
+      {
+        timeoutMs: COMMAND_TIMEOUT_MS,
+        requestTimeoutMs: REQUEST_TIMEOUT_MS,
+      }
+    );
+  }
+
+  const moduleName = entrypoint.replace(".py", "");
+  const wrapper = `
+import json
+import os
+import sys
+import traceback
+sys.path.insert(0, "/home/user")
+sys.path.insert(0, "/home/user/.deps")
+from ${moduleName} import ${handler}
+
+def write_result(payload):
+    with open("/home/user/result.json", "w") as handle:
+        json.dump(payload, handle)
+
+try:
+    inputs = json.loads(open("/home/user/inputs.json").read())
+    result = ${handler}(inputs)
+    if not isinstance(result, dict):
+        raise TypeError("App output must be a JSON object")
+    with open("/home/user/output.json", "w") as handle:
+        json.dump(result, handle)
+    write_result({"ok": True, "output": result, "error": None})
+except Exception:
+    traceback.print_exc()
+    write_result({"ok": False, "output": None, "error": "App execution failed"})
+`;
+
+  await sbx.files.write("/home/user/runner.py", wrapper);
+  await sbx.files.write("/home/user/inputs.json", JSON.stringify(inputs));
+  await sbx.files.write("/home/user/stdout.log", "");
+  await sbx.files.write("/home/user/stderr.log", "");
+}
+
+async function readIncrementalText(
+  sbx: Awaited<ReturnType<typeof Sandbox.connect>>,
+  path: string,
+  offset: number
+) {
+  const text = await readTextFile(sbx, path);
+  if (text.length <= offset) {
+    return { chunk: "", offset: text.length };
+  }
+  return { chunk: text.slice(offset), offset: text.length };
+}
+
+async function readTextFile(sbx: Awaited<ReturnType<typeof Sandbox.connect>>, path: string) {
+  try {
+    return await sbx.files.read(path, { requestTimeoutMs: REQUEST_TIMEOUT_MS });
+  } catch (error) {
+    if (error instanceof FileNotFoundError) {
+      return "";
+    }
+    throw error;
+  }
+}
+
+async function readJsonFile(sbx: Awaited<ReturnType<typeof Sandbox.connect>>, path: string) {
+  const text = await readTextFile(sbx, path);
+  if (!text.trim()) {
+    return null;
+  }
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
+}
+
+async function isCommandRunning(sbx: Awaited<ReturnType<typeof Sandbox.connect>>, pid: number) {
+  const processes = await sbx.commands.list({ requestTimeoutMs: REQUEST_TIMEOUT_MS });
+  return processes.some((process) => process.pid === pid);
+}
+
 function toArrayBuffer(bytes: Uint8Array) {
   const buffer = new ArrayBuffer(bytes.byteLength);
   new Uint8Array(buffer).set(bytes);
@@ -694,13 +1056,14 @@ function sandboxOptions({
   deadlineAt,
 }: {
   allowInternetAccess: boolean;
-  deadlineAt: number;
+  deadlineAt?: number;
 }) {
+  const resolvedDeadline = deadlineAt ?? Date.now() + SANDBOX_TIMEOUT_MS;
   return {
     apiKey: process.env.E2B_API_KEY,
     allowInternetAccess,
     secure: true,
-    ...sandboxTimeoutOptions(deadlineAt),
+    ...sandboxTimeoutOptions(resolvedDeadline),
     lifecycle: { onTimeout: "kill" },
   } as const;
 }
