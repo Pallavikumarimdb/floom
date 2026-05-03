@@ -1,6 +1,12 @@
 import Ajv from "ajv";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { killSandboxExecution, pollSandboxExecution, startSandboxExecution } from "@/lib/e2b/runner";
+import {
+  killSandboxExecution,
+  pollSandboxExecution,
+  runInSandboxContained,
+  startSandboxExecution,
+  type RunnerConfig,
+} from "@/lib/e2b/runner";
 import {
   executionLeaseMs,
   executionTtlMs,
@@ -14,7 +20,7 @@ import {
   staleRunningMs,
   type ExecutionRow,
 } from "@/lib/floom/executions";
-import { MAX_SOURCE_BYTES } from "@/lib/floom/limits";
+import { MAX_BUNDLE_BYTES, MAX_SOURCE_BYTES } from "@/lib/floom/limits";
 import { publishExecutionProcessMessage } from "@/lib/floom/queue";
 import { readRuntimeDependencies } from "@/lib/floom/requirements";
 import { resolveRuntimeSecrets } from "@/lib/floom/runtime-secrets";
@@ -37,6 +43,8 @@ type VersionRow = {
   id: string;
   app_id: string;
   bundle_path: string;
+  bundle_kind: "single_file" | "tarball" | null;
+  command: string | null;
   input_schema: Record<string, unknown>;
   output_schema: Record<string, unknown>;
   dependencies: Record<string, unknown>;
@@ -202,7 +210,8 @@ async function startExecution(
   leaseToken: string,
   baseUrl?: string
 ) {
-  const bundle = await loadBundle(admin, version.bundle_path);
+  const bundleKind = version.bundle_kind ?? "single_file";
+  const bundle = await loadBundle(admin, version.bundle_path, bundleKind);
   if (!bundle.ok) {
     await finalizeExecution(admin, execution, leaseToken, "failed", bundle.error, null);
     return { status: 200, body: { ok: true, terminal: "failed" } };
@@ -249,10 +258,61 @@ async function startExecution(
     return { status: 200, body: { ok: true, terminal: "cancelled" } };
   }
 
+  if (bundleKind === "tarball") {
+    // Tarball (stock_e2b) path: delegate to runInSandboxContained, same as the
+    // sync route, then record the sandbox result directly as a terminal execution.
+    // The async worker uses start/poll for long-running jobs, but runInSandboxContained
+    // handles the full lifecycle internally — it creates and kills its own sandbox.
+    // We record the result inline rather than persisting a sandbox_id for polling.
+    let runnerResult: Awaited<ReturnType<typeof runInSandboxContained>> | null = null;
+    try {
+      const runnerConfig: RunnerConfig = {
+        bundle: (bundle as { ok: true; buffer: Buffer }).buffer,
+        bundleKind: "tarball",
+        command: version.command ?? undefined,
+        inputs: execution.input,
+        hasOutputSchema: Boolean(version.output_schema && Object.keys(version.output_schema).length > 0),
+        dependencies: readRuntimeDependencies(version.dependencies),
+        secrets: runtimeSecrets.envs,
+      };
+      runnerResult = await runInSandboxContained(runnerConfig);
+    } catch (error) {
+      if (error instanceof LeaseLostError) {
+        return { status: 202, body: { ok: true, skipped: "lease_lost" } };
+      }
+      await finalizeExecution(admin, execution, leaseToken, "failed", "App execution failed", null)
+        .catch(() => undefined);
+      return { status: 200, body: { ok: true, terminal: "failed" } };
+    }
+
+    if (runnerResult.kind === "sandbox_unavailable") {
+      await finalizeExecution(admin, execution, leaseToken, "failed", "Sandbox unavailable", null)
+        .catch(() => undefined);
+      return { status: 200, body: { ok: true, terminal: "failed" } };
+    }
+
+    if (runnerResult.kind === "success") {
+      const validateOutput = ajv.compile(version.output_schema ?? {});
+      const outputValid = validateOutput(runnerResult.output ?? {});
+      if (!outputValid) {
+        await finalizeExecution(admin, execution, leaseToken, "failed", "Output validation failed", null);
+        return { status: 200, body: { ok: true, terminal: "failed" } };
+      }
+      await finalizeExecution(admin, execution, leaseToken, "succeeded", null, runnerResult.output);
+      return { status: 200, body: { ok: true, terminal: "succeeded" } };
+    }
+
+    const terminalStatus = runnerResult.kind === "timed_out" ? "timed_out" : "failed";
+    const errorMsg = runnerResult.error?.detail ?? runnerResult.error?.stderr_tail ?? "App execution failed";
+    await finalizeExecution(admin, execution, leaseToken, terminalStatus, errorMsg, null);
+    return { status: 200, body: { ok: true, terminal: terminalStatus } };
+  }
+
+  // single_file (legacy_python) path: start a sandbox and let the async poll loop handle it.
   let started: Awaited<ReturnType<typeof startSandboxExecution>> | null = null;
   try {
     started = await startSandboxExecution({
-      source: bundle.source,
+      source: (bundle as { ok: true; source: string }).source,
       inputs: execution.input,
       runtime: app.runtime,
       entrypoint: app.entrypoint,
@@ -806,7 +866,7 @@ async function loadExecutionContext(admin: SupabaseClient, execution: ExecutionR
 
   const versionQuery = admin
     .from("app_versions")
-    .select("id, app_id, bundle_path, input_schema, output_schema, dependencies, secrets")
+    .select("id, app_id, bundle_path, bundle_kind, command, input_schema, output_schema, dependencies, secrets")
     .eq("app_id", app.id);
   const { data: version, error: versionError } = execution.version_id
     ? await versionQuery.eq("id", execution.version_id).maybeSingle<VersionRow>()
@@ -819,10 +879,22 @@ async function loadExecutionContext(admin: SupabaseClient, execution: ExecutionR
   return { ok: true as const, app, version };
 }
 
-async function loadBundle(admin: SupabaseClient, bundlePath: string) {
+async function loadBundle(
+  admin: SupabaseClient,
+  bundlePath: string,
+  bundleKind: "single_file" | "tarball"
+) {
   const { data, error } = await admin.storage.from("app-bundles").download(bundlePath);
   if (error || !data) {
     return { ok: false as const, error: "Failed to download app bundle" };
+  }
+
+  if (bundleKind === "tarball") {
+    const buffer = Buffer.from(await data.arrayBuffer());
+    if (buffer.byteLength > MAX_BUNDLE_BYTES) {
+      return { ok: false as const, error: "App bundle is too large" };
+    }
+    return { ok: true as const, buffer };
   }
 
   const source = await data.text();

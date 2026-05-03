@@ -355,14 +355,17 @@ async function getApp(args: JsonObject, context: McpToolContext): Promise<McpToo
 
 async function runApp(args: JsonObject, context: McpToolContext): Promise<McpToolResult> {
   const slug = requiredSlug(args);
-  const inputs = asObject(args.inputs);
   if (!slug) {
     return errorResult("slug must be lowercase letters, numbers, and hyphens");
   }
 
-  if (!inputs) {
+  // inputs is optional — apps with no required fields accept an empty object.
+  // Match the REST route's behaviour (POST body may omit inputs entirely).
+  const rawInputs = args.inputs;
+  if (rawInputs !== undefined && (typeof rawInputs !== "object" || Array.isArray(rawInputs) || rawInputs === null)) {
     return errorResult("inputs must be an object");
   }
+  const inputs: JsonObject = rawInputs !== undefined ? (rawInputs as JsonObject) : {};
 
   const inputSize = jsonByteLength(inputs);
   if (inputSize === null || inputSize > MAX_INPUT_BYTES) {
