@@ -15,8 +15,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
 
   let appName = slug;
-  let appDescription =
-    "Run this Floom app from the browser. Inputs are validated with JSON Schema and executed in an isolated sandbox.";
+  let appDescription = "";
   try {
     const res = await fetch(`${SITE_URL}/api/apps/${slug}`, {
       next: { revalidate: 300 },
