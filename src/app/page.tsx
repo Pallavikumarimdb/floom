@@ -18,7 +18,6 @@ import { Code2, Rocket, Share2 } from 'lucide-react';
 
 import { SiteHeader } from '@/components/SiteHeader';
 import { FloomFooter } from '@/components/FloomFooter';
-import { FeedbackButton } from '@/components/FeedbackButton';
 
 import { WorksWithBelt } from '@/components/home/WorksWithBelt';
 import { HeroDemo } from '@/components/home/HeroDemo';
@@ -470,7 +469,6 @@ export default function LandingV17PageMvp() {
       </main>
 
       <FloomFooter />
-      <FeedbackButton />
     </div>
   );
 }

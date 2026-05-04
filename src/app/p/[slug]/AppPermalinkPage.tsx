@@ -17,7 +17,6 @@ import { FloomFooter } from '@/components/FloomFooter';
 import { RunSurface, PastRunsDisclosure } from '@/components/runner/RunSurface';
 import { AppIcon } from '@/components/AppIcon';
 import { AppReviews } from '@/components/AppReviews';
-import { FeedbackButton } from '@/components/FeedbackButton';
 import { DescriptionMarkdown } from '@/components/DescriptionMarkdown';
 import { Confetti } from '@/components/Confetti';
 import { ShareModal } from '@/components/share/ShareModal';
@@ -1693,7 +1692,6 @@ export default function AppPermalinkPage({ initialApp }: { initialApp?: Permalin
         {/* /permalink-card */}
       </main>
       <FloomFooter />
-      <FeedbackButton />
 
       {app && (
         <ShareModal
