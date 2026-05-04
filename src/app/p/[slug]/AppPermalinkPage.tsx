@@ -1550,12 +1550,32 @@ export default function AppPermalinkPage({ initialApp }: { initialApp?: Permalin
               Mint one &rarr;
             </a>
           </p>
+          {/* Share row for the Install tab — links to standalone /mcp and /api pages */}
+          <div style={{ display: 'flex', gap: 8, marginTop: 14, flexWrap: 'wrap' }}>
+            <ShareArtifactButton label="Share MCP install page" href={`/p/${app.slug}/mcp`} />
+            <ShareArtifactButton label="Share API docs" href={`/p/${app.slug}/api`} />
+          </div>
         </section>
         )}
 
         {/* Source tab. v0.4: shows real source code fetched from /api/apps/[slug]/source */}
         {activeTab === 'source' && (
           <section id="tabpanel-source" role="tabpanel" aria-labelledby="tab-source" data-testid="tab-content-source">
+            {/* Share row — standalone shareable URLs for source, api, mcp */}
+            <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
+              <ShareArtifactButton
+                label="Share source"
+                href={`/p/${app.slug}/source`}
+              />
+              <ShareArtifactButton
+                label="Share API"
+                href={`/p/${app.slug}/api`}
+              />
+              <ShareArtifactButton
+                label="Share MCP"
+                href={`/p/${app.slug}/mcp`}
+              />
+            </div>
             <div
               style={{
                 display: 'grid',
@@ -2307,6 +2327,53 @@ function RatingsWidget({ summary }: { summary: ReviewSummary }) {
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * ShareArtifactButton — copies the full URL for a standalone shareable artifact
+ * page (/p/<slug>/source, /p/<slug>/api, /p/<slug>/mcp) to clipboard.
+ * Renders as a small secondary button consistent with the page CTA style.
+ */
+function ShareArtifactButton({ label, href }: { label: string; href: string }) {
+  const [copied, setCopied] = useState(false);
+  const handleClick = () => {
+    const url = `${window.location.origin}${href}`;
+    try {
+      void navigator.clipboard.writeText(url).then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1500);
+      });
+    } catch { /* ignore */ }
+  };
+  return (
+    <button
+      type="button"
+      onClick={handleClick}
+      style={{
+        padding: '6px 12px',
+        border: '1px solid var(--line)',
+        borderRadius: 8,
+        fontSize: 12,
+        fontWeight: 600,
+        color: copied ? 'var(--muted)' : 'var(--ink)',
+        background: 'var(--card)',
+        cursor: 'pointer',
+        fontFamily: 'inherit',
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 5,
+        transition: 'color .12s',
+      }}
+    >
+      <svg width={12} height={12} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <circle cx={18} cy={5} r={3} stroke="currentColor" strokeWidth="1.8" />
+        <circle cx={6} cy={12} r={3} stroke="currentColor" strokeWidth="1.8" />
+        <circle cx={18} cy={19} r={3} stroke="currentColor" strokeWidth="1.8" />
+        <path d="M8.59 13.51l6.83 3.98M15.41 6.51l-6.82 3.98" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      </svg>
+      {copied ? 'Copied!' : label}
+    </button>
   );
 }
 
