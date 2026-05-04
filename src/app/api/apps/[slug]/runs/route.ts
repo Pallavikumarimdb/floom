@@ -11,6 +11,8 @@ type AppRow = {
   owner_id: string;
 };
 
+const PRIVATE_CACHE = { "Cache-Control": "private, no-store" } as const;
+
 type RunRow = {
   id: string;
   status: string;
@@ -63,7 +65,7 @@ export async function GET(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   if (!isOwner) {
-    return NextResponse.json({ runs: [] });
+    return NextResponse.json({ runs: [] }, { headers: PRIVATE_CACHE });
   }
 
   const { data, error } = await admin

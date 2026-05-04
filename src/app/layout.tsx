@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 import { SkipLink } from "@/components/SkipLink";
+import { safeJsonLd } from "@/lib/seo/json-ld";
 
 const SITE_NAME = "Floom";
 const SITE_TAGLINE = "Localhost to live in 60 seconds";
@@ -98,7 +99,7 @@ export default function RootLayout({
         <SkipLink />
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(STRUCTURED_DATA) }}
+          dangerouslySetInnerHTML={{ __html: safeJsonLd(STRUCTURED_DATA) }}
         />
         {children}
         <Analytics />

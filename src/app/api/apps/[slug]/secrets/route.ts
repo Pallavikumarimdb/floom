@@ -33,6 +33,8 @@ export async function GET(
     .select("name, created_at, updated_at")
     .eq("app_id", auth.app.id)
     .eq("owner_id", auth.app.owner_id)
+    .eq("scope", "shared")
+    .is("runner_user_id", null)
     .order("name", { ascending: true });
 
   if (error) {
@@ -91,10 +93,12 @@ export async function PUT(
         app_id: auth.app.id,
         owner_id: auth.app.owner_id,
         name,
+        scope: "shared",
+        runner_user_id: null,
         value_ciphertext: valueCiphertext,
         updated_at: new Date().toISOString(),
       },
-      { onConflict: "app_id,name" }
+      { onConflict: "app_id,name,runner_user_id" }
     );
 
   if (error) {
@@ -137,7 +141,9 @@ export async function DELETE(
     .delete()
     .eq("app_id", auth.app.id)
     .eq("owner_id", auth.app.owner_id)
-    .eq("name", name);
+    .eq("name", name)
+    .eq("scope", "shared")
+    .is("runner_user_id", null);
 
   if (error) {
     return NextResponse.json({ error: "Failed to delete app secret" }, { status: 500 });

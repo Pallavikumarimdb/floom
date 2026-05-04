@@ -1559,9 +1559,9 @@ function validateManifest(args: JsonObject): McpToolResult {
 
   // Secrets names — must be valid env var names to inject at runtime.
   const secrets = manifestResult.manifest.secrets ?? [];
-  for (const secretName of secrets) {
-    if (typeof secretName !== "string" || !SECRET_NAME_RE.test(secretName)) {
-      publishErrors.push(`secret name "${secretName}" is invalid; must be an uppercase environment variable name of 2-64 characters (e.g. OPENAI_API_KEY)`);
+  for (const secret of secrets) {
+    if (!SECRET_NAME_RE.test(secret.name)) {
+      publishErrors.push(`secret name "${secret.name}" is invalid; must be an uppercase environment variable name of 2-64 characters (e.g. OPENAI_API_KEY)`);
     }
   }
 

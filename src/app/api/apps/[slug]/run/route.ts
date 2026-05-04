@@ -732,3 +732,26 @@ function isJsonValue(value: unknown): boolean {
     return false;
   }
 }
+
+/**
+ * Recursively strip null bytes (\x00) from all string values in a JSON-safe
+ * structure. Postgres jsonb rejects null bytes (SQLSTATE 22P05);
+ * sanitising here prevents a 500 before the value reaches the DB.
+ */
+export function stripNullBytes(value: unknown): unknown {
+  if (typeof value === "string") {
+    // eslint-disable-next-line no-control-regex
+    return value.replace(/\x00/g, "");
+  }
+  if (Array.isArray(value)) {
+    return value.map(stripNullBytes);
+  }
+  if (value !== null && typeof value === "object") {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      out[k] = stripNullBytes(v);
+    }
+    return out;
+  }
+  return value;
+}

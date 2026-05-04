@@ -28,8 +28,9 @@ import { publishExecutionProcessMessage } from "@/lib/floom/queue";
 const MAX_INFRA_ATTEMPTS = 30;
 const INFRA_RETRY_DELAY_SECONDS = 10;
 import { readRuntimeDependencies } from "@/lib/floom/requirements";
-import { resolveRuntimeSecrets } from "@/lib/floom/runtime-secrets";
+import { resolveRuntimeSecrets, isAnonPerRunnerError } from "@/lib/floom/runtime-secrets";
 import { redactExactSecretValues, redactSecretOutput } from "@/lib/floom/schema";
+import { reconcileQuotaReservation, reserveDailyQuota } from "@/lib/floom/quota";
 
 const ajv = new Ajv({ strict: false });
 
@@ -53,7 +54,7 @@ type VersionRow = {
   input_schema: Record<string, unknown>;
   output_schema: Record<string, unknown>;
   dependencies: Record<string, unknown>;
-  secrets: string[];
+  secrets: unknown;
 };
 
 type ExecutionEventInsert = {
@@ -281,9 +282,14 @@ async function startExecution(
     admin,
     version.secrets ?? [],
     app.id,
-    app.owner_id
+    app.owner_id,
+    execution.caller_user_id
   );
 
+  if (isAnonPerRunnerError(runtimeSecrets)) {
+    await finalizeExecution(admin, execution, leaseToken, "failed", "This app requires sign-in to connect your own credentials.", null);
+    return { status: 200, body: { ok: true, terminal: "failed" } };
+  }
   if (!runtimeSecrets.ok) {
     await finalizeExecution(admin, execution, leaseToken, "failed", runtimeSecrets.error, null);
     return { status: 200, body: { ok: true, terminal: "failed" } };
@@ -325,6 +331,7 @@ async function startExecution(
     // handles the full lifecycle internally — it creates and kills its own sandbox.
     // We record the result inline rather than persisting a sandbox_id for polling.
     let runnerResult: Awaited<ReturnType<typeof runInSandboxContained>> | null = null;
+    const tarballStartedAt = Date.now();
     try {
       const runnerConfig: RunnerConfig = {
         bundle: (bundle as { ok: true; buffer: Buffer }).buffer,
@@ -340,6 +347,8 @@ async function startExecution(
       if (error instanceof LeaseLostError) {
         return { status: 202, body: { ok: true, skipped: "lease_lost" } };
       }
+      const actualSeconds = Math.max(1, Math.ceil((Date.now() - tarballStartedAt) / 1000));
+      await reconcileQuotaUsage(admin, app, execution, actualSeconds).catch(() => undefined);
       await finalizeExecution(admin, execution, leaseToken, "failed", "App execution failed", null)
         .catch(() => undefined);
       return { status: 200, body: { ok: true, terminal: "failed" } };
@@ -348,6 +357,8 @@ async function startExecution(
     if (runnerResult.kind === "sandbox_unavailable") {
       // E2B Free tier: sandbox is busy/rate-limited. Requeue with backoff instead
       // of failing immediately, up to MAX_INFRA_ATTEMPTS.
+      // No sandbox time was consumed — release the full reservation.
+      await reconcileQuotaUsage(admin, app, execution, 0).catch(() => undefined);
       const infraAttempt = (execution.infra_attempt_count ?? 0) + 1;
       if (infraAttempt <= MAX_INFRA_ATTEMPTS) {
         await updateExecutionByLease(admin, execution, leaseToken, {
@@ -360,6 +371,11 @@ async function startExecution(
         .catch(() => undefined);
       return { status: 200, body: { ok: true, terminal: "failed" } };
     }
+
+    const actualTarballSeconds = runnerResult.kind === "success"
+      ? Math.max(1, Math.ceil((runnerResult.elapsedMs ?? (Date.now() - tarballStartedAt)) / 1000))
+      : Math.max(1, Math.ceil((Date.now() - tarballStartedAt) / 1000));
+    await reconcileQuotaUsage(admin, app, execution, actualTarballSeconds).catch(() => undefined);
 
     if (runnerResult.kind === "success") {
       const validateOutput = ajv.compile(version.output_schema ?? {});
@@ -472,6 +488,44 @@ function isSandboxBusyError(error: unknown): boolean {
     statusCode === 429 ||
     /rate.?limit|too many|sandbox.+(unavailable|busy|failed|boot)|429/i.test(message)
   );
+}
+
+/**
+ * Reconcile the quota reservation made by the route when the execution
+ * reaches a terminal state in the async worker.
+ *
+ * The route always reserves ceil(sandboxTimeoutMs() / 1000) seconds upfront.
+ * This function reconciles to the actual elapsed seconds (or 0 if no sandbox
+ * ran, e.g. sandbox_unavailable requeue).
+ *
+ * Safe to call with .catch(() => undefined) — quota reconcile failures must
+ * never block execution finalization.
+ */
+async function reconcileQuotaUsage(
+  admin: SupabaseClient,
+  app: AppRow,
+  execution: ExecutionRow,
+  actualSeconds: number
+) {
+  const reservedSeconds = Math.ceil(sandboxTimeoutMs() / 1000);
+  const safe = Math.max(0, Math.ceil(actualSeconds));
+  await reconcileQuotaReservation(admin, app.id, reservedSeconds, safe);
+}
+
+/**
+ * Reconcile quota for a single_file execution terminal in pollExecution.
+ * Actual elapsed seconds are computed from execution.started_at to now.
+ */
+async function reconcileQuotaForPollTerminal(
+  admin: SupabaseClient,
+  app: AppRow,
+  execution: ExecutionRow
+) {
+  const reservedSeconds = Math.ceil(sandboxTimeoutMs() / 1000);
+  const actualSeconds = execution.started_at
+    ? Math.max(1, Math.ceil((Date.now() - Date.parse(execution.started_at)) / 1000))
+    : reservedSeconds;
+  await reconcileQuotaReservation(admin, app.id, reservedSeconds, actualSeconds);
 }
 
 async function pollExecution(
@@ -589,9 +643,10 @@ async function pollExecution(
       admin,
       version.secrets ?? [],
       app.id,
-      app.owner_id
+      app.owner_id,
+      execution.caller_user_id
     );
-    const finalOutput = runtimeSecrets.ok
+    const finalOutput = (!isAnonPerRunnerError(runtimeSecrets) && runtimeSecrets.ok)
       ? redactExactSecretValues(redactedOutput, Object.values(runtimeSecrets.envs))
       : redactedOutput;
     await finalizeExecution(admin, execution, leaseToken, "succeeded", null, finalOutput, {
@@ -613,9 +668,10 @@ async function pollExecution(
     admin,
     version.secrets ?? [],
     app.id,
-    app.owner_id
+    app.owner_id,
+    execution.caller_user_id
   );
-  const errorSecretValues = errorRedactSecrets.ok
+  const errorSecretValues = (!isAnonPerRunnerError(errorRedactSecrets) && errorRedactSecrets.ok)
     ? Object.values(errorRedactSecrets.envs)
     : [];
   await finalizeExecution(
@@ -767,10 +823,11 @@ async function recoverOrTerminateStaleRunning(
           admin,
           context.version.secrets ?? [],
           context.app.id,
-          context.app.owner_id
+          context.app.owner_id,
+          claimed.caller_user_id
         );
         const redactedOutput = redactSecretOutput(context.version.output_schema ?? {}, pollResult.output ?? {});
-        const finalOutput = runtimeSecrets.ok
+        const finalOutput = (!isAnonPerRunnerError(runtimeSecrets) && runtimeSecrets.ok)
           ? redactExactSecretValues(redactedOutput, Object.values(runtimeSecrets.envs))
           : redactedOutput;
         await finalizeExecution(
@@ -922,9 +979,10 @@ async function buildPollEventInserts(
     admin,
     version.secrets ?? [],
     app.id,
-    app.owner_id
+    app.owner_id,
+    execution.caller_user_id
   );
-  const secretValues = runtimeSecrets.ok ? Object.values(runtimeSecrets.envs) : null;
+  const secretValues = (!isAnonPerRunnerError(runtimeSecrets) && runtimeSecrets.ok) ? Object.values(runtimeSecrets.envs) : null;
 
   if (pollResult.stdoutChunk && secretValues) {
     eventInserts.push({

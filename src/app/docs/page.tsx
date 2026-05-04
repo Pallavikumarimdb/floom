@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { safeJsonLd } from "@/lib/seo/json-ld";
 
 const SITE_URL = "https://floom.dev";
 
@@ -117,7 +118,7 @@ export default function DocsOverviewPage() {
     <>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(DOCS_STRUCTURED_DATA) }}
+        dangerouslySetInnerHTML={{ __html: safeJsonLd(DOCS_STRUCTURED_DATA) }}
       />
 
       {/* Hero */}

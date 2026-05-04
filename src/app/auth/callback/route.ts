@@ -166,6 +166,10 @@ function redirectToLoginWithAuthError(req: NextRequest) {
   return NextResponse.redirect(redirectUrl);
 }
 
+// Allowlist for x-forwarded-host when FLOOM_ORIGIN is not configured.
+// Prevents open-redirect-after-OAuth on non-Vercel deploys / staging misconfigs.
+const ALLOWED_FORWARDED_HOST_RE = /^([a-z0-9-]+\.)*(floom\.dev|vercel\.app)$/i;
+
 function resolvePublicOrigin(req: NextRequest) {
   const configuredOrigin = configuredPublicOrigin();
   if (configuredOrigin) {
@@ -176,7 +180,10 @@ function resolvePublicOrigin(req: NextRequest) {
   const forwardedHost = req.headers.get("x-forwarded-host")?.split(",")[0]?.trim();
 
   if (forwardedHost) {
-    return `${forwardedProto || "https"}://${forwardedHost}`;
+    if (ALLOWED_FORWARDED_HOST_RE.test(forwardedHost)) {
+      return `${forwardedProto || "https"}://${forwardedHost}`;
+    }
+    console.warn("[auth:callback] Rejected untrusted x-forwarded-host:", forwardedHost);
   }
 
   return new URL(req.url).origin;
