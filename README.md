@@ -1,6 +1,17 @@
-# Floom v0.1
+# Floom
 
-from localhost to live and secure in 60sec.
+> Hosted runtime for AI-built apps. Turn a Python or TypeScript function into a shareable URL with auth, secrets, integrations, and MCP. Localhost to live in 60 seconds.
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![npm](https://img.shields.io/npm/v/@floomhq/cli.svg)](https://www.npmjs.com/package/@floomhq/cli)
+
+This is the source code for [floom.dev](https://floom.dev).
+
+- **[Quickstart](https://floom.dev/docs/quickstart)** — deploy your first app
+- **[Contributing](./CONTRIBUTING.md)** — how to help
+- **[Skills reference](https://floom.dev/skills/floomit)** — for AI agents
+
+---
 
 ## What is this?
 
