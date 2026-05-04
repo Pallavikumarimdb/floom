@@ -11,6 +11,9 @@ import { callerHasScope, resolveAuthCaller } from "@/lib/supabase/auth";
 
 const MAX_SECRET_VALUE_BYTES = 32 * 1024;
 
+// Prevents shared/CDN caches from storing user-private secret metadata.
+const PRIVATE_CACHE = { "Cache-Control": "private, no-store" } as const;
+
 type OwnedApp = {
   id: string;
   owner_id: string;
@@ -36,7 +39,10 @@ export async function GET(
     return NextResponse.json({ error: "Failed to list app secrets" }, { status: 500 });
   }
 
-  return NextResponse.json({ secrets: (data ?? []) as RuntimeSecretMetadata[] });
+  return NextResponse.json(
+    { secrets: (data ?? []) as RuntimeSecretMetadata[] },
+    { headers: PRIVATE_CACHE },
+  );
 }
 
 export async function PUT(
@@ -78,7 +84,7 @@ export async function PUT(
     return NextResponse.json({ error: "App secrets are not configured" }, { status: 503 });
   }
 
-  const { data, error } = await auth.admin
+  const { error } = await auth.admin
     .from("app_secrets")
     .upsert(
       {
@@ -89,15 +95,19 @@ export async function PUT(
         updated_at: new Date().toISOString(),
       },
       { onConflict: "app_id,name" }
-    )
-    .select("name, created_at, updated_at")
-    .single();
+    );
 
-  if (error || !data) {
+  if (error) {
     return NextResponse.json({ error: "Failed to store app secret" }, { status: 500 });
   }
 
-  return NextResponse.json({ secret: data as RuntimeSecretMetadata });
+  // RLS on app_secrets blocks SELECT even for service_role (using: false policy).
+  // Return a synthesised metadata record; the secret was written if no error above.
+  const now = new Date().toISOString();
+  return NextResponse.json(
+    { secret: { name, created_at: now, updated_at: now } as RuntimeSecretMetadata },
+    { headers: PRIVATE_CACHE },
+  );
 }
 
 export async function DELETE(

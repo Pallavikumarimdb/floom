@@ -209,6 +209,34 @@ export async function POST(
   if (isAsyncRuntimeEnabled()) {
     const { token: viewToken, hash: viewTokenHash } = generateViewToken();
 
+    // Reserve daily quota BEFORE inserting the execution row (async path).
+    // Mirrors the sync path's P0-2 pattern. The execution-worker reconciles
+    // the actual seconds when the execution reaches a terminal state.
+    const asyncQuota = await reserveDailyQuota(
+      admin,
+      app.id,
+      app.owner_id,
+      Math.ceil(SANDBOX_TIMEOUT_MS / 1000)
+    );
+    if (asyncQuota.allowed && asyncQuota.warningPercent !== undefined && asyncQuota.warningPercent >= 80) {
+      after(maybeFireQuotaWarningEmail(admin, app.owner_id, asyncQuota.warningPercent));
+    }
+    if (!asyncQuota.allowed) {
+      if (asyncQuota.reason === "unavailable") {
+        return NextResponse.json(
+          { error: "quota_check_unavailable", retry_after: asyncQuota.retryAfterUnix },
+          { status: 503 }
+        );
+      }
+      const quotaRetryAfter = asyncQuota.retryAfterUnix
+        ? String(Math.max(1, asyncQuota.retryAfterUnix - Math.floor(Date.now() / 1000)))
+        : "60";
+      return NextResponse.json(
+        { error: "app_quota_exhausted", retry_after: asyncQuota.retryAfterUnix },
+        { status: 429, headers: { "Retry-After": quotaRetryAfter } }
+      );
+    }
+
     // P0-1: atomic queue-slot claim via Postgres advisory lock.
     // claim_app_queue_slot takes pg_advisory_xact_lock(app_id), checks the
     // in-flight count, and inserts the execution row in one transaction.
@@ -228,6 +256,8 @@ export async function POST(
     );
 
     if (execError) {
+      // Release quota reservation since no execution row was created.
+      await reconcileQuotaReservation(admin, app.id, asyncQuota.reservedSeconds, 0).catch(() => undefined);
       // SQLSTATE P0001 = queue_full raised by claim_app_queue_slot.
       if (execError.code === "P0001") {
         return NextResponse.json(
@@ -238,6 +268,7 @@ export async function POST(
       return NextResponse.json({ error: "Failed to create execution" }, { status: 500 });
     }
     if (!execution) {
+      await reconcileQuotaReservation(admin, app.id, asyncQuota.reservedSeconds, 0).catch(() => undefined);
       return NextResponse.json({ error: "Failed to create execution" }, { status: 500 });
     }
 
@@ -269,6 +300,8 @@ export async function POST(
         status: "failed",
         error: "Failed to enqueue execution",
       });
+      // Release quota reservation since the execution failed to enqueue.
+      await reconcileQuotaReservation(admin, app.id, asyncQuota.reservedSeconds, 0).catch(() => undefined);
       return NextResponse.json({ error: "Failed to enqueue execution" }, { status: 500 });
     }
 
