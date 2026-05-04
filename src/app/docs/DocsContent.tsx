@@ -233,15 +233,18 @@ tool: run_app
 arguments: { "slug": "csv-stats", "inputs": { "csv": "name,score\\nAlice,90" } }`;
 
 const composioExample = `# 1. Connect Gmail in your Floom settings (one-time browser OAuth)
-# 2. Set the connection ID as an app secret:
-npx @floomhq/cli@latest secrets set my-app COMPOSIO_CONNECTION_ID --value-stdin
+# 2. Declare the toolkit in floom.yaml — no manual copy step:
+#    composio: gmail
 
-# 3. Use it in your Python app — injected as an env var at runtime:
+# 3. Use it in your Python app — COMPOSIO_CONNECTION_ID is auto-injected at run time:
 import os
-from composio import ComposioToolSet
+from composio import ComposioToolSet, Action
 
 toolset = ComposioToolSet(entity_id=os.environ["COMPOSIO_CONNECTION_ID"])
-tools = toolset.get_tools(actions=["GMAIL_SEND_EMAIL"])`;
+result = toolset.execute_action(
+    action=Action.GMAIL_SEND_EMAIL,
+    params={"recipient_email": "...", "subject": "...", "body": "..."},
+)`;
 
 const asyncFireAndForgetExample = `# Fire-and-forget — returns 202 immediately
 curl -X POST https://floom.dev/api/apps/my-app/run \\
@@ -675,11 +678,11 @@ export default function DocsContent() {
 
             <Section id="connections" title="Connections (Composio)">
               <p>
-                Apps that need to call external services can use Floom Connections, powered by Composio. Connect your accounts once via OAuth in Settings, then reference the connection in your app as an env var.
+                Apps that need to call external services can use Floom Connections, powered by Composio. Connect your accounts once via OAuth in Settings, then declare the toolkit in your manifest — Floom injects the connection automatically at run time.
               </p>
               <CodeBlock label="Python app using Gmail">{composioExample}</CodeBlock>
               <p className="text-sm text-neutral-600 mt-3">
-                Today you set your connection ID manually as an app secret. Auto-injection — where Floom reads your active connection at run time so apps don't need a manual copy step — is on the roadmap for v0.5.
+                No manual copy step needed. Floom reads your active connection at run time and injects <IC>COMPOSIO_CONNECTION_ID</IC> (and <IC>COMPOSIO_&lt;TOOLKIT&gt;_CONNECTION_ID</IC> for multi-toolkit apps) automatically. If you have not connected the toolkit yet, the run returns HTTP 412 with a link to <IC>/connections</IC>.
               </p>
               {/* Fix #5: updated connections list with 77 providers */}
               <p>
@@ -851,7 +854,7 @@ export default function DocsContent() {
       <div className="border-t border-[#ded8cc] bg-[#faf9f5]">
         <div className="mx-auto max-w-6xl px-5 py-4">
           <p className="text-xs text-neutral-400">
-            Last updated: 2026-05-04 · Floom v0.3
+            Last updated: 2026-05-04 · Floom v0.4
           </p>
         </div>
       </div>

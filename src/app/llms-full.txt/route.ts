@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 
 // Auto-generated from /docs/* page sources. Concatenated in TOC order.
-// Last updated: 2026-05-04 · Floom v0.3
-const CONTENT = `# Floom — Full Documentation for LLMs
+// Last updated: 2026-05-04 · Floom v0.4
+const CONTENT = `# Floom v0.4 — Full Documentation for LLMs
 
 > Floom is a deployment platform for small Python (and Node.js) AI apps. A Floom app is a Python script plus a JSON Schema for inputs/outputs. After floom deploy, the app gets a public URL, a REST API, and an MCP endpoint — no servers, no Docker, no infrastructure work.
 
@@ -19,9 +19,9 @@ Three minutes from zero to a running app. You need Node.js installed for the CLI
 
 ### 1. Authenticate
 
-Run \`npx @floomhq/cli@latest setup\` once per machine. It opens a browser page to link your Floom account. The token is saved to \`~/.config/floom/token\`.
+Run \`npx @floomhq/cli@latest setup\` once per machine. It opens a browser page to link your Floom account. The token is saved to \`~/.floom/config.json\`.
 
-In CI, set the FLOOM_TOKEN env var instead — no setup command needed.
+In CI, set the FLOOM_API_KEY env var instead — no setup command needed.
 
 ### 2. Scaffold
 
@@ -85,9 +85,16 @@ output_schema: ./output.schema.json
 # Make the app publicly runnable without auth.
 public: true
 # Secret names to inject as env vars at run time. Values are set separately.
+# Default scope is per_runner; use scope: shared to inject creator's key for every caller.
 secrets:
-  - GEMINI_API_KEY
-  - OPENAI_API_KEY
+  - OPENAI_API_KEY                     # scope: per_runner (default)
+  - name: GEMINI_API_KEY
+    scope: shared                       # creator's key injected for every runner
+# Composio integrations: auto-inject the runner's active connection at run time.
+# composio: gmail
+# composio:
+#   - gmail
+#   - slack
 # Optional: additional pip deps installed before the run command.
 # dependencies:
 #   python: ./requirements.txt --require-hashes
@@ -106,7 +113,8 @@ secrets:
 | input_schema | No | Relative path to a JSON Schema file. Floom validates inputs before running. |
 | output_schema | No | Relative path to a JSON Schema file. Floom validates stdout output against this. |
 | public | No | true = anyone can run without auth. Default: false. |
-| secrets | No | List of secret names. Values set via CLI or REST, injected as env vars at run time. |
+| secrets | No | List of secret names or objects with name + optional scope. Default scope: per_runner. Use scope: shared to inject creator's key for every caller. |
+| composio | No | Toolkit slug or list of slugs (e.g. gmail, slack). Floom auto-injects COMPOSIO_CONNECTION_ID at run time. |
 | dependencies.python | No | Path to requirements.txt, optionally with --require-hashes. |
 | bundle_exclude | No | List of paths/globs to skip when building the bundle. |
 
@@ -250,11 +258,28 @@ Requires an agent token with publish scope.
 
 DELETE /api/apps/:slug/secrets/:name with an agent token that has publish scope. There is no CLI shortcut yet.
 
+### Secret scopes: per_runner vs shared
+
+Every secret has a scope that controls whose value is injected at run time.
+
+- **per_runner (default):** each user who runs the app provides their own value. Declare with just the name, or explicitly with scope: per_runner.
+- **shared (demo-subsidy mode):** the app creator's value is injected for every caller, including anonymous visitors. Use with rate limits — you absorb the API cost.
+
+\`\`\`yaml
+secrets:
+  - name: OPENAI_API_KEY          # scope: per_runner (default)
+  - name: GEMINI_API_KEY
+    scope: shared                  # creator's key injected for every runner
+\`\`\`
+
+Warning: with scope: shared, your API keys are charged for every run by every caller. Always pair shared secrets with rate limits.
+
 ### Rules
 
 - Secret values are never visible in logs or the browser UI.
 - Values are scoped to a single app slug — not shared across apps.
 - Declaring a secret name in floom.yaml is required; the value must be set separately before the first run that needs it.
+- scope: per_runner is the default. Use scope: shared only for demo apps you want to subsidize.
 
 ---
 
@@ -270,20 +295,20 @@ Google OAuth at https://floom.dev/login. Creates a session for the browser UI. N
 
 ### 2. CLI device flow
 
-Runs when you execute \`floom setup\`. Opens a browser confirmation page; the CLI polls until you approve. The resulting token is saved to ~/.config/floom/token.
+Runs when you execute \`floom setup\`. Opens a browser confirmation page; the CLI polls until you approve. The resulting token is saved to ~/.floom/config.json.
 
 \`\`\`bash
 # Opens a browser page to authorise your CLI. Run once per machine.
 npx @floomhq/cli@latest setup
 
-# Token is saved to ~/.config/floom/token
+# Token is saved to ~/.floom/config.json
 # Or export it manually:
-export FLOOM_TOKEN=<your-agent-token>
+export FLOOM_API_KEY=<your-agent-token>
 \`\`\`
 
 ### 3. Agent tokens
 
-Create at https://floom.dev/tokens. Use in the Authorization: Bearer header for REST calls, or as the FLOOM_TOKEN env var for the CLI.
+Create at https://floom.dev/tokens. Use in the Authorization: Bearer header for REST calls, or as the FLOOM_API_KEY env var for the CLI.
 
 | Scope | Allows |
 |---|---|
@@ -320,10 +345,11 @@ Response envelope:
 
 \`\`\`json
 {
-  "status": "ok",
-  "output": { "action_items": ["Ship by Friday", "Review PR #42"] },
-  "exit_code": 0,
-  "duration_ms": 3412
+  "execution_id": "exec_abc123",
+  "status": "queued",
+  "output": null,
+  "error": null,
+  "view_token": "<view-token>"
 }
 \`\`\`
 
@@ -459,15 +485,18 @@ Apps that need to call external services can use Floom Connections, powered by C
 
 \`\`\`python
 # 1. Connect Gmail in your Floom settings (one-time browser OAuth)
-# 2. Add the connection ID as a secret:
-# npx @floomhq/cli@latest secrets set my-app COMPOSIO_CONNECTION_ID --value-stdin
+# 2. Declare the toolkit in floom.yaml — no manual copy step:
+#    composio: gmail
 
+# 3. Use it in your Python app — COMPOSIO_CONNECTION_ID is auto-injected at run time:
 import os
-from composio import ComposioToolSet
+from composio import ComposioToolSet, Action
 
-toolset = ComposioToolSet()
-tools = toolset.get_tools(actions=["GMAIL_SEND_EMAIL"])
-# connection_id is read from COMPOSIO_CONNECTION_ID automatically
+toolset = ComposioToolSet(entity_id=os.environ["COMPOSIO_CONNECTION_ID"])
+result = toolset.execute_action(
+    action=Action.GMAIL_SEND_EMAIL,
+    params={"recipient_email": "...", "subject": "...", "body": "..."},
+)
 \`\`\`
 
 ### Available providers (77 total)
@@ -512,14 +541,14 @@ Five working apps you can run now or use as a starting point:
 
 URL: https://floom.dev/docs/ci
 
-Use FLOOM_TOKEN as a repository secret. The CLI reads it automatically — no floom setup needed in CI.
+Use FLOOM_API_KEY as a repository secret. The CLI reads it automatically — no floom setup needed in CI.
 
 ### GitHub Actions
 
 \`\`\`yaml
 - name: Deploy Floom app
   env:
-    FLOOM_TOKEN: \${{ secrets.FLOOM_TOKEN }}
+    FLOOM_API_KEY: \${{ secrets.FLOOM_API_KEY }}
   run: |
     npx @floomhq/cli@latest deploy
 

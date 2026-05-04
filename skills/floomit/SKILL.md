@@ -50,8 +50,8 @@ All fields: slug, command, runtime, entrypoint, public, input_schema, output_sch
 Creator-subsidized shared keys vs per-runner user-provided keys. Manifest schema and CLI commands.
 
 ### Use Gmail, Slack, or other Composio integrations
-**Read:** https://floom.dev/docs/composio (check current status — 404 as of 2026-05-04; ask Federico if blocked)
-Manifest field, runtime auto-injection, missing-connection handling.
+**Read:** https://floom.dev/docs/connections
+Manifest field (composio: gmail), runtime auto-injection of COMPOSIO_CONNECTION_ID, missing-connection HTTP 412 handling.
 
 ### Call the REST API directly
 **Read:** https://floom.dev/docs/api
@@ -63,7 +63,7 @@ Available tools, auth, integration with Claude Desktop / Cursor / Codex.
 
 ### Mint or revoke agent tokens
 **Read:** https://floom.dev/docs/auth
-Token format, scopes (read/run/publish), 90-day lifetime, CI usage.
+Token format, scopes (read/run/publish), no expiry (revoke manually), CI usage.
 
 ### Debug a failed run
 **Read:** https://floom.dev/docs/troubleshooting
