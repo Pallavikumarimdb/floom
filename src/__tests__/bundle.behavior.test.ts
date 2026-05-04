@@ -216,7 +216,12 @@ describe("validateUploadedTarball — hardlink rejection", () => {
       await fs.link(path.join(tmpDir, "target.py"), path.join(tmpDir, "app.py"));
 
       // Use Pack without portable flag and hardlinkAsFileIfExists=false to preserve Link type
-      const pack = new tar.Pack({ gzip: true, cwd: tmpDir, hardlinkAsFileIfExists: false } as Parameters<typeof tar.Pack>[0]);
+      type PackInstance = NodeJS.ReadableStream & {
+        add(p: string): void;
+        end(): void;
+      };
+      const PackCtor = tar.Pack as unknown as new (opts: Record<string, unknown>) => PackInstance;
+      const pack = new PackCtor({ gzip: true, cwd: tmpDir, hardlinkAsFileIfExists: false });
       const chunks: Buffer[] = [];
       pack.on("data", (c: Buffer) => chunks.push(c));
       const bundleBuf = await new Promise<Buffer>((resolve, reject) => {
