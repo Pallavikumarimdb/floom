@@ -1127,3 +1127,295 @@ export async function executionSnapshotAfterWait(
 
   return { terminal: false, snapshot: formatExecutionSnapshot(last) };
 }
+
+// ── Decoupled sandbox poller (Option B) ──────────────────────────────────────
+//
+// Called from /api/internal/executions/poll-sandboxes (cron, every ~30s).
+// Only active when FLOOM_DECOUPLED_SANDBOX=enabled.
+//
+// For each running execution with a sandbox_id that hasn't been polled
+// recently, reconnect to E2B, check status, finalize or bump last_polled_at.
+// Concurrency protection: use the existing lease mechanism so two cron
+// invocations that overlap don't both finalize the same execution.
+
+export async function pollInFlightSandboxes(
+  admin: SupabaseClient
+): Promise<{ polled: number; finalized: number; errors: number }> {
+  const staleThreshold = new Date(Date.now() - 30_000).toISOString();
+
+  // Fetch running executions with a sandbox_id that haven't been polled in
+  // the last 30 s (or have never been polled).  Limit 50 per cron tick.
+  const { data: candidates } = await admin
+    .from("executions")
+    .select("*")
+    .eq("status", "running")
+    .not("sandbox_id", "is", null)
+    .or(`last_polled_at.is.null,last_polled_at.lt.${staleThreshold}`)
+    .order("last_polled_at", { ascending: true, nullsFirst: true })
+    .limit(50)
+    .returns<ExecutionRow[]>();
+
+  if (!candidates || candidates.length === 0) {
+    return { polled: 0, finalized: 0, errors: 0 };
+  }
+
+  let finalized = 0;
+  let errors = 0;
+
+  for (const execution of candidates) {
+    try {
+      const result = await pollOneInFlightSandbox(admin, execution);
+      if (result === "finalized") {
+        finalized++;
+      }
+    } catch {
+      errors++;
+    }
+  }
+
+  return { polled: candidates.length, finalized, errors };
+}
+
+async function pollOneInFlightSandbox(
+  admin: SupabaseClient,
+  execution: ExecutionRow
+): Promise<"finalized" | "still_running" | "skipped"> {
+  // Claim a short lease to prevent concurrent poll routes from double-finalizing.
+  const leaseToken = crypto.randomUUID();
+  const leaseExpiresAt = new Date(Date.now() + executionLeaseMs()).toISOString();
+  const { data: claimedRows, error: claimError } = await admin.rpc("claim_execution_lease", {
+    p_execution_id: execution.id,
+    p_lease_token: leaseToken,
+    p_lease_expires_at: leaseExpiresAt,
+  });
+
+  if (claimError) {
+    return "skipped";
+  }
+
+  const claimed = Array.isArray(claimedRows) ? (claimedRows[0] as ExecutionRow | undefined) : null;
+  if (!claimed) {
+    // Lease already held by another worker (e.g., a concurrent QStash process message).
+    return "skipped";
+  }
+
+  if (isTerminalExecutionStatus(claimed.status)) {
+    return "skipped";
+  }
+
+  if (!claimed.sandbox_id) {
+    return "skipped";
+  }
+
+  // Check cancel before polling.
+  if (claimed.cancel_requested_at) {
+    await cancelExecutionInPoller(admin, claimed, leaseToken);
+    return "finalized";
+  }
+
+  // Enforce sandbox timeout.
+  if (claimed.started_at) {
+    const elapsedMs = Date.now() - Date.parse(claimed.started_at);
+    if (Number.isFinite(elapsedMs) && elapsedMs >= sandboxTimeoutMs()) {
+      await finalizeExecutionInPoller(
+        admin,
+        claimed,
+        leaseToken,
+        "timed_out",
+        "Execution exceeded SANDBOX_TIMEOUT_MS",
+        null,
+        { timed_out_at: new Date().toISOString() }
+      );
+      await killSandboxExecution(claimed.sandbox_id, claimed.sandbox_pid);
+      return "finalized";
+    }
+  }
+
+  let pollResult: Awaited<ReturnType<typeof pollSandboxExecution>>;
+  try {
+    pollResult = await pollSandboxExecution({
+      sandboxId: claimed.sandbox_id,
+      pid: claimed.sandbox_pid,
+      stdoutOffset: claimed.stdout_offset,
+      stderrOffset: claimed.stderr_offset,
+    });
+  } catch {
+    await finalizeExecutionInPoller(admin, claimed, leaseToken, "failed", "App execution failed", null);
+    return "finalized";
+  }
+
+  const now = new Date().toISOString();
+
+  if (pollResult.status === "running") {
+    // Still running — bump last_polled_at and release lease.
+    await updateExecutionInPoller(admin, claimed, leaseToken, {
+      last_polled_at: now,
+      last_heartbeat_at: now,
+      heartbeat_at: now,
+      progress: pollResult.progress ?? claimed.progress,
+      stdout_offset: pollResult.stdoutOffset,
+      stderr_offset: pollResult.stderrOffset,
+      lease_token: null,
+      lease_expires_at: null,
+      lease_until: null,
+    });
+    return "still_running";
+  }
+
+  const context = await loadExecutionContext(admin, claimed);
+
+  if (pollResult.status === "succeeded") {
+    if (!context.ok) {
+      await finalizeExecutionInPoller(admin, claimed, leaseToken, "failed", context.error, null, {
+        last_polled_at: now,
+        stdout_offset: pollResult.stdoutOffset,
+        stderr_offset: pollResult.stderrOffset,
+      });
+      await killSandboxExecution(claimed.sandbox_id, claimed.sandbox_pid);
+      return "finalized";
+    }
+
+    const validateOutput = ajv.compile(context.version.output_schema ?? {});
+    const outputValid = validateOutput(pollResult.output ?? {});
+    if (!outputValid) {
+      await finalizeExecutionInPoller(admin, claimed, leaseToken, "failed", "Output validation failed", null, {
+        last_polled_at: now,
+        progress: pollResult.progress ?? claimed.progress,
+        stdout_offset: pollResult.stdoutOffset,
+        stderr_offset: pollResult.stderrOffset,
+      });
+      await killSandboxExecution(claimed.sandbox_id, claimed.sandbox_pid);
+      return "finalized";
+    }
+
+    const redactedOutput = redactSecretOutput(context.version.output_schema ?? {}, pollResult.output ?? {});
+    const runtimeSecrets = await resolveRuntimeSecrets(
+      admin,
+      context.version.secrets ?? [],
+      context.app.id,
+      context.app.owner_id
+    );
+    const finalOutput = runtimeSecrets.ok
+      ? redactExactSecretValues(redactedOutput, Object.values(runtimeSecrets.envs))
+      : redactedOutput;
+
+    await finalizeExecutionInPoller(admin, claimed, leaseToken, "succeeded", null, finalOutput, {
+      last_polled_at: now,
+      progress: pollResult.progress ?? claimed.progress,
+      stdout_offset: pollResult.stdoutOffset,
+      stderr_offset: pollResult.stderrOffset,
+    });
+    await killSandboxExecution(claimed.sandbox_id, claimed.sandbox_pid);
+    return "finalized";
+  }
+
+  // failed or timed_out
+  const terminalStatus = pollResult.status === "timed_out" ? "timed_out" : "failed";
+  let errorSecretValues: string[] = [];
+  if (context.ok) {
+    const errorRedactSecrets = await resolveRuntimeSecrets(
+      admin,
+      context.version.secrets ?? [],
+      context.app.id,
+      context.app.owner_id
+    );
+    errorSecretValues = errorRedactSecrets.ok ? Object.values(errorRedactSecrets.envs) : [];
+  }
+
+  await finalizeExecutionInPoller(
+    admin,
+    claimed,
+    leaseToken,
+    terminalStatus,
+    pollResult.error ?? "App execution failed",
+    null,
+    {
+      last_polled_at: now,
+      progress: pollResult.progress ?? claimed.progress,
+      stdout_offset: pollResult.stdoutOffset,
+      stderr_offset: pollResult.stderrOffset,
+      timed_out_at: terminalStatus === "timed_out" ? now : claimed.timed_out_at,
+    },
+    errorSecretValues
+  );
+  await killSandboxExecution(claimed.sandbox_id, claimed.sandbox_pid);
+  return "finalized";
+}
+
+async function finalizeExecutionInPoller(
+  admin: SupabaseClient,
+  execution: ExecutionRow,
+  leaseToken: string,
+  status: "succeeded" | "failed" | "timed_out" | "cancelled",
+  error: string | null,
+  output: unknown | null,
+  extra: Record<string, unknown> = {},
+  secretValues: readonly string[] = []
+) {
+  const completedAt = new Date().toISOString();
+  const publicError = error === null ? null : sanitizePublicError(error, undefined, secretValues);
+  await updateExecutionInPoller(admin, execution, leaseToken, {
+    status,
+    output,
+    error: publicError,
+    completed_at: completedAt,
+    last_heartbeat_at: completedAt,
+    heartbeat_at: completedAt,
+    lease_token: null,
+    lease_expires_at: null,
+    lease_until: null,
+    next_poll_at: null,
+    ...extra,
+  });
+
+  await admin.from("execution_events").insert({
+    execution_id: execution.id,
+    kind: "status",
+    payload: {
+      status,
+      error: publicError,
+      completed_at: completedAt,
+    },
+  });
+}
+
+async function cancelExecutionInPoller(
+  admin: SupabaseClient,
+  execution: ExecutionRow,
+  leaseToken: string
+) {
+  await finalizeExecutionInPoller(admin, execution, leaseToken, "cancelled", "Execution was cancelled", null, {
+    cancel_reason: execution.cancel_reason ?? "caller",
+  });
+  if (execution.sandbox_id) {
+    await killSandboxExecution(execution.sandbox_id, execution.sandbox_pid);
+  }
+  await admin.from("execution_events").insert({
+    execution_id: execution.id,
+    kind: "system",
+    payload: { code: "cancel_completed" },
+  });
+}
+
+async function updateExecutionInPoller(
+  admin: SupabaseClient,
+  execution: ExecutionRow,
+  leaseToken: string,
+  values: Record<string, unknown>
+) {
+  const { data, error } = await admin
+    .from("executions")
+    .update(values)
+    .eq("id", execution.id)
+    .eq("lease_token", leaseToken)
+    .gt("lease_expires_at", new Date().toISOString())
+    .in("status", ["queued", "running"])
+    .select("id")
+    .maybeSingle();
+
+  if (error || !data) {
+    // Lease lost — another worker already handled this execution.
+    return null;
+  }
+  return data;
+}

@@ -12,6 +12,10 @@ export type SweepExecutionsMessage = {
   kind: "sweep";
 };
 
+export type PollSandboxesMessage = {
+  kind: "poll-sandboxes";
+};
+
 export type PublishProcessOptions = {
   executionId: string;
   pollCount?: number;
@@ -52,6 +56,18 @@ export async function publishSweepMessage(baseUrl?: string) {
     retries: 0,
     deduplicationId: `execution-sweep-${Math.floor(Date.now() / 60_000)}`,
     label: "floom-execution-sweep",
+  });
+}
+
+export async function publishPollSandboxesMessage(baseUrl?: string) {
+  const client = qstashClient();
+  const url = `${resolveWorkerBaseUrl(baseUrl)}/api/internal/executions/poll-sandboxes`;
+  return client.publishJSON({
+    url,
+    body: { kind: "poll-sandboxes" } satisfies PollSandboxesMessage,
+    retries: 0,
+    deduplicationId: `poll-sandboxes-${Math.floor(Date.now() / 60_000)}`,
+    label: "floom-poll-sandboxes",
   });
 }
 

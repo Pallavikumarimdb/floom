@@ -63,6 +63,7 @@ export type ExecutionRow = {
   stdout_offset: number;
   stderr_offset: number;
   view_token_hash?: string | null;
+  last_polled_at?: string | null;
 };
 
 export type AppVisibilityRow = {
@@ -79,6 +80,13 @@ export type ExecutionAuthResult =
 
 export function isAsyncRuntimeEnabled() {
   return process.env.FLOOM_ASYNC_RUNTIME === "enabled";
+}
+
+export function isDecoupledSandboxEnabled() {
+  return (
+    process.env.FLOOM_ASYNC_RUNTIME === "enabled" &&
+    process.env.FLOOM_DECOUPLED_SANDBOX === "enabled"
+  );
 }
 
 export function normalizeExecutionStatus(status: string): ExecutionStatus {
