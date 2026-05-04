@@ -1,3 +1,10 @@
+export type SecretScope = "shared" | "per-runner";
+
+export type ManifestSecret = {
+  name: string;
+  scope: SecretScope;
+};
+
 export type ManifestDependencies = {
   python?: string;
 };
@@ -11,7 +18,7 @@ type SharedManifestFields = {
   input_schema?: string;
   output_schema?: string;
   dependencies?: ManifestDependencies;
-  secrets?: string[];
+  secrets?: ManifestSecret[];
   bundle_exclude?: string[];
 };
 
@@ -116,7 +123,7 @@ function parseSharedFields(data: Record<string, unknown>) {
     input_schema: optionalRelativePath(data.input_schema, "input_schema"),
     output_schema: optionalRelativePath(data.output_schema, "output_schema"),
     dependencies: parseDependencies(data.dependencies),
-    secrets: parseSecretNames(data.secrets),
+    secrets: parseSecrets(data.secrets),
     bundle_exclude: parseBundleExclude(data.bundle_exclude),
   };
 }
@@ -203,31 +210,63 @@ function parseDependencies(value: unknown): ManifestDependencies | undefined {
   return { python: normalized };
 }
 
-function parseSecretNames(value: unknown): string[] | undefined {
+/**
+ * Parse the secrets field from floom.yaml.
+ * Accepts two forms (backwards compat):
+ *   - bare string: "OPENAI_API_KEY"  → { name, scope: "shared" }
+ *   - object form: { name: "OPENAI_API_KEY", scope: "per-runner" }
+ * Default scope for object form with no explicit scope = "per-runner".
+ */
+export function parseSecrets(value: unknown): ManifestSecret[] | undefined {
   if (value === undefined) {
     return undefined;
   }
 
   if (!Array.isArray(value)) {
-    throw new Error("secrets must be an array of environment variable names");
+    throw new Error("secrets must be an array of environment variable names or {name, scope} objects");
   }
 
   if (value.length > 10) {
     throw new Error("secrets supports at most 10 names");
   }
 
-  const names = value.map((item) => {
-    if (typeof item !== "string" || !SECRET_NAME_RE.test(item)) {
-      throw new Error("secrets must contain only uppercase environment variable names");
+  const secrets = value.map((item): ManifestSecret => {
+    if (typeof item === "string") {
+      if (!SECRET_NAME_RE.test(item)) {
+        throw new Error("secrets must contain only uppercase environment variable names");
+      }
+      return { name: item, scope: "shared" };
     }
-    return item;
+    if (item && typeof item === "object" && !Array.isArray(item)) {
+      const obj = item as Record<string, unknown>;
+      const name = typeof obj.name === "string" ? obj.name.trim() : "";
+      if (!SECRET_NAME_RE.test(name)) {
+        throw new Error("secrets object must have a valid uppercase name");
+      }
+      const scopeRaw = obj.scope;
+      if (scopeRaw !== undefined && scopeRaw !== "shared" && scopeRaw !== "per-runner") {
+        throw new Error(`secrets scope must be "shared" or "per-runner"`);
+      }
+      const scope: SecretScope = (scopeRaw as SecretScope) ?? "per-runner";
+      return { name, scope };
+    }
+    throw new Error("secrets must contain only uppercase environment variable names or {name, scope} objects");
   });
 
+  const names = secrets.map((s) => s.name);
   if (new Set(names).size !== names.length) {
     throw new Error("secrets must not contain duplicate names");
   }
 
-  return names;
+  return secrets;
+}
+
+/**
+ * Extract secret names from a ManifestSecret array.
+ * Used by callers that only need the names (bundle.ts, mcp/tools.ts).
+ */
+export function secretNames(secrets: ManifestSecret[] | undefined): string[] {
+  return secrets?.map((s) => s.name) ?? [];
 }
 
 function parseBundleExclude(value: unknown): string[] | undefined {

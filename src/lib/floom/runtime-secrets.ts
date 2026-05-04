@@ -1,5 +1,6 @@
 import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { ManifestSecret, SecretScope } from "@/lib/floom/manifest";
 
 export const SECRET_NAME_RE = /^[A-Z][A-Z0-9_]{1,63}$/;
 const ENCRYPTION_ALGORITHM = "aes-256-gcm";
@@ -25,6 +26,21 @@ export type RuntimeSecretResolution =
       ok: false;
       error: string;
     };
+
+/**
+ * Returned when an anonymous caller tries to run an app that requires
+ * per-runner secrets. The UI uses requiresSignIn to show a sign-in gate.
+ */
+export type AnonPerRunnerSecretError = {
+  ok: false;
+  requiresSignIn: string[];
+};
+
+export function isAnonPerRunnerError(
+  r: RuntimeSecretResolution | AnonPerRunnerSecretError
+): r is AnonPerRunnerSecretError {
+  return !r.ok && "requiresSignIn" in r;
+}
 
 export function isValidSecretName(name: string) {
   return SECRET_NAME_RE.test(name);
@@ -72,18 +88,29 @@ export function decryptSecretValue(encryptedValue: string) {
   return plaintext.toString("utf8");
 }
 
+/**
+ * Resolve runtime secrets for an execution.
+ *
+ * @param admin    - Supabase admin client
+ * @param secretsRaw - raw secrets from app_versions.secrets JSONB (string[] or ManifestSecret[])
+ * @param appId    - app id
+ * @param ownerId  - app owner user id (used for shared secrets)
+ * @param callerId - runner user id (null for anon); used for per-runner secrets
+ *
+ * Returns AnonPerRunnerSecretError when an anon caller tries to run an app
+ * that requires per-runner secrets. The caller (run route / worker) should
+ * surface this as a 401 with requires_sign_in=true.
+ */
 export async function resolveRuntimeSecrets(
   admin: SupabaseClient,
-  secretNames: unknown,
+  secretsRaw: unknown,
   appId: string,
-  ownerId: string
-): Promise<RuntimeSecretResolution> {
-  const parsedNames = parseSecretNames(secretNames);
-  if (!parsedNames.ok) {
-    return { ok: false, error: "Invalid configured app secret name" };
-  }
+  ownerId: string,
+  callerId?: string | null
+): Promise<RuntimeSecretResolution | AnonPerRunnerSecretError> {
+  const secrets = parseManifestSecrets(secretsRaw);
 
-  if (parsedNames.names.length === 0) {
+  if (secrets.length === 0) {
     return { ok: true, envs: {}, missing: [] };
   }
 
@@ -93,43 +120,115 @@ export async function resolveRuntimeSecrets(
     return { ok: false, error: "App secrets are not configured" };
   }
 
-  const { data, error } = await admin
-    .from("app_secrets")
-    .select("name, value_ciphertext")
-    .eq("app_id", appId)
-    .eq("owner_id", ownerId)
-    .in("name", parsedNames.names);
+  const sharedSecrets = secrets.filter((s) => s.scope === "shared");
+  const perRunnerSecrets = secrets.filter((s) => s.scope === "per-runner");
 
-  if (error) {
-    return { ok: false, error: "Failed to load app secrets" };
+  // Gate: anon callers cannot use per-runner-secret apps.
+  if (perRunnerSecrets.length > 0 && !callerId) {
+    return {
+      ok: false,
+      requiresSignIn: perRunnerSecrets.map((s) => s.name),
+    };
   }
 
-  const rows = new Map(
-    (data ?? []).map((row) => [
-      String(row.name),
-      String(row.value_ciphertext),
-    ])
-  );
   const envs: RuntimeSecrets = {};
   const missing: string[] = [];
 
-  for (const name of parsedNames.names) {
-    const encryptedValue = rows.get(name);
-    if (!encryptedValue) {
-      missing.push(name);
-      continue;
+  // ── Shared secrets (owner's values) ──────────────────────────────────────
+  if (sharedSecrets.length > 0) {
+    const { data, error } = await admin
+      .from("app_secrets")
+      .select("name, value_ciphertext")
+      .eq("app_id", appId)
+      .eq("owner_id", ownerId)
+      .eq("scope", "shared")
+      .is("runner_user_id", null)
+      .in("name", sharedSecrets.map((s) => s.name));
+
+    if (error) {
+      return { ok: false, error: "Failed to load app secrets" };
     }
 
-    try {
-      envs[name] = decryptSecretValue(encryptedValue);
-    } catch {
-      return { ok: false, error: "Failed to decrypt app secrets" };
+    const rows = new Map(
+      (data ?? []).map((row) => [String(row.name), String(row.value_ciphertext)])
+    );
+
+    for (const { name } of sharedSecrets) {
+      const encryptedValue = rows.get(name);
+      if (!encryptedValue) {
+        missing.push(name);
+        continue;
+      }
+      try {
+        envs[name] = decryptSecretValue(encryptedValue);
+      } catch {
+        return { ok: false, error: "Failed to decrypt app secrets" };
+      }
+    }
+  }
+
+  // ── Per-runner secrets (caller's own values) ──────────────────────────────
+  if (perRunnerSecrets.length > 0 && callerId) {
+    const { data, error } = await admin
+      .from("app_secrets")
+      .select("name, value_ciphertext")
+      .eq("app_id", appId)
+      .eq("scope", "per_runner")
+      .eq("runner_user_id", callerId)
+      .in("name", perRunnerSecrets.map((s) => s.name));
+
+    if (error) {
+      return { ok: false, error: "Failed to load runner secrets" };
+    }
+
+    const rows = new Map(
+      (data ?? []).map((row) => [String(row.name), String(row.value_ciphertext)])
+    );
+
+    for (const { name } of perRunnerSecrets) {
+      const encryptedValue = rows.get(name);
+      if (!encryptedValue) {
+        missing.push(name);
+        continue;
+      }
+      try {
+        envs[name] = decryptSecretValue(encryptedValue);
+      } catch {
+        return { ok: false, error: "Failed to decrypt runner secrets" };
+      }
     }
   }
 
   return { ok: true, envs, missing };
 }
 
+/**
+ * Parse the JSONB secrets column from app_versions into ManifestSecret[].
+ * Handles both legacy string[] form and new {name, scope}[] form.
+ */
+export function parseManifestSecrets(raw: unknown): ManifestSecret[] {
+  if (!Array.isArray(raw)) return [];
+
+  return raw.map((item): ManifestSecret => {
+    if (typeof item === "string") {
+      return { name: item, scope: "shared" };
+    }
+    if (item && typeof item === "object" && !Array.isArray(item)) {
+      const obj = item as Record<string, unknown>;
+      const name = typeof obj.name === "string" ? obj.name : "";
+      const scopeRaw = obj.scope as string | undefined;
+      const scope: SecretScope =
+        scopeRaw === "shared" || scopeRaw === "per-runner" ? scopeRaw : "per-runner";
+      return { name, scope };
+    }
+    return { name: String(item), scope: "shared" };
+  });
+}
+
+/**
+ * Legacy helper for callers that only need secret names.
+ * Handles both string[] and object[] forms.
+ */
 export function parseSecretNames(
   secretNames: unknown
 ): { ok: true; names: string[] } | { ok: false } {
@@ -139,10 +238,17 @@ export function parseSecretNames(
 
   const names: string[] = [];
   for (const item of secretNames) {
-    if (typeof item !== "string" || !isValidSecretName(item)) {
+    if (typeof item === "string") {
+      if (!isValidSecretName(item)) return { ok: false };
+      names.push(item);
+    } else if (item && typeof item === "object" && !Array.isArray(item)) {
+      const obj = item as Record<string, unknown>;
+      const name = typeof obj.name === "string" ? obj.name : "";
+      if (!isValidSecretName(name)) return { ok: false };
+      names.push(name);
+    } else {
       return { ok: false };
     }
-    names.push(item);
   }
 
   if (new Set(names).size !== names.length) {
