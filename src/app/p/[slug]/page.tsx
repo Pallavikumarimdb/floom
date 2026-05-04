@@ -23,38 +23,29 @@ interface Props {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
 
-  let appName = slug;
+  // Use the same cached Supabase query as Page() — no fetch() to a dynamic API route.
+  // Fetching /api/apps/[slug] (a dynamic ƒ route) from generateMetadata was causing
+  // Next.js to classify this page as fully dynamic, defeating ISR. Direct admin
+  // query wrapped in unstable_cache keeps the page in the ISR window.
+  const app = await getPublicAppMeta(slug);
+
+  let appName = app?.name ?? slug;
   let appDescription = "";
-  let appFound = false;
-  try {
-    const res = await fetch(`${SITE_URL}/api/apps/${slug}`, {
-      next: { revalidate: 300 },
-    });
-    if (res.ok) {
-      appFound = true;
-      const data = (await res.json()) as {
-        name?: string;
-        description?: string;
-        input_schema?: { properties?: Record<string, { description?: string }> };
-      };
-      if (data.name) appName = data.name;
-      if (data.description) {
-        appDescription = data.description.replace(/\s+/g, " ").trim().slice(0, 220);
-      } else {
-        // Fallback: first input field's `description`. Until apps.description
-        // is a first-class column, the input-schema description is the only
-        // app-authored summary available — generic enough for meta + OG, and
-        // strictly better than the static "Run this Floom app..." stub.
-        const props = data.input_schema?.properties ?? {};
-        const firstField = Object.values(props)[0];
-        const candidate = firstField?.description?.trim();
-        if (candidate) {
-          appDescription = candidate.replace(/\s+/g, " ").slice(0, 220);
-        }
+  const appFound = app !== null;
+
+  if (app) {
+    // Prefer the app's description column; fall back to the first input field's description.
+    if (app.description) {
+      appDescription = app.description.replace(/\s+/g, " ").trim().slice(0, 220);
+    } else if (app.input_schema) {
+      const schema = app.input_schema as { properties?: Record<string, { description?: string }> };
+      const props = schema.properties ?? {};
+      const firstField = Object.values(props)[0];
+      const candidate = firstField?.description?.trim();
+      if (candidate) {
+        appDescription = candidate.replace(/\s+/g, " ").slice(0, 220);
       }
     }
-  } catch {
-    // Fall back to slug + generic description.
   }
 
   // If no description was found from any source, emit a minimal fallback so
@@ -99,7 +90,18 @@ export default async function Page({ params }: Props) {
   // Pre-fetch only PUBLIC app metadata server-side so the first paint renders
   // the form rather than a loading skeleton. Private apps return null here and
   // the client component handles them via the authenticated API fetch.
-  const initialApp = await fetchPublicInitialApp(slug);
+  const appMeta = await getPublicAppMeta(slug);
+
+  const initialApp: PermalinkInitialApp | undefined = appMeta
+    ? {
+        id: appMeta.id,
+        slug: appMeta.slug,
+        name: appMeta.name,
+        handler: appMeta.handler,
+        input_schema: appMeta.input_schema as Record<string, unknown> | null,
+        public: true,
+      }
+    : undefined;
 
   // JSON-LD: describe each public app as a WebApplication hosted on the Floom
   // platform. Helps LLMs understand "this is a deployable app on Floom" when
@@ -107,7 +109,7 @@ export default async function Page({ params }: Props) {
   const appJsonLd = {
     "@context": "https://schema.org",
     "@type": "WebApplication",
-    name: initialApp?.name ?? slug,
+    name: appMeta?.name ?? slug,
     url: `${SITE_URL}/p/${slug}`,
     applicationCategory: "DeveloperApplication",
     operatingSystem: "Web",
@@ -138,22 +140,31 @@ export default async function Page({ params }: Props) {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: safeJsonLd(appJsonLd) }}
       />
-      <AppPermalinkPage initialApp={initialApp ?? undefined} />
+      <AppPermalinkPage initialApp={initialApp} />
     </>
   );
 }
 
-// Fetch public-only app metadata for server-side pre-rendering.
-// Only returns data for apps with public=true; private apps return null so
-// the client component handles auth and renders after hydration.
-// No cookies(), no headers(), no server auth — this keeps the route ISR-cacheable.
+// App metadata shape returned by getPublicAppMeta — a superset of PermalinkInitialApp
+// that includes the description column used in generateMetadata.
+type PublicAppMeta = {
+  id: string;
+  slug: string;
+  name: string;
+  handler: string | null;
+  description: string | null;
+  input_schema: unknown;
+  public: true;
+};
+
+// Cached public-only app metadata lookup.
+// Both generateMetadata and Page() call this function — unstable_cache deduplicates
+// the Supabase query within the same request and across requests within the 300s window.
 //
-// Wrapped in unstable_cache so Next.js treats the Supabase query result as
-// explicitly cached data (not an uncached non-fetch call). Without this, the
-// Supabase JS client's internal fetch — which includes auth headers — is not
-// coalesced into the route's ISR window, leaving the route classified as
-// fully dynamic. unstable_cache makes the cache boundary explicit.
-async function fetchPublicInitialApp(slug: string): Promise<PermalinkInitialApp | null> {
+// This is the only async data operation in this file. No fetch(), no cookies(), no
+// headers() — the Supabase admin client is auth'd via service-role key in env vars.
+// Keeping this as the sole data boundary ensures Next.js can classify the route as ISR.
+async function getPublicAppMeta(slug: string): Promise<PublicAppMeta | null> {
   if (!hasSupabaseConfig()) {
     if (slug === demoApp.slug) {
       return {
@@ -161,6 +172,7 @@ async function fetchPublicInitialApp(slug: string): Promise<PermalinkInitialApp 
         slug: demoApp.slug,
         name: demoApp.name,
         handler: ((demoApp as Record<string, unknown>).handler as string) ?? null,
+        description: null,
         input_schema:
           ((demoApp as Record<string, unknown>).input_schema as Record<string, unknown>) ?? null,
         public: true,
@@ -175,7 +187,7 @@ async function fetchPublicInitialApp(slug: string): Promise<PermalinkInitialApp 
         const admin = createAdminClient();
         const { data: app, error } = await admin
           .from("apps")
-          .select("id, slug, name, handler, public, app_versions(input_schema)")
+          .select("id, slug, name, handler, description, public, app_versions(input_schema)")
           .eq("slug", slug)
           .eq("public", true) // Only pre-render public apps server-side
           .order("version", { foreignTable: "app_versions", ascending: false })
@@ -193,14 +205,15 @@ async function fetchPublicInitialApp(slug: string): Promise<PermalinkInitialApp 
           slug: app.slug,
           name: app.name,
           handler: (app.handler as string | null) ?? null,
+          description: (app.description as string | null) ?? null,
           input_schema: latestVersion?.input_schema ?? null,
-          public: true,
-        } satisfies PermalinkInitialApp;
+          public: true as const,
+        } satisfies PublicAppMeta;
       } catch {
         return null;
       }
     },
-    ["public-app", slug],
+    ["public-app-meta", slug],
     { revalidate: 300, tags: [`app:${slug}`] }
   )(slug);
 }
