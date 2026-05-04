@@ -230,403 +230,321 @@ npx @floomhq/cli@latest deploy`,
           </div>
         )}
 
-        {/* When no tokens: create form is the hero, publish command below */}
-        {tokens.length === 0 ? (
-          <>
-            {/* First-time hint: only shown before any token exists AND before newToken is revealed */}
-            {!newToken && (
+        {/* Primary actions: always at top — create + publish command */}
+        <div style={{ marginTop: 32, display: 'grid', gap: 20, gridTemplateColumns: 'minmax(0,1fr) minmax(0,1.1fr)' }}>
+          <div style={cardStyle}>
+            <h2 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 6px', letterSpacing: '-0.01em' }}>
+              {tokens.length === 0 ? "Manual token fallback" : "Create new token"}
+            </h2>
+            <p style={{ fontSize: 12.5, color: 'var(--muted)', margin: '0 0 16px', lineHeight: 1.55 }}>
+              {tokens.length === 0
+                ? <>Prefer <code style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11 }}>npx @floomhq/cli@latest setup</code>. Manual raw tokens are shown once.</>
+                : "Browser-authorized setup is the main path. Use this only for manual token management."}
+            </p>
+            <label
+              style={{ display: 'block', fontSize: 12.5, fontWeight: 600, color: 'var(--muted)', marginBottom: 6 }}
+              htmlFor="token-name"
+            >
+              Token name
+            </label>
+            <input
+              id="token-name"
+              ref={nameInputRef}
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              className="input-field"
+              placeholder="e.g. Launch token"
+              style={{ width: '100%', boxSizing: 'border-box', marginBottom: 14 }}
+            />
+            <button
+              type="button"
+              disabled={working}
+              onClick={createToken}
+              className="btn-primary sm"
+              style={{ opacity: working ? 0.6 : 1 }}
+            >
+              {working ? "Working…" : "Create agent token"}
+            </button>
+            {newToken && (
               <div
+                role="status"
                 style={{
-                  marginTop: 32,
-                  padding: '20px 24px',
+                  marginTop: 16,
+                  borderRadius: 10,
+                  border: '2px solid var(--accent-border)',
                   background: 'var(--accent-soft)',
-                  border: '1px solid var(--accent-border)',
-                  borderRadius: 14,
-                  maxWidth: 620,
+                  padding: 14,
                 }}
               >
-                <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--accent)', letterSpacing: '0.07em', textTransform: 'uppercase', margin: '0 0 14px', fontFamily: "'JetBrains Mono', ui-monospace, monospace" }}>
-                  Your first 60 seconds
+                <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--accent)', margin: '0 0 8px' }}>
+                  Copy now, not shown again
                 </p>
-                <div
-                  style={{
-                    display: 'flex',
-                    flexWrap: 'wrap',
-                    gap: 10,
-                  }}
-                >
-                  {[
-                    { n: 1, text: 'Run setup in your terminal.' },
-                    { n: 2, text: <>Approve the browser code from <code style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, background: 'rgba(0,0,0,0.06)', padding: '1px 5px', borderRadius: 4 }}>/cli/authorize</code>.</> },
-                    { n: 3, text: 'Drop a Python file in. Floom does the rest.' },
-                  ].map(({ n, text }) => (
-                    <div
-                      key={n}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'flex-start',
-                        gap: 10,
-                        flex: '1 1 180px',
-                        minWidth: 160,
-                      }}
-                    >
-                      <span
-                        style={{
-                          flexShrink: 0,
-                          width: 22,
-                          height: 22,
-                          borderRadius: '50%',
-                          background: 'var(--accent)',
-                          color: '#fff',
-                          fontSize: 11,
-                          fontWeight: 800,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontFamily: "'JetBrains Mono', monospace",
-                          marginTop: 1,
-                        }}
-                      >
-                        {n}
-                      </span>
-                      <span style={{ fontSize: 13, color: 'var(--ink)', lineHeight: 1.5 }}>{text}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <div style={{ marginTop: 24, maxWidth: 460, ...cardStyle }}>
-              <h2 style={{ fontSize: 20, fontWeight: 700, margin: '0 0 6px', letterSpacing: '-0.015em' }}>Manual token fallback</h2>
-              <p style={{ fontSize: 13, color: 'var(--muted)', margin: '0 0 20px', lineHeight: 1.55 }}>
-                Prefer <code style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11 }}>npx @floomhq/cli@latest setup</code>. Manual raw tokens are shown once.
-              </p>
-              <label
-                style={{ display: 'block', fontSize: 12.5, fontWeight: 600, color: 'var(--muted)', marginBottom: 6 }}
-                htmlFor="token-name"
-              >
-                Token name
-              </label>
-              <input
-                id="token-name"
-                ref={nameInputRef}
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-                className="input-field"
-                placeholder="e.g. Launch token"
-                style={{ width: '100%', boxSizing: 'border-box', marginBottom: 16 }}
-              />
-              <button
-                type="button"
-                disabled={working}
-                onClick={createToken}
-                className="btn-primary"
-                style={{ opacity: working ? 0.6 : 1 }}
-              >
-                {working ? "Working…" : "Create agent token"}
-              </button>
-
-              {newToken && (
-                <div
-                  role="status"
-                  style={{
-                    marginTop: 20,
-                    borderRadius: 10,
-                    border: '2px solid var(--accent-border)',
-                    background: 'var(--accent-soft)',
-                    padding: 16,
-                  }}
-                >
-                  <p style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--accent)', margin: '0 0 10px' }}>
-                    Manual token created: copy now if you need it
-                  </p>
-                  <pre style={{ maxHeight: 120, overflow: 'auto', borderRadius: 8, border: '1px solid var(--accent-border)', background: 'var(--card)', padding: '10px 12px', fontSize: 11.5, margin: '0 0 10px', fontFamily: "'JetBrains Mono', monospace", color: 'var(--ink)', wordBreak: 'break-all', whiteSpace: 'pre-wrap' }}>
-                    {newToken}
-                  </pre>
-                  <button
-                    type="button"
-                    onClick={() => copy(newToken, "token")}
-                    className="btn-primary sm"
-                  >
-                    {copied === "token" ? "✓ Copied" : "Copy token"}
-                  </button>
-                </div>
-              )}
-            </div>
-
-            <div style={{ marginTop: 24, maxWidth: 640, ...cardStyle }}>
-              <h2 style={{ fontSize: 15, fontWeight: 700, margin: '0 0 6px', letterSpacing: '-0.01em' }}>Publish command</h2>
-              <p style={{ fontSize: 12.5, color: 'var(--muted)', margin: '0 0 14px', lineHeight: 1.55 }}>
-                Setup opens browser authorization and saves your agent token locally.
-              </p>
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, background: 'var(--terminal-bg)', borderRadius: 8, padding: '12px 14px' }}>
-                <pre style={{ flex: 1, fontFamily: "'JetBrains Mono', monospace", fontSize: 11.5, color: 'var(--terminal-ink)', margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-all', lineHeight: 1.7 }}>
-                  {publishCommand}
+                <pre style={{ maxHeight: 80, overflow: 'auto', borderRadius: 6, border: '1px solid var(--accent-border)', background: 'var(--card)', padding: '8px 10px', fontSize: 11, margin: '0 0 8px', fontFamily: "'JetBrains Mono', monospace", color: 'var(--ink)', wordBreak: 'break-all', whiteSpace: 'pre-wrap' }}>
+                  {newToken}
                 </pre>
                 <button
                   type="button"
-                  onClick={() => copy(publishCommand, "command")}
-                  style={{ flexShrink: 0, fontSize: 11, fontWeight: 600, color: copied === 'command' ? '#fff' : 'var(--code-accent)', background: 'transparent', border: `1px solid ${copied === 'command' ? 'var(--code-accent)' : 'rgba(110,231,183,0.3)'}`, borderRadius: 5, padding: '4px 10px', cursor: 'pointer', fontFamily: 'inherit', transition: 'background 0.1s', whiteSpace: 'nowrap' }}
+                  onClick={() => copy(newToken, "token")}
+                  className="btn-primary sm"
                 >
-                  {copied === "command" ? "✓ Copied" : "Copy"}
+                  {copied === "token" ? "✓ Copied" : "Copy token"}
                 </button>
               </div>
+            )}
+          </div>
+
+          <div style={cardStyle}>
+            <h2 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 6px', letterSpacing: '-0.01em' }}>Publish command</h2>
+            <p style={{ fontSize: 12.5, color: 'var(--muted)', margin: '0 0 12px', lineHeight: 1.55 }}>
+              Setup opens browser authorization and saves your agent token locally.
+            </p>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, background: 'var(--terminal-bg)', borderRadius: 8, padding: '10px 12px' }}>
+              <pre style={{ flex: 1, fontFamily: "'JetBrains Mono', monospace", fontSize: 10.5, color: 'var(--terminal-ink)', margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-all', lineHeight: 1.7 }}>
+                {publishCommand}
+              </pre>
+              <button
+                type="button"
+                onClick={() => copy(publishCommand, "command")}
+                style={{ flexShrink: 0, fontSize: 11, fontWeight: 600, color: copied === 'command' ? '#fff' : 'var(--code-accent)', background: 'transparent', border: `1px solid ${copied === 'command' ? 'var(--code-accent)' : 'rgba(110,231,183,0.3)'}`, borderRadius: 5, padding: '4px 10px', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}
+              >
+                {copied === "command" ? "✓ Copied" : "Copy"}
+              </button>
             </div>
-          </>
-        ) : (
-          /* When tokens exist: table leads, create form demoted */
-          <>
-            {/* Token table — '+ New token' button removed; the Create card
-                below is the single token-minting affordance. Two buttons in
-                close visual proximity doing the same thing read as
-                duplication. */}
-            <div style={{ marginTop: 32, ...cardStyle }}>
-              <div style={{ marginBottom: 18 }}>
-                <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0, letterSpacing: '-0.015em' }}>Agent tokens</h2>
-              </div>
-              {isMobile ? (
-                /* Mobile: stack each token as a card. The 8-col table at
-                   375px hid Scopes/Status/Created/Last used/Expires AND
-                   the Revoke button behind a horizontal scroll container —
-                   making it impossible to revoke a leaked token from a
-                   phone. */
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                  {tokens.map((token) => (
-                    <div
-                      key={token.id}
-                      style={{
-                        border: '1px solid var(--line)',
-                        borderRadius: 10,
-                        padding: 14,
-                        background: 'var(--card)',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: 8,
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
-                        <div style={{ minWidth: 0, flex: 1 }}>
-                          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink)', lineHeight: 1.3, wordBreak: 'break-word' }}>{token.name}</div>
-                          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>{token.token_prefix}…</div>
-                        </div>
-                        {token.revoked_at ? (
-                          <span style={{ borderRadius: 999, background: 'var(--danger-soft)', border: '1px solid var(--danger-border)', padding: '2px 8px', fontSize: 11, fontWeight: 600, color: 'var(--danger)', whiteSpace: 'nowrap' }}>
-                            Revoked
-                          </span>
-                        ) : (
-                          <span style={{ borderRadius: 999, background: 'var(--accent-soft)', border: '1px solid var(--accent-border)', padding: '2px 8px', fontSize: 11, fontWeight: 600, color: 'var(--accent)', whiteSpace: 'nowrap' }}>
-                            Active
-                          </span>
-                        )}
+          </div>
+        </div>
+
+        {/* First-time hint: only when no tokens yet AND before newToken is revealed */}
+        {tokens.length === 0 && !newToken && (
+          <div
+            style={{
+              marginTop: 20,
+              padding: '20px 24px',
+              background: 'var(--accent-soft)',
+              border: '1px solid var(--accent-border)',
+              borderRadius: 14,
+              maxWidth: 620,
+            }}
+          >
+            <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--accent)', letterSpacing: '0.07em', textTransform: 'uppercase', margin: '0 0 14px', fontFamily: "'JetBrains Mono', ui-monospace, monospace" }}>
+              Your first 60 seconds
+            </p>
+            <div
+              style={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: 10,
+              }}
+            >
+              {[
+                { n: 1, text: 'Run setup in your terminal.' },
+                { n: 2, text: <>Approve the browser code from <code style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, background: 'rgba(0,0,0,0.06)', padding: '1px 5px', borderRadius: 4 }}>/cli/authorize</code>.</> },
+                { n: 3, text: 'Drop a Python file in. Floom does the rest.' },
+              ].map(({ n, text }) => (
+                <div
+                  key={n}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: 10,
+                    flex: '1 1 180px',
+                    minWidth: 160,
+                  }}
+                >
+                  <span
+                    style={{
+                      flexShrink: 0,
+                      width: 22,
+                      height: 22,
+                      borderRadius: '50%',
+                      background: 'var(--accent)',
+                      color: '#fff',
+                      fontSize: 11,
+                      fontWeight: 800,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontFamily: "'JetBrains Mono', monospace",
+                      marginTop: 1,
+                    }}
+                  >
+                    {n}
+                  </span>
+                  <span style={{ fontSize: 13, color: 'var(--ink)', lineHeight: 1.5 }}>{text}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Tokens list: below the primary actions */}
+        {tokens.length > 0 && (
+          <div style={{ marginTop: 24, ...cardStyle }}>
+            <div style={{ marginBottom: 18 }}>
+              <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0, letterSpacing: '-0.015em' }}>Agent tokens</h2>
+            </div>
+            {isMobile ? (
+              /* Mobile: stack each token as a card. The 8-col table at
+                 375px hid Scopes/Status/Created/Last used/Expires AND
+                 the Revoke button behind a horizontal scroll container —
+                 making it impossible to revoke a leaked token from a
+                 phone. */
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                {tokens.map((token) => (
+                  <div
+                    key={token.id}
+                    style={{
+                      border: '1px solid var(--line)',
+                      borderRadius: 10,
+                      padding: 14,
+                      background: 'var(--card)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 8,
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink)', lineHeight: 1.3, wordBreak: 'break-word' }}>{token.name}</div>
+                        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>{token.token_prefix}…</div>
                       </div>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', columnGap: 12, rowGap: 4, fontSize: 12.5 }}>
-                        <span style={{ color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: 10.5, fontWeight: 700, alignSelf: 'center' }}>Scopes</span>
-                        <span style={{ color: 'var(--ink)' }}>{token.scopes.join(", ")}</span>
-                        <span style={{ color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: 10.5, fontWeight: 700, alignSelf: 'center' }}>Created</span>
-                        <span style={{ color: 'var(--muted)' }}>{relative(token.created_at)}</span>
-                        <span style={{ color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: 10.5, fontWeight: 700, alignSelf: 'center' }}>Last used</span>
-                        <span style={{ color: 'var(--muted)' }}>{relative(token.last_used_at)}</span>
-                        <span style={{ color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: 10.5, fontWeight: 700, alignSelf: 'center' }}>Expires</span>
-                        <span style={{ color: 'var(--muted)' }}>{token.expires_at ? new Date(token.expires_at).toLocaleDateString() : "Never"}</span>
-                      </div>
-                      {!token.revoked_at && (
-                        <div style={{ marginTop: 4 }}>
-                          {confirmRevoke === token.id ? (
-                            <div style={{ display: 'flex', gap: 8 }}>
-                              <button
-                                type="button"
-                                disabled={working}
-                                onClick={() => revokeToken(token.id)}
-                                style={{ background: 'var(--danger)', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 14px', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', opacity: working ? 0.6 : 1, flex: 1 }}
-                              >
-                                Confirm revoke
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setConfirmRevoke(null)}
-                                style={{ background: 'var(--card)', color: 'var(--ink)', border: '1px solid var(--line)', borderRadius: 8, padding: '8px 14px', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}
-                              >
-                                Cancel
-                              </button>
-                            </div>
-                          ) : (
+                      {token.revoked_at ? (
+                        <span style={{ borderRadius: 999, background: 'var(--danger-soft)', border: '1px solid var(--danger-border)', padding: '2px 8px', fontSize: 11, fontWeight: 600, color: 'var(--danger)', whiteSpace: 'nowrap' }}>
+                          Revoked
+                        </span>
+                      ) : (
+                        <span style={{ borderRadius: 999, background: 'var(--accent-soft)', border: '1px solid var(--accent-border)', padding: '2px 8px', fontSize: 11, fontWeight: 600, color: 'var(--accent)', whiteSpace: 'nowrap' }}>
+                          Active
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', columnGap: 12, rowGap: 4, fontSize: 12.5 }}>
+                      <span style={{ color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: 10.5, fontWeight: 700, alignSelf: 'center' }}>Scopes</span>
+                      <span style={{ color: 'var(--ink)' }}>{token.scopes.join(", ")}</span>
+                      <span style={{ color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: 10.5, fontWeight: 700, alignSelf: 'center' }}>Created</span>
+                      <span style={{ color: 'var(--muted)' }}>{relative(token.created_at)}</span>
+                      <span style={{ color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: 10.5, fontWeight: 700, alignSelf: 'center' }}>Last used</span>
+                      <span style={{ color: 'var(--muted)' }}>{relative(token.last_used_at)}</span>
+                      <span style={{ color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: 10.5, fontWeight: 700, alignSelf: 'center' }}>Expires</span>
+                      <span style={{ color: 'var(--muted)' }}>{token.expires_at ? new Date(token.expires_at).toLocaleDateString() : "Never"}</span>
+                    </div>
+                    {!token.revoked_at && (
+                      <div style={{ marginTop: 4 }}>
+                        {confirmRevoke === token.id ? (
+                          <div style={{ display: 'flex', gap: 8 }}>
                             <button
                               type="button"
                               disabled={working}
-                              onClick={() => setConfirmRevoke(token.id)}
-                              style={{ background: 'var(--danger-soft)', color: 'var(--danger)', border: '1px solid var(--danger-border)', borderRadius: 8, padding: '8px 14px', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', opacity: working ? 0.6 : 1, width: '100%' }}
+                              onClick={() => revokeToken(token.id)}
+                              style={{ background: 'var(--danger)', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 14px', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', opacity: working ? 0.6 : 1, flex: 1 }}
                             >
-                              Revoke
+                              Confirm revoke
                             </button>
+                            <button
+                              type="button"
+                              onClick={() => setConfirmRevoke(null)}
+                              style={{ background: 'var(--card)', color: 'var(--ink)', border: '1px solid var(--line)', borderRadius: 8, padding: '8px 14px', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            disabled={working}
+                            onClick={() => setConfirmRevoke(token.id)}
+                            style={{ background: 'var(--danger-soft)', color: 'var(--danger)', border: '1px solid var(--danger-border)', borderRadius: 8, padding: '8px 14px', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', opacity: working ? 0.6 : 1, width: '100%' }}
+                          >
+                            Revoke
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', minWidth: 640, borderCollapse: 'collapse', fontSize: 13, textAlign: 'left' }}>
+                  <thead>
+                    <tr>
+                      {['Name', 'Prefix', 'Scopes', 'Status', 'Created', 'Last used', 'Expires', ''].map((h) => (
+                        <th key={h} style={{ borderBottom: '1px solid var(--line)', padding: '6px 12px 10px 0', fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.07em', whiteSpace: 'nowrap' }}>
+                          {h}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {tokens.map((token) => (
+                      <tr key={token.id}>
+                        <td style={{ borderBottom: '1px solid var(--line)', padding: '10px 12px 10px 0', fontWeight: 600, color: 'var(--ink)' }}>
+                          {token.name}
+                        </td>
+                        <td style={{ borderBottom: '1px solid var(--line)', padding: '10px 12px 10px 0', fontFamily: "'JetBrains Mono', monospace", fontSize: 11.5, color: 'var(--muted)' }}>
+                          {token.token_prefix}…
+                        </td>
+                        <td style={{ borderBottom: '1px solid var(--line)', padding: '10px 12px 10px 0', color: 'var(--muted)' }}>
+                          {token.scopes.join(", ")}
+                        </td>
+                        <td style={{ borderBottom: '1px solid var(--line)', padding: '10px 12px 10px 0' }}>
+                          {token.revoked_at ? (
+                            <span style={{ borderRadius: 999, background: 'var(--danger-soft)', border: '1px solid var(--danger-border)', padding: '2px 8px', fontSize: 11, fontWeight: 600, color: 'var(--danger)' }}>
+                              Revoked
+                            </span>
+                          ) : (
+                            <span style={{ borderRadius: 999, background: 'var(--accent-soft)', border: '1px solid var(--accent-border)', padding: '2px 8px', fontSize: 11, fontWeight: 600, color: 'var(--accent)' }}>
+                              Active
+                            </span>
                           )}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div style={{ overflowX: 'auto' }}>
-                  <table style={{ width: '100%', minWidth: 640, borderCollapse: 'collapse', fontSize: 13, textAlign: 'left' }}>
-                    <thead>
-                      <tr>
-                        {['Name', 'Prefix', 'Scopes', 'Status', 'Created', 'Last used', 'Expires', ''].map((h) => (
-                          <th key={h} style={{ borderBottom: '1px solid var(--line)', padding: '6px 12px 10px 0', fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.07em', whiteSpace: 'nowrap' }}>
-                            {h}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {tokens.map((token) => (
-                        <tr key={token.id}>
-                          <td style={{ borderBottom: '1px solid var(--line)', padding: '10px 12px 10px 0', fontWeight: 600, color: 'var(--ink)' }}>
-                            {token.name}
-                          </td>
-                          <td style={{ borderBottom: '1px solid var(--line)', padding: '10px 12px 10px 0', fontFamily: "'JetBrains Mono', monospace", fontSize: 11.5, color: 'var(--muted)' }}>
-                            {token.token_prefix}…
-                          </td>
-                          <td style={{ borderBottom: '1px solid var(--line)', padding: '10px 12px 10px 0', color: 'var(--muted)' }}>
-                            {token.scopes.join(", ")}
-                          </td>
-                          <td style={{ borderBottom: '1px solid var(--line)', padding: '10px 12px 10px 0' }}>
-                            {token.revoked_at ? (
-                              <span style={{ borderRadius: 999, background: 'var(--danger-soft)', border: '1px solid var(--danger-border)', padding: '2px 8px', fontSize: 11, fontWeight: 600, color: 'var(--danger)' }}>
-                                Revoked
-                              </span>
-                            ) : (
-                              <span style={{ borderRadius: 999, background: 'var(--accent-soft)', border: '1px solid var(--accent-border)', padding: '2px 8px', fontSize: 11, fontWeight: 600, color: 'var(--accent)' }}>
-                                Active
-                              </span>
-                            )}
-                          </td>
-                          <td style={{ borderBottom: '1px solid var(--line)', padding: '10px 12px 10px 0', color: 'var(--muted)', whiteSpace: 'nowrap' }}>
-                            {relative(token.created_at)}
-                          </td>
-                          <td style={{ borderBottom: '1px solid var(--line)', padding: '10px 12px 10px 0', color: 'var(--muted)', whiteSpace: 'nowrap' }}>
-                            {relative(token.last_used_at)}
-                          </td>
-                          <td style={{ borderBottom: '1px solid var(--line)', padding: '10px 12px 10px 0', color: 'var(--muted)', whiteSpace: 'nowrap' }}>
-                            {token.expires_at ? new Date(token.expires_at).toLocaleDateString() : "Never"}
-                          </td>
-                          <td style={{ borderBottom: '1px solid var(--line)', padding: '10px 0 10px 0', textAlign: 'right' }}>
-                            {!token.revoked_at && (
-                              confirmRevoke === token.id ? (
-                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                                  <button
-                                    type="button"
-                                    disabled={working}
-                                    onClick={() => revokeToken(token.id)}
-                                    style={{ background: 'var(--danger)', color: '#fff', border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 11.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', opacity: working ? 0.6 : 1 }}
-                                  >
-                                    Confirm
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => setConfirmRevoke(null)}
-                                    style={{ background: 'var(--card)', color: 'var(--ink)', border: '1px solid var(--line)', borderRadius: 6, padding: '4px 10px', fontSize: 11.5, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}
-                                  >
-                                    Cancel
-                                  </button>
-                                </span>
-                              ) : (
+                        </td>
+                        <td style={{ borderBottom: '1px solid var(--line)', padding: '10px 12px 10px 0', color: 'var(--muted)', whiteSpace: 'nowrap' }}>
+                          {relative(token.created_at)}
+                        </td>
+                        <td style={{ borderBottom: '1px solid var(--line)', padding: '10px 12px 10px 0', color: 'var(--muted)', whiteSpace: 'nowrap' }}>
+                          {relative(token.last_used_at)}
+                        </td>
+                        <td style={{ borderBottom: '1px solid var(--line)', padding: '10px 12px 10px 0', color: 'var(--muted)', whiteSpace: 'nowrap' }}>
+                          {token.expires_at ? new Date(token.expires_at).toLocaleDateString() : "Never"}
+                        </td>
+                        <td style={{ borderBottom: '1px solid var(--line)', padding: '10px 0 10px 0', textAlign: 'right' }}>
+                          {!token.revoked_at && (
+                            confirmRevoke === token.id ? (
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                                 <button
                                   type="button"
                                   disabled={working}
-                                  onClick={() => setConfirmRevoke(token.id)}
-                                  style={{ background: 'var(--danger-soft)', color: 'var(--danger)', border: '1px solid var(--danger-border)', borderRadius: 6, padding: '4px 10px', fontSize: 11.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', opacity: working ? 0.6 : 1 }}
+                                  onClick={() => revokeToken(token.id)}
+                                  style={{ background: 'var(--danger)', color: '#fff', border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 11.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', opacity: working ? 0.6 : 1 }}
                                 >
-                                  Revoke
+                                  Confirm
                                 </button>
-                              )
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-
-            {/* Demoted create form */}
-            <div style={{ marginTop: 24, display: 'grid', gap: 20, gridTemplateColumns: 'minmax(0,1fr) minmax(0,1.1fr)' }}>
-              <div style={cardStyle}>
-                <h2 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 6px', letterSpacing: '-0.01em' }}>Create token manually</h2>
-                <p style={{ fontSize: 12.5, color: 'var(--muted)', margin: '0 0 16px', lineHeight: 1.55 }}>
-                  Browser-authorized setup is the main path. Use this only for manual token management.
-                </p>
-                <label
-                  style={{ display: 'block', fontSize: 12.5, fontWeight: 600, color: 'var(--muted)', marginBottom: 6 }}
-                  htmlFor="token-name"
-                >
-                  Token name
-                </label>
-                <input
-                  id="token-name"
-                  ref={nameInputRef}
-                  value={name}
-                  onChange={(event) => setName(event.target.value)}
-                  className="input-field"
-                  placeholder="e.g. Launch token"
-                  style={{ width: '100%', boxSizing: 'border-box', marginBottom: 14 }}
-                />
-                <button
-                  type="button"
-                  disabled={working}
-                  onClick={createToken}
-                  className="btn-primary sm"
-                  style={{ opacity: working ? 0.6 : 1 }}
-                >
-                  {working ? "Working…" : "Create agent token"}
-                </button>
-                {newToken && (
-                  <div
-                    role="status"
-                    style={{
-                      marginTop: 16,
-                      borderRadius: 10,
-                      border: '2px solid var(--accent-border)',
-                      background: 'var(--accent-soft)',
-                      padding: 14,
-                    }}
-                  >
-                    <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--accent)', margin: '0 0 8px' }}>
-                      Copy now, not shown again
-                    </p>
-                    <pre style={{ maxHeight: 80, overflow: 'auto', borderRadius: 6, border: '1px solid var(--accent-border)', background: 'var(--card)', padding: '8px 10px', fontSize: 11, margin: '0 0 8px', fontFamily: "'JetBrains Mono', monospace", color: 'var(--ink)', wordBreak: 'break-all', whiteSpace: 'pre-wrap' }}>
-                      {newToken}
-                    </pre>
-                    <button
-                      type="button"
-                      onClick={() => copy(newToken, "token")}
-                      className="btn-primary sm"
-                    >
-                      {copied === "token" ? "✓ Copied" : "Copy token"}
-                    </button>
-                  </div>
-                )}
+                                <button
+                                  type="button"
+                                  onClick={() => setConfirmRevoke(null)}
+                                  style={{ background: 'var(--card)', color: 'var(--ink)', border: '1px solid var(--line)', borderRadius: 6, padding: '4px 10px', fontSize: 11.5, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}
+                                >
+                                  Cancel
+                                </button>
+                              </span>
+                            ) : (
+                              <button
+                                type="button"
+                                disabled={working}
+                                onClick={() => setConfirmRevoke(token.id)}
+                                style={{ background: 'var(--danger-soft)', color: 'var(--danger)', border: '1px solid var(--danger-border)', borderRadius: 6, padding: '4px 10px', fontSize: 11.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', opacity: working ? 0.6 : 1 }}
+                              >
+                                Revoke
+                              </button>
+                            )
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-
-              <div style={cardStyle}>
-                <h2 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 6px', letterSpacing: '-0.01em' }}>Publish command</h2>
-                <p style={{ fontSize: 12.5, color: 'var(--muted)', margin: '0 0 12px', lineHeight: 1.55 }}>
-                  Setup opens browser authorization and saves your agent token locally.
-                </p>
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, background: 'var(--terminal-bg)', borderRadius: 8, padding: '10px 12px' }}>
-                  <pre style={{ flex: 1, fontFamily: "'JetBrains Mono', monospace", fontSize: 10.5, color: 'var(--terminal-ink)', margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-all', lineHeight: 1.7 }}>
-                    {publishCommand}
-                  </pre>
-                  <button
-                    type="button"
-                    onClick={() => copy(publishCommand, "command")}
-                    style={{ flexShrink: 0, fontSize: 11, fontWeight: 600, color: copied === 'command' ? '#fff' : 'var(--code-accent)', background: 'transparent', border: `1px solid ${copied === 'command' ? 'var(--code-accent)' : 'rgba(110,231,183,0.3)'}`, borderRadius: 5, padding: '4px 10px', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}
-                  >
-                    {copied === "command" ? "✓ Copied" : "Copy"}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </>
+            )}
+          </div>
         )}
 
         {/* Production URL line removed — the user
