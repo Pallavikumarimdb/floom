@@ -32,11 +32,16 @@ interface Props {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
 
-  // Use the same cached Supabase query as Page() — no fetch() to a dynamic API route.
-  // Fetching /api/apps/[slug] (a dynamic ƒ route) from generateMetadata was causing
-  // Next.js to classify this page as fully dynamic, defeating ISR. Direct admin
-  // query wrapped in unstable_cache keeps the page in the ISR window.
-  const app = await getPublicAppMeta(slug);
+  // IMPORTANT: do NOT use getPublicAppMeta (unstable_cache) here.
+  // With force-static + unstable_cache, apps created after the build have no
+  // cache entry at build time → cache returns null → metadata falls back to
+  // "Not found · Floom" even though the app exists and is public.
+  // This breaks every iMessage/Slack/Twitter OG preview for newly-created apps.
+  //
+  // Fix: metadata always fetches fresh via a direct admin query (uncached).
+  // The body render (Page()) still uses unstable_cache — CDN-friendly, safe.
+  // Metadata is ~1–2 KB per request and correctness matters more than caching here.
+  const app = await getPublicAppMetaFresh(slug);
 
   const appName = app?.name ?? slug;
   let appDescription = "";
@@ -173,12 +178,64 @@ type PublicAppMeta = {
   public: true;
 };
 
-// Cached public-only app metadata lookup.
-// Both generateMetadata and Page() call this function — unstable_cache deduplicates
-// the Supabase query within the same request and across requests within the 300s window.
+// Uncached direct Supabase query — used only by generateMetadata.
+// Never use unstable_cache here: with force-static the cache is populated at build
+// time and apps created after the deploy return null → "Not found" OG metadata.
+// The body render uses getPublicAppMeta (cached) below.
+async function getPublicAppMetaFresh(slug: string): Promise<PublicAppMeta | null> {
+  if (!hasSupabaseConfig()) {
+    if (slug === demoApp.slug) {
+      return {
+        id: demoApp.id,
+        slug: demoApp.slug,
+        name: demoApp.name,
+        handler: ((demoApp as Record<string, unknown>).handler as string) ?? null,
+        description: null,
+        input_schema:
+          ((demoApp as Record<string, unknown>).input_schema as Record<string, unknown>) ?? null,
+        public: true,
+      };
+    }
+    return null;
+  }
+
+  try {
+    const admin = createAdminClient();
+    const { data: app, error } = await admin
+      .from("apps")
+      .select("id, slug, name, handler, description, public, app_versions(input_schema)")
+      .eq("slug", slug)
+      .eq("public", true)
+      .order("version", { foreignTable: "app_versions", ascending: false })
+      .limit(1, { foreignTable: "app_versions" })
+      .maybeSingle();
+
+    if (error || !app) return null;
+
+    const latestVersion = (
+      app.app_versions as Array<{ input_schema: Record<string, unknown> | null }>
+    )?.[0];
+
+    return {
+      id: app.id,
+      slug: app.slug,
+      name: app.name,
+      handler: (app.handler as string | null) ?? null,
+      description: (app.description as string | null) ?? null,
+      input_schema: latestVersion?.input_schema ?? null,
+      public: true as const,
+    } satisfies PublicAppMeta;
+  } catch {
+    return null;
+  }
+}
+
+// Cached public-only app metadata lookup — used by Page() for the body render.
+// unstable_cache deduplicates the Supabase query within the same request and
+// across requests within the 300s window.
 //
-// This is the only async data operation in this file. No fetch(), no cookies(), no
-// headers() — the Supabase admin client is auth'd via service-role key in env vars.
+// This is the only async data operation for the page body. No fetch(), no cookies(),
+// no headers() — the Supabase admin client is auth'd via service-role key in env vars.
 // Keeping this as the sole data boundary ensures Next.js can classify the route as ISR.
 async function getPublicAppMeta(slug: string): Promise<PublicAppMeta | null> {
   if (!hasSupabaseConfig()) {
