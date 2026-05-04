@@ -117,8 +117,9 @@ export async function GET() {
   // A 401 means the key is present but we're on a restricted endpoint; that's fine —
   // it proves the service is reachable. Only skip the probe if the env var is missing.
   if (process.env.QSTASH_TOKEN) {
+    const qstashBase = process.env.QSTASH_URL ?? "https://qstash-us-east-1.upstash.io";
     checks.push(
-      await probe("qstash", "https://qstash.upstash.io/v2/keys", {
+      await probe("qstash", `${qstashBase.replace(/\/$/, "")}/v2/topics`, {
         headers: { Authorization: `Bearer ${process.env.QSTASH_TOKEN}` },
         timeoutMs: 2500,
         okStatuses: [200, 401, 403],
