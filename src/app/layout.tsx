@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 import { SkipLink } from "@/components/SkipLink";
@@ -85,11 +86,18 @@ const STRUCTURED_DATA = {
   ],
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Read the per-request nonce injected by proxy.ts. Next.js reads the nonce
+  // from the CSP header automatically for its own runtime scripts; we also
+  // forward it here for any inline <script> tags we render in Server Components.
+  // <script type="application/ld+json"> is a data block (not executable JS) so
+  // CSP script-src does not apply to it, but we pass nonce for completeness.
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
+
   return (
     <html lang="en">
       <head>
@@ -99,6 +107,7 @@ export default function RootLayout({
         <SkipLink />
         <script
           type="application/ld+json"
+          nonce={nonce}
           dangerouslySetInnerHTML={{ __html: safeJsonLd(STRUCTURED_DATA) }}
         />
         {children}
