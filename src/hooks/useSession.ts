@@ -66,13 +66,36 @@ async function _fetchSession(): Promise<void> {
 
     if (session?.user) {
       const u = session.user;
+
+      // getSession() returns the locally-cached JWT. For avatar_url specifically,
+      // the JWT may be stale after server-side metadata updates (e.g. quota emails
+      // writing user_metadata via admin API). Fetch fresh user data from the server
+      // so we always have the latest avatar_url.
+      let freshMeta: Record<string, unknown> | undefined;
+      try {
+        const { data: { user: freshUser } } = await supabase.auth.getUser();
+        if (freshUser?.user_metadata) {
+          freshMeta = freshUser.user_metadata as Record<string, unknown>;
+        }
+      } catch {
+        // If getUser() fails (e.g. network error), fall back to JWT metadata.
+      }
+
+      const meta = freshMeta ?? (u.user_metadata as Record<string, unknown> | undefined);
+      // Google OAuth may store the avatar as avatar_url or picture depending on
+      // the GoTrue version. Accept both.
+      const image =
+        (meta?.avatar_url as string | undefined) ??
+        (meta?.picture as string | undefined) ??
+        undefined;
+
       _cache = {
         data: {
           user: {
             id: u.id,
             email: u.email ?? undefined,
-            name: u.user_metadata?.full_name ?? u.user_metadata?.name ?? undefined,
-            image: u.user_metadata?.avatar_url ?? undefined,
+            name: (meta?.full_name as string | undefined) ?? (meta?.name as string | undefined) ?? undefined,
+            image,
             is_local: false,
           },
           session,
