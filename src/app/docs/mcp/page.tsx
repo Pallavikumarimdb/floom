@@ -7,8 +7,24 @@ export const metadata: Metadata = {
   alternates: { canonical: "https://floom.dev/docs/mcp" },
 };
 
-const mcpConfigExample = `// Claude Desktop config
+// Claude Desktop 0.10+ supports remote MCP servers via the Streamable HTTP transport.
+// Older Claude Desktop versions only support stdio (local) MCP servers.
+// If you see "not valid MCP server configurations", upgrade Claude Desktop first.
+// The url+headers format also works in Claude.ai (web) and Cursor.
+const mcpConfigClaudeDesktop = `// Claude Desktop config (requires Claude Desktop 0.10 or later)
 // ~/Library/Application Support/Claude/claude_desktop_config.json
+{
+  "mcpServers": {
+    "floom": {
+      "type": "streamable-http",
+      "url": "https://floom.dev/mcp",
+      "headers": { "Authorization": "Bearer YOUR_AGENT_TOKEN" }
+    }
+  }
+}`;
+
+// Claude.ai (web) and Cursor use the plain url+headers format without a type field.
+const mcpConfigExample = `// Claude.ai (web) and Cursor — Settings → MCP
 {
   "mcpServers": {
     "floom": {
@@ -66,9 +82,13 @@ export default function McpPage() {
       </div>
 
       <Section id="setup" title="Add to Claude Desktop">
-        <CodeBlock label="Claude Desktop config">{mcpConfigExample}</CodeBlock>
+        <CodeBlock label="Claude Desktop 0.10+ (remote MCP)">{mcpConfigClaudeDesktop}</CodeBlock>
+        <p className="text-sm text-neutral-500 mb-4">
+          Requires <strong>Claude Desktop 0.10 or later</strong>. If you see &ldquo;not valid MCP server configurations&rdquo;, upgrade Claude Desktop first. Earlier versions only support stdio (local) MCP servers.
+        </p>
+        <CodeBlock label="Claude.ai (web) and Cursor">{mcpConfigExample}</CodeBlock>
         <p className="text-sm text-neutral-500">
-          Agent tokens with <IC>run</IC> scope can run any owned private app. Tokens with <IC>publish</IC> scope can deploy via <IC>publish_app</IC>.
+          Agent tokens with <IC>run</IC> scope can run any owned private app. Tokens with <IC>publish</IC> scope can deploy via <IC>publish_app</IC>. Generate tokens at <a href="/tokens" className="underline">floom.dev/tokens</a>.
         </p>
       </Section>
 

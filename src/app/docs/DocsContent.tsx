@@ -189,16 +189,21 @@ const apiResponseExample = `{
   "view_token": "<view-token>"
 }`;
 
-const mcpConfigExample = `// Claude Desktop config
+const mcpConfigExample = `// Claude Desktop 0.10+ config
 // ~/Library/Application Support/Claude/claude_desktop_config.json
+// Requires Claude Desktop 0.10 or later. Older versions only support stdio servers.
 {
   "mcpServers": {
     "floom": {
+      "type": "streamable-http",
       "url": "https://floom.dev/mcp",
       "headers": { "Authorization": "Bearer YOUR_AGENT_TOKEN" }
     }
   }
-}`;
+}
+
+// Claude.ai (web) and Cursor — omit the "type" field:
+// { "mcpServers": { "floom": { "url": "https://floom.dev/mcp", "headers": { ... } } } }`;
 
 // All 15 MCP tools (fix #4)
 const mcpToolsExample = `# Auth
@@ -665,9 +670,9 @@ export default function DocsContent() {
 
             <Section id="mcp-for-ai-agents" title="MCP for AI agents">
               <p>
-                Floom exposes a Model Context Protocol server at <IC>https://floom.dev/mcp</IC>. Add it to Claude Desktop, Cursor, or any MCP-compatible client.
+                Floom exposes a Model Context Protocol server at <IC>https://floom.dev/mcp</IC>. Add it to Claude Desktop (0.10+), Claude.ai, Cursor, or any MCP-compatible client.
               </p>
-              <CodeBlock label="Claude Desktop config">{mcpConfigExample}</CodeBlock>
+              <CodeBlock label="MCP config">{mcpConfigExample}</CodeBlock>
               {/* Fix #4: all 15 MCP tools with descriptions grouped by purpose */}
               <CodeBlock label="All 15 available tools">{mcpToolsExample}</CodeBlock>
               <p>
