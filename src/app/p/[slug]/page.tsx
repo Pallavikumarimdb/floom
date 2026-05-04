@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { unstable_cache } from "next/cache";
 import AppPermalinkPage, { type PermalinkInitialApp } from "./AppPermalinkPage";
 import { demoApp, hasSupabaseConfig } from "@/lib/demo-app";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -146,6 +147,12 @@ export default async function Page({ params }: Props) {
 // Only returns data for apps with public=true; private apps return null so
 // the client component handles auth and renders after hydration.
 // No cookies(), no headers(), no server auth — this keeps the route ISR-cacheable.
+//
+// Wrapped in unstable_cache so Next.js treats the Supabase query result as
+// explicitly cached data (not an uncached non-fetch call). Without this, the
+// Supabase JS client's internal fetch — which includes auth headers — is not
+// coalesced into the route's ISR window, leaving the route classified as
+// fully dynamic. unstable_cache makes the cache boundary explicit.
 async function fetchPublicInitialApp(slug: string): Promise<PermalinkInitialApp | null> {
   if (!hasSupabaseConfig()) {
     if (slug === demoApp.slug) {
@@ -162,32 +169,38 @@ async function fetchPublicInitialApp(slug: string): Promise<PermalinkInitialApp 
     return null;
   }
 
-  try {
-    const admin = createAdminClient();
-    const { data: app, error } = await admin
-      .from("apps")
-      .select("id, slug, name, handler, public, app_versions(input_schema)")
-      .eq("slug", slug)
-      .eq("public", true) // Only pre-render public apps server-side
-      .order("version", { foreignTable: "app_versions", ascending: false })
-      .limit(1, { foreignTable: "app_versions" })
-      .maybeSingle();
+  return unstable_cache(
+    async (slug: string) => {
+      try {
+        const admin = createAdminClient();
+        const { data: app, error } = await admin
+          .from("apps")
+          .select("id, slug, name, handler, public, app_versions(input_schema)")
+          .eq("slug", slug)
+          .eq("public", true) // Only pre-render public apps server-side
+          .order("version", { foreignTable: "app_versions", ascending: false })
+          .limit(1, { foreignTable: "app_versions" })
+          .maybeSingle();
 
-    if (error || !app) return null;
+        if (error || !app) return null;
 
-    const latestVersion = (
-      app.app_versions as Array<{ input_schema: Record<string, unknown> | null }>
-    )?.[0];
+        const latestVersion = (
+          app.app_versions as Array<{ input_schema: Record<string, unknown> | null }>
+        )?.[0];
 
-    return {
-      id: app.id,
-      slug: app.slug,
-      name: app.name,
-      handler: (app.handler as string | null) ?? null,
-      input_schema: latestVersion?.input_schema ?? null,
-      public: true,
-    };
-  } catch {
-    return null;
-  }
+        return {
+          id: app.id,
+          slug: app.slug,
+          name: app.name,
+          handler: (app.handler as string | null) ?? null,
+          input_schema: latestVersion?.input_schema ?? null,
+          public: true,
+        } satisfies PermalinkInitialApp;
+      } catch {
+        return null;
+      }
+    },
+    ["public-app", slug],
+    { revalidate: 300, tags: [`app:${slug}`] }
+  )(slug);
 }
