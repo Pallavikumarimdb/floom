@@ -8,7 +8,7 @@
 import { useCallback, useEffect, useMemo, useState, useTransition } from 'react';
 import type { AppDetail, RunRecord } from '@/lib/types';
 import { createClient } from '@/lib/supabase/client';
-import { extractRows, unionKeys } from '@/lib/floom/output-rows';
+import { extractRows, unionKeys, isArrayOfObjects } from '@/lib/floom/output-rows';
 
 export interface RunSurfaceResult {
   runId?: string;
@@ -1094,20 +1094,19 @@ const iconBtnStyle = {
   cursor: 'pointer',
 } as const;
 
-// CSV-only when output is Array<{<string,string>:scalar}> with consistent
-// keys across rows. Falls back to null otherwise → button hides.
+// CSV-only when output contains an array-of-objects. Uses the same
+// extractRows heuristic as OutputDisplay so {count, items:[...]} shapes
+// are handled identically — the CSV button appears whenever the table view
+// does. Falls back to null → button hides.
 function toCsv(output: unknown): string | null {
-  if (!Array.isArray(output) || output.length === 0) return null;
-  const rows = output.filter(
-    (r) => r && typeof r === 'object' && !Array.isArray(r),
-  ) as Array<Record<string, unknown>>;
-  if (rows.length !== output.length) return null;
-  const keys = Object.keys(rows[0] ?? {});
+  // Prefer extractRows so nested shapes like {count, items:[...]} work.
+  const rows = extractRows(output);
+  if (!rows || rows.length === 0) return null;
+  // Verify every row is a plain object (extractRows already guarantees this,
+  // but be explicit so the type-checker is happy).
+  if (!isArrayOfObjects(rows)) return null;
+  const keys = Array.from(new Set(rows.flatMap((r) => Object.keys(r))));
   if (keys.length === 0) return null;
-  const allConsistent = rows.every(
-    (r) => Object.keys(r).length === keys.length && keys.every((k) => k in r),
-  );
-  if (!allConsistent) return null;
   const escape = (v: unknown) => {
     const s = v === null || v === undefined ? '' : typeof v === 'object' ? JSON.stringify(v) : String(v);
     return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;

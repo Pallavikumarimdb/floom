@@ -403,8 +403,15 @@ export default function AppPermalinkPage({ initialApp }: { initialApp?: Permalin
     });
   }, [updateSearchParams]);
 
-  const handleRunResult = useCallback((result: { runId?: string }) => {
+  const handleRunResult = useCallback((result: { runId?: string; status?: string }) => {
     if (!result.runId) return;
+    // Only persist ?run= to the URL once the run reaches a terminal state.
+    // Updating the URL during queued/running causes runIdFromUrl to change,
+    // which re-triggers the initialRunLoading effect and unmounts the active
+    // RunSurface — replacing the entire output panel with "Loading shared run...".
+    // Terminal statuses only: 'succeeded', 'failed', 'timed_out', 'cancelled'.
+    const terminal = ['succeeded', 'failed', 'timed_out', 'cancelled'];
+    if (result.status && !terminal.includes(result.status)) return;
     updateSearchParams((prev) => {
       const next = new URLSearchParams(prev);
       next.set('run', result.runId!);
@@ -1280,9 +1287,8 @@ export default function AppPermalinkPage({ initialApp }: { initialApp?: Permalin
                     Inputs are sent to {app.manifest?.name ?? app.name}{' '}to produce a result. Floom doesn&apos;t sell or share run data.
                   </span>
                 </div>
-                {/* "Built with Floom" credit row removed — already in the
-                    site footer right below; doubling the brand on every app
-                    page is noise, not signal. */}
+                {/* Use via API — collapsible curl snippet directly on the Run tab */}
+                <ApiCurlDisclosure slug={app.slug} curlBody={curlExampleBody} isPublic={!!app.public} />
                 {celebrate && (
                   <CelebrationCard
                     slug={app.slug}
@@ -1841,6 +1847,128 @@ function TabBar({
             pointerEvents: 'none',
           }}
         />
+      )}
+    </div>
+  );
+}
+
+/* ----------------- API curl disclosure (Run tab) ----------------- */
+
+function ApiCurlDisclosure({
+  slug,
+  curlBody,
+  isPublic,
+}: {
+  slug: string;
+  curlBody: string;
+  isPublic: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const origin = typeof window !== 'undefined' ? window.location.origin : 'https://floom.dev';
+  const anonSnippet = `curl -X POST ${origin}/api/apps/${slug}/run \\\n  -H "Content-Type: application/json" \\\n  -d '${curlBody}'`;
+  const authedSnippet = `curl -X POST ${origin}/api/apps/${slug}/run \\\n  -H "Authorization: Bearer <your-agent-token>" \\\n  -H "Content-Type: application/json" \\\n  -d '${curlBody}'`;
+  const snippet = isPublic ? anonSnippet : authedSnippet;
+
+  function handleCopy() {
+    try {
+      void navigator.clipboard.writeText(snippet).then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1500);
+      });
+    } catch { /* ignore */ }
+  }
+
+  return (
+    <div style={{ marginTop: 14 }}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        style={{
+          background: 'transparent',
+          border: 'none',
+          padding: '2px 0',
+          fontSize: 12,
+          fontWeight: 500,
+          color: 'var(--muted)',
+          cursor: 'pointer',
+          fontFamily: 'inherit',
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 5,
+        }}
+        aria-expanded={open}
+      >
+        <span
+          style={{
+            display: 'inline-block',
+            width: 10,
+            transition: 'transform .15s',
+            transform: open ? 'rotate(90deg)' : 'rotate(0deg)',
+            fontSize: 10,
+            lineHeight: 1,
+          }}
+          aria-hidden="true"
+        >
+          &#9654;
+        </span>
+        Use via API
+      </button>
+      {open && (
+        <div
+          data-testid="api-curl-section"
+          style={{
+            marginTop: 8,
+            background: 'var(--studio, #f5f4f0)',
+            border: '1px solid var(--line)',
+            borderRadius: 10,
+            padding: '12px 14px',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+            <pre
+              style={{
+                flex: 1,
+                fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+                fontSize: 11.5,
+                color: 'var(--ink)',
+                margin: 0,
+                whiteSpace: 'pre-wrap',
+                wordBreak: 'break-all',
+                lineHeight: 1.6,
+              }}
+            >
+              {snippet}
+            </pre>
+            <button
+              type="button"
+              onClick={handleCopy}
+              style={{
+                background: 'var(--card)',
+                color: copied ? 'var(--muted)' : 'var(--accent)',
+                border: `1px solid ${copied ? 'var(--line)' : 'rgba(4,120,87,0.35)'}`,
+                borderRadius: 6,
+                padding: '5px 10px',
+                fontSize: 11,
+                fontWeight: 600,
+                fontFamily: 'inherit',
+                cursor: 'pointer',
+                flexShrink: 0,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {copied ? 'Copied' : 'Copy'}
+            </button>
+          </div>
+          {!isPublic && (
+            <p style={{ margin: '8px 0 0', fontSize: 11, color: 'var(--muted)', lineHeight: 1.5 }}>
+              This app needs an agent token.{' '}
+              <a href="/tokens" style={{ color: 'var(--accent)', fontWeight: 600, textDecoration: 'none' }}>
+                Mint one &rarr;
+              </a>
+            </p>
+          )}
+        </div>
       )}
     </div>
   );
