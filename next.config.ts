@@ -79,6 +79,11 @@ const nextConfig: NextConfig = {
       // /legal/privacy and /legal/terms return 404 (no sub-pages exist); redirect to real pages.
       { source: "/legal/privacy", destination: "/privacy", permanent: true },
       { source: "/legal/terms", destination: "/terms", permanent: true },
+      // Authed nav routes that don't have pages yet in v0.4 — redirect to the
+      // existing token dashboard. v0.5 builds proper /me/runs and /studio pages.
+      { source: "/me", destination: "/tokens", permanent: false },
+      { source: "/account", destination: "/tokens", permanent: false },
+      { source: "/studio", destination: "/", permanent: false },
     ];
   },
 };

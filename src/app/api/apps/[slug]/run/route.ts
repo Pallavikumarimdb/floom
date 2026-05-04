@@ -28,6 +28,10 @@ import { publishExecutionProcessMessage } from "@/lib/floom/queue";
 import { readRuntimeDependencies } from "@/lib/floom/requirements";
 import { resolveRuntimeSecrets, isAnonPerRunnerError } from "@/lib/floom/runtime-secrets";
 import {
+  MissingComposioConnectionError,
+  resolveComposioConnections,
+} from "@/lib/composio/runtime";
+import {
   redactExactSecretValues,
   redactSecretInput,
   redactSecretOutput,
@@ -58,6 +62,7 @@ type LatestVersion = {
   output_schema: Record<string, unknown> | null;
   dependencies: Record<string, unknown> | null;
   secrets: string[] | null;
+  composio: string[] | null;
   command: string | null;
 };
 
@@ -75,6 +80,12 @@ export async function POST(
   let body: unknown;
   try {
     const rawBody = await req.text();
+    // Enforce the size cap on the actual body bytes, not just the declared
+    // Content-Length header. A spoofed Content-Length header (e.g. "100") could
+    // bypass the header check above while req.text() reads the full large body.
+    if (rawBody.length > MAX_REQUEST_BYTES) {
+      return NextResponse.json({ error: "body_too_large" }, { status: 413 });
+    }
     if (rawBody.trim() !== "") {
       body = JSON.parse(rawBody);
     } else {
@@ -84,10 +95,20 @@ export async function POST(
     return NextResponse.json({ error: "Request body must be valid JSON" }, { status: 400 });
   }
   const rawInputs = (body as { inputs?: unknown }).inputs;
-  // Strip null bytes before any validation or DB write.
-  // Postgres jsonb rejects \x00 (SQLSTATE 22P05) and produces a 500
-  // without this guard.
-  const inputs = rawInputs === undefined ? undefined : stripNullBytes(rawInputs);
+  // Reject null bytes before any validation or DB write.
+  // Postgres jsonb rejects \x00 (SQLSTATE 22P05); rejecting here returns a
+  // clear 400 rather than a 500 from the DB layer.
+  if (rawInputs !== undefined) {
+    try {
+      rejectNullBytes(rawInputs, "inputs");
+    } catch (e) {
+      return NextResponse.json(
+        { error: e instanceof Error ? e.message : "null byte in input" },
+        { status: 400 }
+      );
+    }
+  }
+  const inputs = rawInputs;
 
   const inputBytes = inputs === undefined ? 0 : Buffer.byteLength(JSON.stringify(inputs), "utf8");
   if (inputBytes > MAX_INPUT_BYTES) {
@@ -120,7 +141,7 @@ export async function POST(
   const admin = createAdminClient();
   const { data: app, error } = await admin
     .from("apps")
-    .select("*, app_versions(*)")
+    .select("*, app_versions(id, bundle_path, bundle_kind, input_schema, output_schema, dependencies, secrets, composio, command)")
     .eq("slug", slug)
     .order("version", { foreignTable: "app_versions", ascending: false })
     .limit(1, { foreignTable: "app_versions" })
@@ -228,9 +249,35 @@ export async function POST(
     );
   }
 
+  // Resolve Composio connections declared in the manifest composio: field.
+  const composioToolkits = Array.isArray(latestVersion.composio) ? latestVersion.composio : [];
+  let composioEnv: Record<string, string> = {};
+  if (composioToolkits.length > 0) {
+    try {
+      composioEnv = await resolveComposioConnections(admin, userId, composioToolkits);
+    } catch (e) {
+      if (e instanceof MissingComposioConnectionError) {
+        return NextResponse.json(
+          {
+            error: "missing_composio_connection",
+            toolkits: e.toolkits,
+            next: e.reason === "sign-in"
+              ? { action: "sign-in", url: "/login" }
+              : { action: "connect", url: "/connections" },
+          },
+          { status: 412 }
+        );
+      }
+      throw e;
+    }
+  }
+
+  // Merge Composio env vars on top of secrets env vars.
+  const mergedEnvs = { ...runtimeSecrets.envs, ...composioEnv };
+
   const redactedInputs = inputSchema
     ? redactSecretInput(inputSchema, inputs)
-    : redactExactSecretValues(inputs ?? null, Object.values(runtimeSecrets.envs));
+    : redactExactSecretValues(inputs ?? null, Object.values(mergedEnvs));
 
   if (isAsyncRuntimeEnabled()) {
     const { token: viewToken, hash: viewTokenHash } = generateViewToken();
@@ -457,7 +504,7 @@ export async function POST(
     inputs,
     hasOutputSchema: Boolean(outputSchema),
     dependencies: readRuntimeDependencies(latestVersion.dependencies),
-    secrets: runtimeSecrets.envs,
+    secrets: mergedEnvs,
     deadlineAt: routeStartedAt + SANDBOX_TIMEOUT_MS,
   });
 
@@ -508,7 +555,7 @@ export async function POST(
     const safeError = sanitizePublicError(
       runnerResult.error.detail ?? runnerResult.error.phase,
       "App execution failed",
-      Object.values(runtimeSecrets.envs ?? {})
+      Object.values(mergedEnvs)
     );
     await admin
       .from("executions")
@@ -560,7 +607,7 @@ export async function POST(
 
   const redactedOutput = redactExactSecretValues(
     outputSchema ? redactSecretOutput(outputSchema, runnerResult.output) : runnerResult.output,
-    Object.values(runtimeSecrets.envs)
+    Object.values(mergedEnvs)
   );
 
   await admin
@@ -752,24 +799,25 @@ function isJsonValue(value: unknown): boolean {
 }
 
 /**
- * Recursively strip null bytes (\x00) from all string values in a JSON-safe
- * structure. Postgres jsonb rejects null bytes (SQLSTATE 22P05);
- * sanitising here prevents a 500 before the value reaches the DB.
+ * Recursively reject null bytes (\x00) in any string value of a JSON-safe
+ * structure. Postgres jsonb rejects \x00 (SQLSTATE 22P05); catching here
+ * returns a clean 400 to the caller rather than a 500 from the DB layer.
+ * Throws an Error with a human-readable path on the first violation found.
  */
-export function stripNullBytes(value: unknown): unknown {
+export function rejectNullBytes(value: unknown, path = "inputs"): void {
   if (typeof value === "string") {
-    // eslint-disable-next-line no-control-regex
-    return value.replace(/\x00/g, "");
+    if (value.includes("\x00")) {
+      throw new Error(`null byte in input at ${path}`);
+    }
+    return;
   }
   if (Array.isArray(value)) {
-    return value.map(stripNullBytes);
+    value.forEach((v, i) => rejectNullBytes(v, `${path}[${i}]`));
+    return;
   }
   if (value !== null && typeof value === "object") {
-    const out: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
-      out[k] = stripNullBytes(v);
+      rejectNullBytes(v, `${path}.${k}`);
     }
-    return out;
   }
-  return value;
 }
