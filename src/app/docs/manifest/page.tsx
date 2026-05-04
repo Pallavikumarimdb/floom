@@ -34,6 +34,11 @@ secrets:
   - OPENAI_API_KEY                     # scope: per_runner (default)
   - name: GEMINI_API_KEY
     scope: shared                       # creator's key injected for every runner
+# Composio integrations: auto-inject the runner's active connection at run time.
+# composio: gmail
+# composio:
+#   - gmail
+#   - slack
 # Optional: additional pip deps installed before the run command.
 # dependencies:
 #   python: ./requirements.txt --require-hashes
@@ -53,6 +58,24 @@ output_schema: ./output.schema.json
 dependencies:
   python: ./requirements.txt`;
 
+const composioExample = `# Single toolkit (shorthand):
+composio: gmail
+
+# Multiple toolkits:
+composio:
+  - gmail
+  - slack
+
+# In your Python app:
+import os
+from composio import ComposioToolSet, Action
+
+toolset = ComposioToolSet(entity_id=os.environ["COMPOSIO_CONNECTION_ID"])
+result = toolset.execute_action(
+    action=Action.GMAIL_SEND_EMAIL,
+    params={"recipient_email": "...", "subject": "...", "body": "..."},
+)`;
+
 const FIELDS = [
   ["slug", "Yes", "URL-safe identifier. Used in /p/:slug, API, and MCP calls."],
   ["name", "No", "Display name shown in the browser UI and app cards. Defaults to slug if omitted."],
@@ -61,6 +84,7 @@ const FIELDS = [
   ["output_schema", "No", "Relative path to a JSON Schema file. Floom validates stdout output against this."],
   ["public", "No", "true = anyone can run without auth. Default: false."],
   ["secrets", "No", "List of secret names (or objects with name + optional scope). Values set via CLI or REST, injected as env vars at run time. Default scope: per_runner. Use scope: shared to inject your own key for every caller."],
+  ["composio", "No", "Toolkit slug or list of slugs (e.g. gmail, slack). Floom auto-injects COMPOSIO_CONNECTION_ID from the runner's active connection at run time. No manual copy step needed."],
   ["dependencies.python", "No", "Path to requirements.txt, optionally with --require-hashes."],
   ["bundle_exclude", "No", "List of paths/globs to skip when building the bundle."],
 ];
@@ -100,6 +124,16 @@ export default function ManifestPage() {
             </tbody>
           </table>
         </div>
+      </Section>
+
+      <Section id="composio" title="Composio integrations">
+        <p>
+          Declare external service integrations the app needs. At run time Floom looks up the runner&rsquo;s active connection for each toolkit and injects <IC>COMPOSIO_CONNECTION_ID</IC> (and <IC>COMPOSIO_&lt;TOOLKIT&gt;_CONNECTION_ID</IC> for multi-toolkit apps) automatically. No manual copy step required.
+        </p>
+        <CodeBlock label="floom.yaml: composio field">{composioExample}</CodeBlock>
+        <p className="text-sm text-neutral-600 mt-3">
+          If the runner has not connected the required toolkit, the run returns HTTP 412 with a link to <IC>/connections</IC>. Anon runners get a sign-in prompt instead.
+        </p>
       </Section>
 
       <Section id="legacy" title="Legacy v0.1 format">

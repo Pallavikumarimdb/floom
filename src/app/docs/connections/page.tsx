@@ -8,15 +8,18 @@ export const metadata: Metadata = {
 };
 
 const composioExample = `# 1. Connect Gmail in your Floom settings (one-time browser OAuth)
-# 2. Set the connection ID as an app secret:
-npx @floomhq/cli@latest secrets set my-app COMPOSIO_CONNECTION_ID --value-stdin
+# 2. Declare the toolkit in your manifest — no manual copy step:
+#    composio: gmail
 
-# 3. Use it in your Python app — injected as an env var at runtime:
+# 3. Use it in your Python app — auto-injected as env vars at run time:
 import os
-from composio import ComposioToolSet
+from composio import ComposioToolSet, Action
 
 toolset = ComposioToolSet(entity_id=os.environ["COMPOSIO_CONNECTION_ID"])
-tools = toolset.get_tools(actions=["GMAIL_SEND_EMAIL"])`;
+result = toolset.execute_action(
+    action=Action.GMAIL_SEND_EMAIL,
+    params={"recipient_email": "...", "subject": "...", "body": "..."},
+)`;
 
 const PROVIDERS = [
   "Gmail", "Slack", "GitHub", "Notion", "Linear", "Google Calendar",
@@ -41,7 +44,7 @@ export default function ConnectionsPage() {
       <Section id="usage" title="Usage in Python">
         <CodeBlock label="Python app using Gmail">{composioExample}</CodeBlock>
         <p className="text-sm text-neutral-600 mt-3">
-          Today you set your connection ID manually as an app secret. Auto-injection — where Floom reads your active connection at run time so apps don't need a manual copy step — is on the roadmap for v0.5.
+          After connecting Gmail, any Floom app declaring <code className="font-mono text-sm">composio: gmail</code> in its manifest will use your connection automatically. No passwords or connection IDs to copy — Floom injects <code className="font-mono text-sm">COMPOSIO_CONNECTION_ID</code> from your active connection at run time.
         </p>
       </Section>
 

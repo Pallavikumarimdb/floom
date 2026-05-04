@@ -48,6 +48,18 @@ const ISSUES = [
       "Not a bug. Floom is working toward direct OAuth registration with Gmail, Slack, and GitHub for v0.5 — those consent screens will show \"Floom\" instead of \"Composio\".",
   },
   {
+    id: "composio-already-connected",
+    symptom: "App says I need to connect Gmail but I already did",
+    why: "Connections expire if the underlying OAuth token is revoked or the Composio session is invalidated. The /connections page shows the current status — if a toolkit shows as Expired or Disconnected, reconnect it and the next run will pick it up automatically.",
+    steps: [
+      {
+        code: "floom.dev/connections",
+        note: "Check that the toolkit shows Connected, not Expired.",
+      },
+    ],
+    extra: "",
+  },
+  {
     id: "lost-output",
     symptom: "I lost my run output when I refreshed the page",
     why: "If you ran the app without signing in, your result is tied to a one-time view token that Floom stores in your browser's local storage. Clear your browsing data, switch to a different browser, use incognito mode, or open the page on another device — and the token is gone. Without the token, there's no way to get the result back.",
