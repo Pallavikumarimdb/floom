@@ -17,7 +17,7 @@ const TOC_ITEMS = [
   { id: "run-through-api", label: "Run through API" },
   { id: "async-runs", label: "Async runs" },
   { id: "mcp-for-ai-agents", label: "MCP for AI agents" },
-  { id: "connections", label: "Connections" },
+  { id: "connections", label: "Integrations" },
   { id: "examples", label: "Examples" },
   { id: "ci-automation", label: "CI / automation" },
   { id: "limits", label: "Limits" },
@@ -684,16 +684,16 @@ export default function DocsContent() {
               </p>
             </Section>
 
-            <Section id="connections" title="Connections">
+            <Section id="connections" title="Integrations">
               <p>
-                Apps that need to call external services can use Floom Connections. Connect your accounts once via OAuth in Settings, then declare the service in your manifest — Floom injects the connection automatically at run time.
+                Apps that need to call external services can use Floom Integrations. Connect your accounts once via OAuth in Settings, then declare the service in your manifest — Floom injects the connection automatically at run time.
               </p>
               <CodeBlock label="Python app using Gmail">{integrationsExample}</CodeBlock>
               <p className="text-sm text-neutral-600 mt-3">
-                No manual copy step needed. Floom reads your active connection at run time and injects <IC>COMPOSIO_CONNECTION_ID</IC> (and <IC>COMPOSIO_&lt;SERVICE&gt;_CONNECTION_ID</IC> for multi-service apps) automatically. If you have not connected the service yet, the run returns HTTP 412 with a link to <IC>/connections</IC>.
+                No manual copy step needed. Floom reads your active connection at run time and injects <IC>COMPOSIO_CONNECTION_ID</IC> (and <IC>COMPOSIO_&lt;SERVICE&gt;_CONNECTION_ID</IC> for multi-service apps) automatically. If you have not connected the service yet, the run returns HTTP 412 with a link to <IC>/integrations</IC>.
               </p>
               <p>
-                77 managed-auth providers available, including <strong>Gmail</strong>, <strong>Slack</strong>, <strong>GitHub</strong>, <strong>Notion</strong>, <strong>Linear</strong>, <strong>Google Calendar</strong>, <strong>HubSpot</strong>, <strong>Stripe</strong>, <strong>Salesforce</strong>, <strong>Asana</strong>, <strong>Airtable</strong>, <strong>Discord</strong>, <strong>Zoom</strong>, <strong>Trello</strong>, <strong>Figma</strong>, <strong>Mailchimp</strong>, <strong>Outlook</strong>, <strong>Google Drive</strong>, <strong>Google Docs</strong>, <strong>Google Sheets</strong>, <strong>Calendly</strong>, <strong>Sentry</strong>, <strong>Supabase</strong>, and more. See the full list at <a href="/connections" className="underline">floom.dev/connections</a>.
+                77 managed-auth providers available, including <strong>Gmail</strong>, <strong>Slack</strong>, <strong>GitHub</strong>, <strong>Notion</strong>, <strong>Linear</strong>, <strong>Google Calendar</strong>, <strong>HubSpot</strong>, <strong>Stripe</strong>, <strong>Salesforce</strong>, <strong>Asana</strong>, <strong>Airtable</strong>, <strong>Discord</strong>, <strong>Zoom</strong>, <strong>Trello</strong>, <strong>Figma</strong>, <strong>Mailchimp</strong>, <strong>Outlook</strong>, <strong>Google Drive</strong>, <strong>Google Docs</strong>, <strong>Google Sheets</strong>, <strong>Calendly</strong>, <strong>Sentry</strong>, <strong>Supabase</strong>, and more. See the full list at <a href="/integrations" className="underline">floom.dev/integrations</a>.
               </p>
               <p className="text-sm text-neutral-500">
                 OAuth tokens are proxied server-side; your credentials are never stored in the app bundle or visible in logs. Rate limit on the connections proxy: 60 calls per minute per token.

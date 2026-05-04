@@ -264,7 +264,7 @@ export async function POST(
             toolkits: e.toolkits,
             next: e.reason === "sign-in"
               ? { action: "sign-in", url: "/login" }
-              : { action: "connect", url: "/connections" },
+              : { action: "connect", url: "/integrations" },
           },
           { status: 412 }
         );

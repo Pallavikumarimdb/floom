@@ -32,12 +32,12 @@ export default function ConnectionsPage() {
   return (
     <>
       <div className="mb-2">
-        <p className="text-sm font-semibold text-emerald-700 mb-2">Connections</p>
+        <p className="text-sm font-semibold text-emerald-700 mb-2">Integrations</p>
         <h1 className="text-4xl font-black tracking-tight text-[#11110f]">
-          Connections
+          Integrations
         </h1>
         <p className="mt-3 text-lg text-neutral-600">
-          Apps that need to call external services can use Floom Connections. Connect your accounts once via OAuth in Settings, then declare the service in your manifest — Floom injects the credentials automatically at run time.
+          Apps that need to call external services can use Floom Integrations. Connect your accounts once via OAuth in Settings, then declare the service in your manifest — Floom injects the credentials automatically at run time.
         </p>
       </div>
 
@@ -63,7 +63,7 @@ export default function ConnectionsPage() {
           </span>
         </div>
         <p className="mt-3 text-sm text-neutral-500">
-          See the full list at <a href="/connections" className="underline">floom.dev/connections</a>.
+          See the full list at <a href="/integrations" className="underline">floom.dev/integrations</a>.
         </p>
       </Section>
 

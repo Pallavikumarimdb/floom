@@ -43,6 +43,25 @@ def run(inputs):
     )
     return {"sent": True, "message_id": result.get("messageId")}`;
 
+const directApiWrong = `import os, urllib.request
+
+req = urllib.request.Request(
+    "https://backend.composio.dev/api/v3/toolkits",
+    headers={"x-api-key": os.environ["COMPOSIO_API_KEY"]},
+)
+urllib.request.urlopen(req)  # → HTTP 403, Cloudflare error 1010`;
+
+const directApiRight = `import os, urllib.request
+
+req = urllib.request.Request(
+    "https://backend.composio.dev/api/v3/toolkits",
+    headers={
+        "x-api-key": os.environ["COMPOSIO_API_KEY"],
+        "User-Agent": "Floom-App/1.0 (Python)",
+    },
+)
+urllib.request.urlopen(req)  # → 200`;
+
 const SERVICES = [
   ["Email / Calendar", "gmail, outlook, googlecalendar, cal, calendly"],
   ["Chat", "slack, discord, microsoft_teams, whatsapp, zoom, intercom"],
@@ -57,7 +76,7 @@ export default function IntegrationsPage() {
   return (
     <>
       <div className="mb-2">
-        <p className="text-sm font-semibold text-emerald-700 mb-2">Connections</p>
+        <p className="text-sm font-semibold text-emerald-700 mb-2">Integrations</p>
         <h1 className="text-4xl font-black tracking-tight text-[#11110f]">
           Integrations
         </h1>
@@ -72,17 +91,17 @@ export default function IntegrationsPage() {
         </p>
         <CodeBlock label="floom.yaml">{declareExample}</CodeBlock>
         <p className="text-sm text-neutral-600">
-          Then connect your account once at <a href="/connections" className="underline">floom.dev/connections</a> via OAuth. No passwords or tokens to copy — Floom handles the rest.
+          Then connect your account once at <a href="/integrations" className="underline">floom.dev/integrations</a> via OAuth. No passwords or tokens to copy — Floom handles the rest.
         </p>
       </Section>
 
       <Section id="runtime" title="What happens at run time">
         <p>
-          When a user runs your app, Floom checks if they have connected each declared service via <IC>/connections</IC>:
+          When a user runs your app, Floom checks if they have connected each declared service via <IC>/integrations</IC>:
         </p>
         <ul className="list-disc space-y-2 pl-5">
           <li><strong>Connected:</strong> <IC>COMPOSIO_&lt;SERVICE&gt;_CONNECTION_ID</IC> is injected as an env var. Single-service apps also get the generic <IC>COMPOSIO_CONNECTION_ID</IC>.</li>
-          <li><strong>Not connected:</strong> the run returns <IC>HTTP 412 missing_integration</IC> with a link to <IC>/connections</IC>. Anon runners get a sign-in prompt first.</li>
+          <li><strong>Not connected:</strong> the run returns <IC>HTTP 412 missing_integration</IC> with a link to <IC>/integrations</IC>. Anon runners get a sign-in prompt first.</li>
         </ul>
       </Section>
 
@@ -90,6 +109,21 @@ export default function IntegrationsPage() {
         <CodeBlock label="app.py: send Gmail using the injected connection">{useExample}</CodeBlock>
         <p className="text-sm text-neutral-600">
           The <IC>COMPOSIO_*_CONNECTION_ID</IC> env vars are only present when the runner has an active connection for that service. Your code can check for their presence to handle the unauthenticated case gracefully.
+        </p>
+      </Section>
+
+      <Section id="direct-api" title="Calling Composio APIs directly">
+        <p>
+          If you use the <IC>composio-core</IC> Python SDK, you do not need to worry about HTTP headers — the SDK handles them automatically.
+        </p>
+        <p>
+          If your app calls the Composio REST API directly using Python&apos;s standard <IC>urllib.request</IC>, you <strong>must</strong> set a <IC>User-Agent</IC> header. Composio&apos;s edge layer blocks the default <IC>Python-urllib/3.x</IC> user agent (Cloudflare error 1010).
+        </p>
+        <CodeBlock label="app.py — wrong: blocked by Cloudflare (error 1010)">{directApiWrong}</CodeBlock>
+        <CodeBlock label="app.py — right: custom User-Agent passes through">{directApiRight}</CodeBlock>
+        <p className="text-sm text-neutral-600">
+          Any non-default string works. <IC>Floom-App/1.0 (Python)</IC> is a safe choice.
+          The <IC>composio-core</IC> SDK is not affected — use it when you can.
         </p>
       </Section>
 
@@ -116,7 +150,7 @@ export default function IntegrationsPage() {
           </table>
         </div>
         <p className="mt-3 text-sm text-neutral-500">
-          Full list and OAuth setup instructions at <a href="/connections" className="underline">floom.dev/connections</a>.
+          Full list and OAuth setup instructions at <a href="/integrations" className="underline">floom.dev/integrations</a>.
         </p>
       </Section>
 
@@ -132,7 +166,7 @@ export default function IntegrationsPage() {
             <tbody className="divide-y divide-[#f0ede6]">
               <tr>
                 <td className="py-2 pr-6 font-mono text-[#2a2520]">412 missing_integration</td>
-                <td className="py-2 text-neutral-600">Runner has not connected the required service. Direct them to <IC>/connections</IC>.</td>
+                <td className="py-2 text-neutral-600">Runner has not connected the required service. Direct them to <IC>/integrations</IC>.</td>
               </tr>
               <tr>
                 <td className="py-2 pr-6 font-mono text-[#2a2520]">412 missing_integration (sign-in)</td>

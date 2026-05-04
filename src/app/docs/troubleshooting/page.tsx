@@ -42,7 +42,7 @@ const ISSUES = [
   {
     id: "composio-consent",
     symptom: "Connecting Gmail or Slack shows 'Composio' on the consent screen",
-    why: 'When you click "Connect Gmail" on /connections, you\'ll see a Google sign-in screen that says "Composio wants access to your Google Account". This is expected. Floom uses Composio to handle OAuth for integrations — Composio is the registered app with Google, Slack, and other providers, so its name appears on the consent screen. Once you connect, Floom uses your credentials to call those services on your behalf.',
+    why: 'When you click "Connect Gmail" on /integrations, you\'ll see a Google sign-in screen that says "Composio wants access to your Google Account". This is expected. Floom uses Composio to handle OAuth for integrations — Composio is the registered app with Google, Slack, and other providers, so its name appears on the consent screen. Once you connect, Floom uses your credentials to call those services on your behalf.',
     steps: [],
     extra:
       "Not a bug. Floom is working toward direct OAuth registration with Gmail, Slack, and GitHub for v0.5 — those consent screens will show \"Floom\" instead of \"Composio\".",
@@ -50,10 +50,10 @@ const ISSUES = [
   {
     id: "composio-already-connected",
     symptom: "App says I need to connect Gmail but I already did",
-    why: "Connections expire if the underlying OAuth token is revoked or the Composio session is invalidated. The /connections page shows the current status — if a toolkit shows as Expired or Disconnected, reconnect it and the next run will pick it up automatically.",
+    why: "Connections expire if the underlying OAuth token is revoked or the Composio session is invalidated. The /integrations page shows the current status — if a toolkit shows as Expired or Disconnected, reconnect it and the next run will pick it up automatically.",
     steps: [
       {
-        code: "floom.dev/connections",
+        code: "floom.dev/integrations",
         note: "Check that the toolkit shows Connected, not Expired.",
       },
     ],

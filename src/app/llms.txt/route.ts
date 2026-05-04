@@ -82,7 +82,7 @@ npx @floomhq/cli@latest run my-app '{"text":"hello"}' --json
 - REST API: https://floom.dev/docs/api
 - Async runs: https://floom.dev/docs/ci
 - MCP for AI agents: https://floom.dev/docs/mcp
-- Connections (OAuth integrations): https://floom.dev/docs/connections
+- Integrations (OAuth connections): https://floom.dev/docs/integrations
 - Examples: https://floom.dev/docs/examples
 - Limits: https://floom.dev/docs/limits
 - FAQ: https://floom.dev/docs/faq

@@ -70,8 +70,8 @@ const TOPIC_CARDS = [
     desc: "All 15 tools: Claude Desktop, Cursor, and more.",
   },
   {
-    href: "/docs/connections",
-    title: "Connections",
+    href: "/docs/integrations",
+    title: "Integrations",
     desc: "77 managed-auth providers via Composio.",
   },
   {

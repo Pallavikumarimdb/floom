@@ -70,6 +70,15 @@ Creator-subsidized shared keys vs per-runner user-provided keys. Manifest schema
 **Read:** https://floom.dev/docs/integrations
 Manifest field (integrations: gmail), runtime auto-injection of COMPOSIO_CONNECTION_ID, missing-connection HTTP 412 handling.
 
+**GOTCHA — User-Agent required for direct Composio REST calls:**
+If your app calls `https://backend.composio.dev/...` directly via `urllib.request` (not the `composio-core` SDK), you MUST set a custom `User-Agent` header. Default Python urllib UA is blocked by Cloudflare (error 1010). The `composio-core` SDK handles this automatically — prefer it when possible.
+```python
+# Wrong — blocked
+req = urllib.request.Request(url, headers={"x-api-key": key})
+# Right — works
+req = urllib.request.Request(url, headers={"x-api-key": key, "User-Agent": "Floom-App/1.0 (Python)"})
+```
+
 ### Call the REST API directly
 **Read:** https://floom.dev/docs/api
 Endpoints, auth headers, sync vs async run patterns, poll pattern.

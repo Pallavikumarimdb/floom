@@ -475,11 +475,11 @@ GET https://floom.dev/.well-known/mcp returns the MCP server endpoint.
 
 ---
 
-## Connections (Composio)
+## Integrations (Composio)
 
-URL: https://floom.dev/docs/connections
+URL: https://floom.dev/docs/integrations
 
-Apps that need to call external services can use Floom Connections, powered by Composio. Connect your accounts once via OAuth in Settings, then reference the connection in your app as an env var.
+Apps that need to call external services can use Floom Integrations, powered by Composio. Connect your accounts once via OAuth in Settings, then reference the connection in your app as an env var.
 
 ### Usage in Python
 
@@ -503,7 +503,7 @@ result = toolset.execute_action(
 
 Gmail, Slack, GitHub, Notion, Linear, Google Calendar, HubSpot, Stripe, Salesforce, Asana, Airtable, Discord, Zoom, Trello, Figma, Mailchimp, Outlook, Google Drive, Google Docs, Google Sheets, Calendly, Sentry, Supabase, + 54 more.
 
-Full list at https://floom.dev/connections.
+Full list at https://floom.dev/integrations.
 
 ### Security
 

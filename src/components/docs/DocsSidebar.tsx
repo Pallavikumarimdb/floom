@@ -29,10 +29,10 @@ export const DOCS_NAV = [
     ],
   },
   {
-    group: "Connections",
+    group: "Integrations",
     items: [
-      { href: "/docs/connections", label: "Connections" },
       { href: "/docs/integrations", label: "Integrations" },
+      { href: "/docs/connections", label: "Connections" },
     ],
   },
   {

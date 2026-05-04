@@ -11,6 +11,7 @@ const DOC_SLUGS = [
   "auth",
   "api",
   "mcp",
+  "integrations",
   "connections",
   "ci",
   "examples",

@@ -55,9 +55,9 @@
   },
   {
     "kind": "page",
-    "title": "Connections (Composio)",
+    "title": "Integrations (Composio)",
     "description": "77 managed-auth providers: Gmail, Slack, GitHub, Notion...",
-    "url": "/docs/connections"
+    "url": "/docs/integrations"
   },
   {
     "kind": "page",
@@ -141,7 +141,7 @@
     "kind": "section",
     "title": "Composio usage in Python",
     "description": "ComposioToolSet: connection ID as env var",
-    "url": "/docs/connections#usage"
+    "url": "/docs/integrations#use"
   },
   {
     "kind": "section",
