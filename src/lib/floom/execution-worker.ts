@@ -29,6 +29,10 @@ const MAX_INFRA_ATTEMPTS = 30;
 const INFRA_RETRY_DELAY_SECONDS = 10;
 import { readRuntimeDependencies } from "@/lib/floom/requirements";
 import { resolveRuntimeSecrets, isAnonPerRunnerError } from "@/lib/floom/runtime-secrets";
+import {
+  MissingComposioConnectionError,
+  resolveComposioConnections,
+} from "@/lib/composio/runtime";
 import { redactExactSecretValues, redactSecretOutput } from "@/lib/floom/schema";
 import { reconcileQuotaReservation, reserveDailyQuota } from "@/lib/floom/quota";
 
@@ -55,6 +59,7 @@ type VersionRow = {
   output_schema: Record<string, unknown>;
   dependencies: Record<string, unknown>;
   secrets: unknown;
+  composio: string[] | null;
 };
 
 type ExecutionEventInsert = {
@@ -324,6 +329,35 @@ async function startExecution(
     return { status: 200, body: { ok: true, terminal: "cancelled" } };
   }
 
+  // Resolve Composio connections declared in the manifest composio: field.
+  // Failures surface as a terminal "failed" execution rather than a 412 (since
+  // the execution row already exists by the time the worker runs).
+  const composioToolkits = Array.isArray(version.composio) ? version.composio : [];
+  let composioEnv: Record<string, string> = {};
+  if (composioToolkits.length > 0) {
+    try {
+      composioEnv = await resolveComposioConnections(admin, execution.caller_user_id, composioToolkits);
+    } catch (e) {
+      if (e instanceof MissingComposioConnectionError) {
+        await finalizeExecution(
+          admin,
+          execution,
+          leaseToken,
+          "failed",
+          e.reason === "sign-in"
+            ? `This app requires Composio connections (${e.toolkits.join(", ")}). Sign in to continue.`
+            : `Missing active Composio connection for: ${e.toolkits.join(", ")}. Visit /connections to connect.`,
+          null
+        );
+        return { status: 200, body: { ok: true, terminal: "failed" } };
+      }
+      throw e;
+    }
+  }
+
+  // Merge Composio env vars on top of runtime secrets.
+  const mergedEnvs = { ...runtimeSecrets.envs, ...composioEnv };
+
   if (bundleKind === "tarball") {
     // Tarball (stock_e2b) path: delegate to runInSandboxContained, same as the
     // sync route, then record the sandbox result directly as a terminal execution.
@@ -340,7 +374,7 @@ async function startExecution(
         inputs: execution.input,
         hasOutputSchema: Boolean(version.output_schema && Object.keys(version.output_schema).length > 0),
         dependencies: readRuntimeDependencies(version.dependencies),
-        secrets: runtimeSecrets.envs,
+        secrets: mergedEnvs,
       };
       runnerResult = await runInSandboxContained(runnerConfig);
     } catch (error) {
@@ -404,7 +438,7 @@ async function startExecution(
       entrypoint: app.entrypoint,
       handler: app.handler,
       dependencies: readRuntimeDependencies(version.dependencies),
-      secrets: runtimeSecrets.envs,
+      secrets: mergedEnvs,
     });
 
     const now = new Date().toISOString();
@@ -1026,7 +1060,7 @@ async function loadExecutionContext(admin: SupabaseClient, execution: ExecutionR
 
   const versionQuery = admin
     .from("app_versions")
-    .select("id, app_id, bundle_path, bundle_kind, command, input_schema, output_schema, dependencies, secrets")
+    .select("id, app_id, bundle_path, bundle_kind, command, input_schema, output_schema, dependencies, secrets, composio")
     .eq("app_id", app.id);
   const { data: version, error: versionError } = execution.version_id
     ? await versionQuery.eq("id", execution.version_id).maybeSingle<VersionRow>()
