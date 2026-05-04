@@ -19,6 +19,7 @@ type SharedManifestFields = {
   output_schema?: string;
   dependencies?: ManifestDependencies;
   secrets?: ManifestSecret[];
+  composio?: string[];
   bundle_exclude?: string[];
 };
 
@@ -124,6 +125,7 @@ function parseSharedFields(data: Record<string, unknown>) {
     output_schema: optionalRelativePath(data.output_schema, "output_schema"),
     dependencies: parseDependencies(data.dependencies),
     secrets: parseSecrets(data.secrets),
+    composio: parseComposioToolkits(data.composio),
     bundle_exclude: parseBundleExclude(data.bundle_exclude),
   };
 }
@@ -267,6 +269,55 @@ export function parseSecrets(value: unknown): ManifestSecret[] | undefined {
  */
 export function secretNames(secrets: ManifestSecret[] | undefined): string[] {
   return secrets?.map((s) => s.name) ?? [];
+}
+
+const TOOLKIT_SLUG_RE = /^[a-z][a-z0-9-]{0,63}$/;
+
+/**
+ * Parse the composio: field from floom.yaml.
+ * Accepts a single string or an array of strings.
+ * Each value must match ^[a-z][a-z0-9-]{0,63}$ (Composio provider slug format).
+ *
+ * Returns an empty array (not undefined) when absent — matches the DB column default.
+ *
+ * Examples:
+ *   composio: gmail
+ *   composio:
+ *     - gmail
+ *     - slack
+ */
+export function parseComposioToolkits(value: unknown): string[] {
+  if (value === undefined || value === null) {
+    return [];
+  }
+
+  const raw: unknown[] = typeof value === "string" ? [value] : Array.isArray(value) ? value : null!;
+  if (!Array.isArray(raw)) {
+    throw new Error("composio must be a toolkit slug string or an array of toolkit slug strings");
+  }
+
+  if (raw.length > 20) {
+    throw new Error("composio supports at most 20 toolkit entries");
+  }
+
+  const slugs = raw.map((item, idx): string => {
+    if (typeof item !== "string" || item.trim() === "") {
+      throw new Error(`composio[${idx}] must be a non-empty string`);
+    }
+    const slug = item.trim().toLowerCase();
+    if (!TOOLKIT_SLUG_RE.test(slug)) {
+      throw new Error(
+        `composio toolkit slug "${slug}" is invalid — must start with a lowercase letter and contain only lowercase letters, digits, and hyphens`
+      );
+    }
+    return slug;
+  });
+
+  if (new Set(slugs).size !== slugs.length) {
+    throw new Error("composio must not contain duplicate toolkit slugs");
+  }
+
+  return slugs;
 }
 
 function parseBundleExclude(value: unknown): string[] | undefined {
