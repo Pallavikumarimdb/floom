@@ -67,8 +67,11 @@ export async function sendEmail(payload: EmailPayload): Promise<EmailResult> {
     return { ok: true, reason: "stdout_fallback" };
   }
 
+  const replyTo =
+    process.env.RESEND_REPLY_TO ?? "Floom <team@floom.dev>";
+
   try {
-    const res = await client.emails.send({ from, to, subject, html, text });
+    const res = await client.emails.send({ from, to, subject, html, text, replyTo });
     if (res && typeof res === "object" && "error" in res && res.error) {
       const err = res.error as { name?: string; message?: string };
       const reason =

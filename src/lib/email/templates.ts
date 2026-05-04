@@ -225,28 +225,45 @@ export function renderWelcomeEmail(input: WelcomeTemplateInput): {
   html: string;
   text: string;
 } {
-  const subject = "Welcome to Floom";
+  const subject = "Your Floom account is live";
   const greeting = input.name ? `Hi ${escapeHtml(input.name)},` : "Hi,";
-  const tokensUrl = `${input.publicUrl.replace(/\/+$/, "")}/tokens`;
+  const appsUrl = `${input.publicUrl.replace(/\/+$/, "")}/tokens`;
 
   const body = [
     bodyParagraph(greeting),
     bodyParagraph(
-      "Your account is live. Get your agent token, then point the CLI at a GitHub repo or OpenAPI spec. Floom does the rest.",
+      "Floom turns Claude-built apps into shareable URLs. No servers, no deployment, no setup. Anyone can run your app from a link or call it via API.",
     ),
-    ctaButton(tokensUrl, "Get your agent token"),
+    ctaButton(appsUrl, "Open Floom →"),
+    bodyParagraph("Three things you can do in your first 60 seconds:"),
+    `<ol style="font-family:${SANS};font-size:15px;line-height:1.7;margin:0 0 16px;padding-left:20px;color:${EMAIL_INK};">` +
+      "<li>Open Floom and describe your app</li>" +
+      "<li>Click Deploy to get a live URL</li>" +
+      "<li>Share the URL or wire it into a workflow</li>" +
+      "</ol>",
     mutedParagraph(
-      "Stuck? Just reply to this email. A human reads every one.",
+      'Want to use the CLI? Run <code style="font-family:monospace;font-size:12px;">npx @floomhq/cli@latest auth login</code> to authenticate.',
+    ),
+    mutedParagraph(
+      "Need help? Reply to this email. A human reads every one.",
     ),
   ].join("\n");
 
   const text = [
     input.name ? `Hi ${input.name},` : "Hi,",
     "",
-    "Your account is live. Get your agent token:",
-    tokensUrl,
+    "Floom turns Claude-built apps into shareable URLs. No servers, no deployment, no setup.",
     "",
-    "Stuck? Just reply to this email. A human reads every one.",
+    "Open Floom: " + appsUrl,
+    "",
+    "Three things you can do in your first 60 seconds:",
+    "1. Open Floom and describe your app",
+    "2. Click Deploy to get a live URL",
+    "3. Share the URL or wire it into a workflow",
+    "",
+    "Want to use the CLI? Run: npx @floomhq/cli@latest auth login",
+    "",
+    "Need help? Reply to this email. A human reads every one.",
     "",
     "Floom",
     "team@floom.dev",
@@ -258,7 +275,7 @@ export function renderWelcomeEmail(input: WelcomeTemplateInput): {
       heading: "Welcome to Floom",
       body,
       preheader:
-        "Your account is live. Grab your agent token and ship your first app.",
+        "Open Floom and turn your Claude app idea into a live URL in under a minute.",
       unsubscribeUrl: input.unsubscribeUrl,
     }),
     text,
