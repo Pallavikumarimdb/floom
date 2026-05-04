@@ -183,7 +183,7 @@ Before broader claim:
 - Python multi-file app.
 - App with dependencies.
 - App with secrets by name.
-- OpenBlog from `federicodeponte/openblog`.
+- OpenBlog from `<your-existing-app>`.
 
 OpenBlog gate:
 
