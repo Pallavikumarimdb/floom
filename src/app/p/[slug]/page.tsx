@@ -15,6 +15,14 @@ import { SITE_URL } from "@/lib/config/origin";
 //   - The API returns 404 for private apps the caller cannot access
 //   - The client component shows the "not found" state in that case
 // This ensures Vercel treats this route as ISR-cacheable (s-maxage=300, swr=86400).
+//
+// force-static: even though Supabase fetch calls are uncached at the Next.js
+// fetch level (they go through the admin client, not fetch() with revalidate),
+// force-static tells Next.js to prerender this page and emit ISR headers
+// (public, s-maxage=300) instead of defaulting to private, no-cache.
+// The data is still correct: unstable_cache handles cross-request dedup and
+// revalidation; force-static just unlocks the ISR rendering path.
+export const dynamic = "force-static";
 export const revalidate = 300;
 
 interface Props {
