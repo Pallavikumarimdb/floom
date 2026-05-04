@@ -1,0 +1,76 @@
+name: Virgin Kimi walk
+
+# Kimi-driven UX gate. Simulates a brand-new user trying to deploy and run a
+# Floom app from scratch. Catches doc confusion, broken onboarding, and DX
+# issues that deterministic curl checks can't catch.
+#
+# Why Kimi (not Sonnet): per Federico's audit memory (feedback_kimi_for_audits_too),
+# Kimi is the default reviewer because it's cheaper and "more stupid" — which
+# means it catches issues smarter models pattern-match past.
+#
+# Runs:
+#   - Daily at 06:00 UTC against prod (https://floom.dev)
+#   - workflow_dispatch for on-demand runs (provide base_url override)
+#
+# CI execution: SSHes into AX41 where kimi-agent is installed.
+# Required secrets: AX41_SSH_KEY, AX41_HOST
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: 'Floom URL to walk (default: https://floom.dev)'
+        required: false
+        default: 'https://floom.dev'
+  schedule:
+    - cron: '0 6 * * *'
+
+jobs:
+  kimi-walk:
+    name: Kimi virgin walk
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Kimi virgin walk on AX41
+        id: kimi
+        run: |
+          TARGET_URL="${{ github.event.inputs.base_url || 'https://floom.dev' }}"
+          echo "Target: $TARGET_URL"
+
+          # Copy script to AX41 and run there (kimi-agent lives on AX41)
+          scp -o StrictHostKeyChecking=no \
+            -i <(echo "${{ secrets.AX41_SSH_KEY }}") \
+            scripts/virgin-kimi-walk.sh \
+            root@${{ secrets.AX41_HOST }}:/tmp/virgin-kimi-walk-ci.sh
+
+          ssh -o StrictHostKeyChecking=no \
+            -i <(echo "${{ secrets.AX41_SSH_KEY }}") \
+            root@${{ secrets.AX41_HOST }} \
+            "chmod +x /tmp/virgin-kimi-walk-ci.sh && bash /tmp/virgin-kimi-walk-ci.sh '${TARGET_URL}'"
+        env:
+          AX41_SSH_KEY: ${{ secrets.AX41_SSH_KEY }}
+          AX41_HOST: ${{ secrets.AX41_HOST }}
+
+      - name: Open P1 issue on FAIL
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh issue create \
+            --title "P1: Kimi virgin walk found UX regression ($(date -u '+%Y-%m-%d'))" \
+            --body "## Kimi virgin walk failed
+
+          Kimi could not complete the end-to-end onboarding journey.
+
+          **Target URL:** ${{ github.event.inputs.base_url || 'https://floom.dev' }}
+          **Workflow run:** ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+          Check the workflow log for Kimi's full output and the top findings.
+
+          This is a UX/docs regression — likely broken quickstart, missing CLI command, or confusing manifest field.
+
+          /cc @federicodeponte" \
+            --label "P1,docs,ux"
