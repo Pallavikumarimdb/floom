@@ -87,3 +87,4 @@ ROADMAP.md
 *.bak
 *.orig
 *.tmp
+.env*.local
