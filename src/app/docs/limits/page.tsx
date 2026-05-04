@@ -18,7 +18,7 @@ const LIMITS = [
   ["Bundle unpacked size", "25 MB"],
   ["Single file size", "10 MB"],
   ["File count per bundle", "500"],
-  ["Composio proxy rate limit", "60 calls / min / token"],
+  ["Connections proxy rate limit", "60 calls / min / token"],
   ["Max concurrent runs (default)", "10"],
 ];
 

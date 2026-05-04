@@ -68,7 +68,7 @@ export default function ConnectionsPage() {
     } else if (errorParam === "oauth_failed") {
       nextError = "OAuth was cancelled or failed. Please try again.";
     } else if (errorParam === "missing_connection_id") {
-      nextError = "Composio callback was missing the connection identifier. Please try again.";
+      nextError = "OAuth callback was missing the connection identifier. Please try again.";
     } else if (errorParam === "db_update_failed") {
       nextError = "Connection was authorised but failed to save. Please contact support.";
     } else if (statusParam === "pending") {
@@ -229,7 +229,7 @@ export default function ConnectionsPage() {
         <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "flex-start", gap: 16, marginBottom: 8 }}>
           <div>
             <p style={{ fontSize: 11.5, fontWeight: 700, color: "var(--accent)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 10, fontFamily: "'JetBrains Mono', ui-monospace, monospace" }}>
-              Composio integrations
+              Integrations
             </p>
             <h1 style={{ fontSize: 30, fontWeight: 800, letterSpacing: "-0.025em", margin: 0, color: "var(--ink)" }}>
               Connected services

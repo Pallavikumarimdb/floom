@@ -2,14 +2,14 @@ import type { Metadata } from "next";
 import { IC, CodeBlock, Section } from "@/components/docs/DocsPrimitives";
 
 export const metadata: Metadata = {
-  title: "Connections (Composio)",
-  description: "77 managed-auth providers for Floom apps: Gmail, Slack, GitHub, Notion, Linear, and more via Composio.",
+  title: "Connections",
+  description: "Connect Gmail, Slack, GitHub, Notion, Linear, and 70+ more services to your Floom apps via OAuth — no credentials to copy.",
   alternates: { canonical: "https://floom.dev/docs/connections" },
 };
 
-const composioExample = `# 1. Connect Gmail in your Floom settings (one-time browser OAuth)
-# 2. Declare the toolkit in your manifest — no manual copy step:
-#    composio: gmail
+const integrationsExample = `# 1. Connect Gmail in your Floom settings (one-time browser OAuth)
+# 2. Declare the integration in your manifest — no manual copy step:
+#    integrations: gmail
 
 # 3. Use it in your Python app — auto-injected as env vars at run time:
 import os
@@ -34,17 +34,17 @@ export default function ConnectionsPage() {
       <div className="mb-2">
         <p className="text-sm font-semibold text-emerald-700 mb-2">Connections</p>
         <h1 className="text-4xl font-black tracking-tight text-[#11110f]">
-          Connections (Composio)
+          Connections
         </h1>
         <p className="mt-3 text-lg text-neutral-600">
-          Apps that need to call external services can use Floom Connections, powered by Composio. Connect your accounts once via OAuth in Settings, then reference the connection in your app as an env var.
+          Apps that need to call external services can use Floom Connections. Connect your accounts once via OAuth in Settings, then declare the service in your manifest — Floom injects the credentials automatically at run time.
         </p>
       </div>
 
       <Section id="usage" title="Usage in Python">
-        <CodeBlock label="Python app using Gmail">{composioExample}</CodeBlock>
+        <CodeBlock label="Python app using Gmail">{integrationsExample}</CodeBlock>
         <p className="text-sm text-neutral-600 mt-3">
-          After connecting Gmail, any Floom app declaring <code className="font-mono text-sm">composio: gmail</code> in its manifest will use your connection automatically. No passwords or connection IDs to copy — Floom injects <code className="font-mono text-sm">COMPOSIO_CONNECTION_ID</code> from your active connection at run time.
+          After connecting Gmail, any Floom app declaring <code className="font-mono text-sm">integrations: gmail</code> in its manifest will use your connection automatically. No passwords or connection IDs to copy — Floom injects <code className="font-mono text-sm">COMPOSIO_CONNECTION_ID</code> from your active connection at run time.
         </p>
       </Section>
 
@@ -69,10 +69,10 @@ export default function ConnectionsPage() {
 
       <Section id="security" title="Security">
         <p>
-          Composio proxies OAuth tokens; your credentials are never stored in the app bundle or visible in logs.
+          OAuth tokens are proxied server-side; your credentials are never stored in the app bundle or visible in logs.
         </p>
         <ul className="list-disc space-y-2 pl-5">
-          <li>Rate limit on the Composio proxy: 60 calls per minute per token.</li>
+          <li>Rate limit on the connections proxy: 60 calls per minute per token.</li>
           <li>Connections are scoped to your Floom account, not shared across apps unless you use the same connection ID secret.</li>
           <li>Revoke access at any time from your Floom settings.</li>
         </ul>

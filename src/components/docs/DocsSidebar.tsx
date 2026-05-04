@@ -31,7 +31,8 @@ export const DOCS_NAV = [
   {
     group: "Connections",
     items: [
-      { href: "/docs/connections", label: "Connections (Composio)" },
+      { href: "/docs/connections", label: "Connections" },
+      { href: "/docs/integrations", label: "Integrations" },
     ],
   },
   {

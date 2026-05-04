@@ -17,7 +17,7 @@ const TOC_ITEMS = [
   { id: "run-through-api", label: "Run through API" },
   { id: "async-runs", label: "Async runs" },
   { id: "mcp-for-ai-agents", label: "MCP for AI agents" },
-  { id: "connections", label: "Connections (Composio)" },
+  { id: "connections", label: "Connections" },
   { id: "examples", label: "Examples" },
   { id: "ci-automation", label: "CI / automation" },
   { id: "limits", label: "Limits" },
@@ -223,7 +223,7 @@ const mcpToolsExample = `# Auth
 # get_execution        — fetch the status and output of an async execution by ID
 
 # Connections
-# list_my_connections  — list the caller's active Composio OAuth connections
+# list_my_connections  — list the caller's active OAuth connections
 # set_secret           — set a secret value for an app (requires publish scope)`;
 
 const mcpRunExample = `# Claude calls run_app internally when you say:
@@ -232,9 +232,9 @@ POST https://floom.dev/mcp
 tool: run_app
 arguments: { "slug": "csv-stats", "inputs": { "csv": "name,score\\nAlice,90" } }`;
 
-const composioExample = `# 1. Connect Gmail in your Floom settings (one-time browser OAuth)
-# 2. Declare the toolkit in floom.yaml — no manual copy step:
-#    composio: gmail
+const integrationsExample = `# 1. Connect Gmail in your Floom settings (one-time browser OAuth)
+# 2. Declare the integration in floom.yaml — no manual copy step:
+#    integrations: gmail
 
 # 3. Use it in your Python app — COMPOSIO_CONNECTION_ID is auto-injected at run time:
 import os
@@ -482,10 +482,13 @@ export default function DocsContent() {
               <p>
                 Three minutes from zero to a running app. You need Node.js installed for the CLI.
               </p>
+              <p className="text-sm text-neutral-500">
+                The snippet below uses <IC>npx</IC> so you can try without installing. For repeated use, install once with <IC>npm install -g @floomhq/cli@latest</IC> and drop the <IC>npx @floomhq/cli@latest</IC> prefix.
+              </p>
               <CodeBlock label="Terminal">{launchCommand}</CodeBlock>
               <ol className="list-decimal space-y-2 pl-5">
                 <li><strong>Setup</strong>: opens a browser page to link your account. Token saved to <IC>~/.floom/config.json</IC>.</li>
-                <li><strong>Init</strong>: scaffolds <IC>floom.yaml</IC>, <IC>app.py</IC>, and <IC>requirements.txt</IC> in the current directory.</li>
+                <li><strong>Init</strong>: scaffolds <IC>floom.yaml</IC> and <IC>app.py</IC> in the current directory.</li>
                 <li><strong>Deploy</strong>: bundles the directory, uploads it, and registers the app under your account.</li>
                 <li><strong>Run</strong>: fires a synchronous run, waits for output, prints JSON.</li>
               </ol>
@@ -676,20 +679,19 @@ export default function DocsContent() {
               </p>
             </Section>
 
-            <Section id="connections" title="Connections (Composio)">
+            <Section id="connections" title="Connections">
               <p>
-                Apps that need to call external services can use Floom Connections, powered by Composio. Connect your accounts once via OAuth in Settings, then declare the toolkit in your manifest — Floom injects the connection automatically at run time.
+                Apps that need to call external services can use Floom Connections. Connect your accounts once via OAuth in Settings, then declare the service in your manifest — Floom injects the connection automatically at run time.
               </p>
-              <CodeBlock label="Python app using Gmail">{composioExample}</CodeBlock>
+              <CodeBlock label="Python app using Gmail">{integrationsExample}</CodeBlock>
               <p className="text-sm text-neutral-600 mt-3">
-                No manual copy step needed. Floom reads your active connection at run time and injects <IC>COMPOSIO_CONNECTION_ID</IC> (and <IC>COMPOSIO_&lt;TOOLKIT&gt;_CONNECTION_ID</IC> for multi-toolkit apps) automatically. If you have not connected the toolkit yet, the run returns HTTP 412 with a link to <IC>/connections</IC>.
+                No manual copy step needed. Floom reads your active connection at run time and injects <IC>COMPOSIO_CONNECTION_ID</IC> (and <IC>COMPOSIO_&lt;SERVICE&gt;_CONNECTION_ID</IC> for multi-service apps) automatically. If you have not connected the service yet, the run returns HTTP 412 with a link to <IC>/connections</IC>.
               </p>
-              {/* Fix #5: updated connections list with 77 providers */}
               <p>
                 77 managed-auth providers available, including <strong>Gmail</strong>, <strong>Slack</strong>, <strong>GitHub</strong>, <strong>Notion</strong>, <strong>Linear</strong>, <strong>Google Calendar</strong>, <strong>HubSpot</strong>, <strong>Stripe</strong>, <strong>Salesforce</strong>, <strong>Asana</strong>, <strong>Airtable</strong>, <strong>Discord</strong>, <strong>Zoom</strong>, <strong>Trello</strong>, <strong>Figma</strong>, <strong>Mailchimp</strong>, <strong>Outlook</strong>, <strong>Google Drive</strong>, <strong>Google Docs</strong>, <strong>Google Sheets</strong>, <strong>Calendly</strong>, <strong>Sentry</strong>, <strong>Supabase</strong>, and more. See the full list at <a href="/connections" className="underline">floom.dev/connections</a>.
               </p>
               <p className="text-sm text-neutral-500">
-                Composio proxies OAuth tokens; your credentials are never stored in the app bundle or visible in logs. Rate limit on the Composio proxy: 60 calls per minute per token.
+                OAuth tokens are proxied server-side; your credentials are never stored in the app bundle or visible in logs. Rate limit on the connections proxy: 60 calls per minute per token.
               </p>
             </Section>
 
@@ -781,7 +783,7 @@ export default function DocsContent() {
                       ["Bundle unpacked size", "25 MB"],
                       ["Single file size", "10 MB"],
                       ["File count per bundle", "500"],
-                      ["Composio proxy rate limit", "60 calls / min / token"],
+                      ["Connections proxy rate limit", "60 calls / min / token"],
                       ["Max concurrent runs (default)", "10"],
                     ].map(([label, value]) => (
                       <tr key={label}>

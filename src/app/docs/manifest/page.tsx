@@ -46,9 +46,9 @@ secrets:
   - OPENAI_API_KEY                     # scope: per_runner (default)
   - name: GEMINI_API_KEY
     scope: shared                       # creator's key injected for every runner
-# Composio integrations: auto-inject the runner's active connection at run time.
-# composio: gmail
-# composio:
+# Integrations: auto-inject the runner's active connection at run time.
+# integrations: gmail
+# integrations:
 #   - gmail
 #   - slack
 # Optional: additional pip deps installed before the run command.
@@ -74,11 +74,11 @@ const pathRefExample = `# Path-reference form (escape hatch for very large or sh
 input_schema: ./input.schema.json
 output_schema: ./output.schema.json`;
 
-const composioExample = `# Single toolkit (shorthand):
-composio: gmail
+const integrationsExample = `# Single integration (shorthand):
+integrations: gmail
 
-# Multiple toolkits:
-composio:
+# Multiple integrations:
+integrations:
   - gmail
   - slack
 
@@ -100,7 +100,7 @@ const FIELDS = [
   ["output_schema", "No", "Inline JSON Schema object or relative path to a .json file. Floom validates stdout output against this. Same two-form support as input_schema."],
   ["public", "No", "true = anyone can run without auth. Default: false."],
   ["secrets", "No", "List of secret names (or objects with name + optional scope). Values set via CLI or REST, injected as env vars at run time. Default scope: per_runner. Use scope: shared to inject your own key for every caller."],
-  ["composio", "No", "Toolkit slug or list of slugs (e.g. gmail, slack). Floom auto-injects COMPOSIO_CONNECTION_ID from the runner's active connection at run time. No manual copy step needed."],
+  ["integrations", "No", "Service slug or list of slugs (e.g. gmail, slack). Floom auto-injects COMPOSIO_CONNECTION_ID from the runner's active connection at run time. No manual copy step needed. (The old composio: field is still accepted but deprecated.)"],
   ["dependencies.python", "No", "Path to requirements.txt, optionally with --require-hashes."],
   ["bundle_exclude", "No", "List of paths/globs to skip when building the bundle."],
 ];
@@ -166,13 +166,16 @@ output_schema:
         </p>
       </Section>
 
-      <Section id="composio" title="Composio integrations">
+      <Section id="integrations" title="Integrations">
         <p>
-          Declare external service integrations the app needs. At run time Floom looks up the runner&rsquo;s active connection for each toolkit and injects <IC>COMPOSIO_CONNECTION_ID</IC> (and <IC>COMPOSIO_&lt;TOOLKIT&gt;_CONNECTION_ID</IC> for multi-toolkit apps) automatically. No manual copy step required.
+          Declare external service connections the app needs. At run time Floom looks up the runner&rsquo;s active connection for each service and injects <IC>COMPOSIO_CONNECTION_ID</IC> (and <IC>COMPOSIO_&lt;SERVICE&gt;_CONNECTION_ID</IC> for multi-service apps) automatically. No manual copy step required.
         </p>
-        <CodeBlock label="floom.yaml: composio field">{composioExample}</CodeBlock>
+        <CodeBlock label="floom.yaml: integrations field">{integrationsExample}</CodeBlock>
         <p className="text-sm text-neutral-600 mt-3">
-          If the runner has not connected the required toolkit, the run returns HTTP 412 with a link to <IC>/connections</IC>. Anon runners get a sign-in prompt instead.
+          If the runner has not connected the required service, the run returns HTTP 412 with a link to <IC>/connections</IC>. Anon runners get a sign-in prompt instead.
+        </p>
+        <p className="text-sm text-neutral-500 mt-2">
+          The old <IC>composio:</IC> field is deprecated but still accepted — existing apps continue to deploy unchanged.
         </p>
       </Section>
 

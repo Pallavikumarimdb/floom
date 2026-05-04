@@ -64,6 +64,7 @@ const nextConfig: NextConfig = {
       { source: "/docs/async-runs", destination: "/docs/api", permanent: true },
       { source: "/docs/mcp-for-ai-agents", destination: "/docs/mcp", permanent: true },
       { source: "/docs/ci-automation", destination: "/docs/ci", permanent: true },
+      { source: "/docs/composio", destination: "/docs/integrations", permanent: true },
       // /legal/privacy and /legal/terms return 404 (no sub-pages exist); redirect to real pages.
       { source: "/legal/privacy", destination: "/privacy", permanent: true },
       { source: "/legal/terms", destination: "/terms", permanent: true },
