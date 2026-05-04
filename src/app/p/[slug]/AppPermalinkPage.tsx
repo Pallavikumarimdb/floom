@@ -440,6 +440,31 @@ export default function AppPermalinkPage({ initialApp }: { initialApp?: Permalin
   // app.description and app.slug without optional-chaining mismatches.
   }, [app]);
 
+  // #77: long descriptions blow out the hero. Truncate to the first
+  // sentence (or 120 chars, whichever comes first) and let users opt-in
+  // to the full text. ~200+ char descriptions push the run surface
+  // below the fold; keeping the hero compact restores fold-balance.
+  const HERO_DESCRIPTION_MAX = 120;
+  const [heroDescriptionExpanded, setHeroDescriptionExpanded] = useState(false);
+  const headerDescriptionTruncated = useMemo(() => {
+    if (!headerDescription) return '';
+    if (headerDescription.length <= HERO_DESCRIPTION_MAX) return headerDescription;
+    // Prefer first-sentence cut; fall back to character cap on ellipsis word.
+    const sentenceEnd = headerDescription.search(/[.!?](\s|$)/);
+    if (sentenceEnd > 0 && sentenceEnd <= HERO_DESCRIPTION_MAX) {
+      return headerDescription.slice(0, sentenceEnd + 1);
+    }
+    // Word-boundary trim so we don't cut mid-word.
+    const slice = headerDescription.slice(0, HERO_DESCRIPTION_MAX);
+    const lastSpace = slice.lastIndexOf(' ');
+    return (lastSpace > 80 ? slice.slice(0, lastSpace) : slice) + '…';
+  }, [headerDescription]);
+  const headerDescriptionIsTruncated =
+    headerDescriptionTruncated.length < headerDescription.length;
+  const headerDescriptionDisplay = heroDescriptionExpanded
+    ? headerDescription
+    : headerDescriptionTruncated;
+
   const samplePrefillInputs = useMemo<Record<string, unknown> | null>(() => {
     if (!app) return null;
     if (runIdFromUrl || rerunIdFromUrl) return null;
@@ -966,7 +991,31 @@ export default function AppPermalinkPage({ initialApp }: { initialApp?: Permalin
                     maxWidth: 640,
                   }}
                 >
-                  {headerDescription}
+                  {headerDescriptionDisplay}
+                  {headerDescriptionIsTruncated && (
+                    <>
+                      {' '}
+                      <button
+                        type="button"
+                        data-testid="hero-description-toggle"
+                        onClick={() => setHeroDescriptionExpanded((v) => !v)}
+                        style={{
+                          background: 'transparent',
+                          border: 'none',
+                          padding: 0,
+                          color: 'var(--accent)',
+                          fontSize: 13.5,
+                          fontWeight: 500,
+                          cursor: 'pointer',
+                          fontFamily: 'inherit',
+                          textDecoration: 'underline',
+                          textUnderlineOffset: 2,
+                        }}
+                      >
+                        {heroDescriptionExpanded ? 'Show less' : 'Show more'}
+                      </button>
+                    </>
+                  )}
                 </p>
               )}
               {/* G5 / R7 U2: unified single-row pills (wrap allowed) */}

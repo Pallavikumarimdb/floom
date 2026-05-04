@@ -482,7 +482,19 @@ input { font-family: inherit; }
 }
 
 /* ── Landing page ────────────────────────────────────────── */
-.page-root { min-height: 100vh; }
+/* #78: footer was floating mid-viewport on short outputs because the page
+   wrapper had no flex layout. Use a flex column with the main element
+   stretching, so the footer pins to the bottom regardless of content
+   height. The :has() selector lets us scope this to wrappers that
+   actually contain a <main> + <footer>, leaving simpler page-root
+   uses (loading, 404) untouched. */
+.page-root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+.page-root > main { flex: 1 0 auto; }
+.page-root > footer { flex-shrink: 0; }
 .landing-v17 { background: var(--bg); }
 
 /* Hero headline responsive */

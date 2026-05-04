@@ -5,7 +5,7 @@
 // terminal, no output toolbar, no run history) — but it actually runs
 // the app, which the stub did not.
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, useTransition } from 'react';
 import type { AppDetail, RunRecord } from '@/lib/types';
 import { createClient } from '@/lib/supabase/client';
 import { extractRows, unionKeys } from '@/lib/floom/output-rows';
@@ -17,6 +17,8 @@ export interface RunSurfaceResult {
 }
 
 interface RunSurfaceProps {
+  // manifest comes through AppDetail; secrets_needed lives at
+  // app.manifest.secrets_needed (string[]).
   app: AppDetail & { input_schema?: unknown; output_schema?: unknown; handler?: string };
   initialRun?: RunRecord | null;
   initialInputs?: Record<string, unknown>;
@@ -115,6 +117,24 @@ export function RunSurface({ app, initialRun, initialInputs, examplePrefillInput
   const optionalFields = useMemo(() => fields.filter((f) => !f.required), [fields]);
   const [showOptional, setShowOptional] = useState(false);
 
+  // #76: secret-typed inputs render as masked password fields. A field is
+  // treated as a secret when its name appears in manifest.secrets_needed OR
+  // when its JSON Schema declares format: "password". Names match
+  // case-insensitively to tolerate both `GEMINI_API_KEY` (manifest convention)
+  // and `gemini_api_key` (input_schema convention).
+  const secretNames = useMemo(() => {
+    const declared = (app.manifest?.secrets_needed ?? []) as ReadonlyArray<string>;
+    return new Set(declared.map((s) => s.toLowerCase()));
+  }, [app.manifest?.secrets_needed]);
+  const isSecretField = useCallback(
+    (f: RunField) => f.format === 'password' || secretNames.has(f.name.toLowerCase()),
+    [secretNames],
+  );
+  const [revealedSecrets, setRevealedSecrets] = useState<Record<string, boolean>>({});
+  const toggleReveal = useCallback((name: string) => {
+    setRevealedSecrets((v) => ({ ...v, [name]: !v[name] }));
+  }, []);
+
   const [values, setValues] = useState<Record<string, string>>(() => {
     const seed: Record<string, string> = {};
     for (const f of fields) {
@@ -164,6 +184,13 @@ export function RunSurface({ app, initialRun, initialInputs, examplePrefillInput
     }
   }, [initialRun]);
 
+  // #79: queued→running transition was repainting the output panel because
+  // the synchronous setState forced React to flush in the middle of the
+  // user looking at it. Wrap non-terminal status updates in startTransition
+  // so React schedules them as low-priority and keeps the previous frame
+  // visible until the new one is ready. Terminal updates (succeeded /
+  // failed) stay urgent — those are the ones the user is waiting for.
+  const [, startTransition] = useTransition();
   const applyExecutionSnapshot = useCallback((data: ExecutionSnapshot, ms: number) => {
     const status = normalizeClientStatus(data.status);
     if (status === 'succeeded') {
@@ -176,14 +203,21 @@ export function RunSurface({ app, initialRun, initialInputs, examplePrefillInput
       onResult?.({ runId: data.execution_id, status, output: data.output });
       return;
     }
-    setState({
-      kind: 'active',
-      executionId: data.execution_id,
-      status,
-      progress: data.progress,
-      startedAt: data.started_at,
-      completedAt: data.completed_at,
-        submittedAt: performance.now() - ms,
+    startTransition(() => {
+      setState((prev) => ({
+        kind: 'active',
+        executionId: data.execution_id,
+        status,
+        progress: data.progress,
+        startedAt: data.started_at,
+        completedAt: data.completed_at,
+        // Preserve the original submittedAt so elapsed-time math stays
+        // monotonic across polls. Falls back to now() if we're starting fresh.
+        submittedAt:
+          prev.kind === 'active' && prev.executionId === data.execution_id
+            ? prev.submittedAt
+            : performance.now() - ms,
+      }));
     });
     onResult?.({ runId: data.execution_id, status, output: data.output });
   }, [onResult]);
@@ -368,6 +402,50 @@ export function RunSurface({ app, initialRun, initialInputs, examplePrefillInput
             rows={5}
             style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit' }}
           />
+        ) : isSecretField(f) ? (
+          // #76: secrets render masked. Eye toggle reveals; on-screen hint
+          // explains the storage model so users know what they're entrusting.
+          <>
+            <div style={{ position: 'relative' }}>
+              <input
+                type={revealedSecrets[f.name] ? 'text' : 'password'}
+                value={values[f.name] ?? ''}
+                autoComplete="off"
+                spellCheck={false}
+                onChange={(e) =>
+                  setValues((v) => ({ ...v, [f.name]: e.target.value }))
+                }
+                style={{ ...inputStyle, paddingRight: 64, fontFamily: "'JetBrains Mono', ui-monospace, monospace", fontSize: 12.5 }}
+              />
+              <button
+                type="button"
+                onClick={() => toggleReveal(f.name)}
+                aria-label={revealedSecrets[f.name] ? `Hide ${f.title}` : `Show ${f.title}`}
+                aria-pressed={!!revealedSecrets[f.name]}
+                style={{
+                  position: 'absolute',
+                  right: 6,
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  padding: '4px 8px',
+                  fontSize: 11,
+                  fontWeight: 600,
+                  color: 'var(--muted)',
+                  background: 'transparent',
+                  border: '1px solid var(--line)',
+                  borderRadius: 5,
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                  letterSpacing: '0.02em',
+                }}
+              >
+                {revealedSecrets[f.name] ? 'Hide' : 'Show'}
+              </button>
+            </div>
+            <span style={{ fontSize: 11, color: 'var(--muted)' }}>
+              Encrypted at rest, injected as env var at run time.
+            </span>
+          </>
         ) : (
           <input
             type={f.type === 'integer' || f.type === 'number' ? 'number' : 'text'}
@@ -596,7 +674,14 @@ export function RunSurface({ app, initialRun, initialInputs, examplePrefillInput
             </p>
           )}
           {state.kind === 'active' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            // #79: stable key on the active panel keeps React reconciling
+            // the SAME elements when status flips queued→running, instead
+            // of tearing down + recreating the subtree (which caused the
+            // black-flash repaint).
+            <div
+              key="active-panel"
+              style={{ display: 'flex', flexDirection: 'column', gap: 10 }}
+            >
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                 <StatusPill status={state.status} />
                 <span style={{ fontSize: 12, color: 'var(--muted)' }}>
