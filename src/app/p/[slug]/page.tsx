@@ -53,10 +53,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const appFound = app !== null;
 
   if (app) {
-    // Prefer the app's description column; fall back to the first input field's description.
-    if (app.description) {
-      appDescription = app.description.replace(/\s+/g, " ").trim().slice(0, 220);
-    } else if (app.input_schema) {
+    // apps table has no description column — derive from the first input field's description.
+    if (app.input_schema) {
       const schema = app.input_schema as { properties?: Record<string, { description?: string }> };
       const props = schema.properties ?? {};
       const firstField = Object.values(props)[0];
@@ -171,21 +169,20 @@ export default async function Page({ params }: Props) {
   );
 }
 
-// App metadata shape returned by getPublicAppMeta — a superset of PermalinkInitialApp
-// that includes the description column used in generateMetadata.
+// App metadata shape returned by getPublicAppMeta.
+// NOTE: apps table has no description column — description is derived from input_schema.
 type PublicAppMeta = {
   id: string;
   slug: string;
   name: string;
   handler: string | null;
-  description: string | null;
   input_schema: unknown;
   public: true;
 };
 
 // Uncached direct Supabase query — used only by generateMetadata.
-// Never use unstable_cache here: with force-static the cache is populated at build
-// time and apps created after the deploy return null → "Not found" OG metadata.
+// Never use unstable_cache here: the cache can miss for slugs created after the
+// last warm-up, causing generateMetadata to return null → "Not found" OG metadata.
 // The body render uses getPublicAppMeta (cached) below.
 async function getPublicAppMetaFresh(slug: string): Promise<PublicAppMeta | null> {
   if (!hasSupabaseConfig()) {
@@ -195,7 +192,6 @@ async function getPublicAppMetaFresh(slug: string): Promise<PublicAppMeta | null
         slug: demoApp.slug,
         name: demoApp.name,
         handler: ((demoApp as Record<string, unknown>).handler as string) ?? null,
-        description: null,
         input_schema:
           ((demoApp as Record<string, unknown>).input_schema as Record<string, unknown>) ?? null,
         public: true,
@@ -208,7 +204,7 @@ async function getPublicAppMetaFresh(slug: string): Promise<PublicAppMeta | null
     const admin = createAdminClient();
     const { data: app, error } = await admin
       .from("apps")
-      .select("id, slug, name, handler, description, public, app_versions(input_schema)")
+      .select("id, slug, name, handler, public, app_versions(input_schema)")
       .eq("slug", slug)
       .eq("public", true)
       .order("version", { foreignTable: "app_versions", ascending: false })
@@ -226,7 +222,6 @@ async function getPublicAppMetaFresh(slug: string): Promise<PublicAppMeta | null
       slug: app.slug,
       name: app.name,
       handler: (app.handler as string | null) ?? null,
-      description: (app.description as string | null) ?? null,
       input_schema: latestVersion?.input_schema ?? null,
       public: true as const,
     } satisfies PublicAppMeta;
@@ -250,7 +245,6 @@ async function getPublicAppMeta(slug: string): Promise<PublicAppMeta | null> {
         slug: demoApp.slug,
         name: demoApp.name,
         handler: ((demoApp as Record<string, unknown>).handler as string) ?? null,
-        description: null,
         input_schema:
           ((demoApp as Record<string, unknown>).input_schema as Record<string, unknown>) ?? null,
         public: true,
@@ -265,7 +259,7 @@ async function getPublicAppMeta(slug: string): Promise<PublicAppMeta | null> {
         const admin = createAdminClient();
         const { data: app, error } = await admin
           .from("apps")
-          .select("id, slug, name, handler, description, public, app_versions(input_schema)")
+          .select("id, slug, name, handler, public, app_versions(input_schema)")
           .eq("slug", slug)
           .eq("public", true) // Only pre-render public apps server-side
           .order("version", { foreignTable: "app_versions", ascending: false })
@@ -283,7 +277,6 @@ async function getPublicAppMeta(slug: string): Promise<PublicAppMeta | null> {
           slug: app.slug,
           name: app.name,
           handler: (app.handler as string | null) ?? null,
-          description: (app.description as string | null) ?? null,
           input_schema: latestVersion?.input_schema ?? null,
           public: true as const,
         } satisfies PublicAppMeta;
