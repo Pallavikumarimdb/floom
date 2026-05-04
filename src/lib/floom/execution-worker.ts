@@ -15,6 +15,7 @@ import {
   nextPollDelaySeconds,
   normalizeExecutionStatus,
   queueTtlMs,
+  sandboxTimeoutMs,
   sanitizePublicError,
   staleRunningMs,
   type ExecutionRow,
@@ -142,8 +143,8 @@ export async function sweepExecutions(admin: SupabaseClient, baseUrl?: string) {
   const staleBefore = new Date(now - staleRunningMs()).toISOString();
   const ttlBefore = new Date(now - executionTtlMs()).toISOString();
   // Catch-all: any running execution whose effective start time exceeds 1.5x
-  // sandboxTimeoutMs is definitively stuck — the sandbox cannot still be alive.
-  const hardDeadlineBefore = new Date(now - Math.floor(sandboxTimeoutMs() * 1.5)).toISOString();
+  // executionTtlMs (default 2400s → hard deadline 3600s = 60min) is definitively stuck.
+  const hardDeadlineBefore = new Date(now - Math.floor(executionTtlMs() * 1.5)).toISOString();
 
   const { data: staleQueued } = await admin
     .from("executions")
@@ -206,7 +207,7 @@ export async function sweepExecutions(admin: SupabaseClient, baseUrl?: string) {
   }
 
   // Hard catch-all: any running row whose effective age exceeds 1.5x
-  // sandboxTimeoutMs is force-transitioned to timed_out regardless of heartbeat
+  // executionTtlMs * 1.5 is force-transitioned to timed_out regardless of heartbeat
   // or lease state.  This ensures the UI never shows a permanently-stuck run.
   const { data: hardDeadlineRunning } = await admin
     .from("executions")
@@ -846,6 +847,7 @@ async function recoverOrTerminateStaleRunning(
     }).catch(() => null);
 
     if (pollResult && pollResult.status !== "running") {
+      // Sandbox completed (succeeded / failed / timed_out) — finalize.
       const eventInserts = await buildPollEventInserts(
         admin,
         claimed,
@@ -901,17 +903,57 @@ async function recoverOrTerminateStaleRunning(
       await killSandboxExecution(claimed.sandbox_id, claimed.sandbox_pid);
       return;
     }
+
+    // Sandbox is confirmed still running (pollResult.status === "running") OR
+    // the E2B poll threw an unhandled error (pollResult === null).
+    // In both cases: only terminate if the overall execution TTL has elapsed.
+    // Otherwise refresh the heartbeat and reschedule — the sandbox is alive.
+    const elapsedMs = claimed.started_at ? Date.now() - Date.parse(claimed.started_at) : Infinity;
+    const ttlElapsed = !Number.isFinite(elapsedMs) || elapsedMs >= executionTtlMs();
+
+    if (pollResult?.status === "running" && !ttlElapsed) {
+      // Sandbox is alive and within TTL — the sweep fired due to a transient
+      // QStash delay or a slow Vercel cold-start. Refresh heartbeat and
+      // reschedule a poll so the execution continues normally.
+      const now = new Date().toISOString();
+      const pollCount = claimed.poll_count + 1;
+      const pollDelaySeconds = nextPollDelaySeconds({ ...claimed, poll_count: pollCount });
+      const nextPollAt = new Date(Date.now() + pollDelaySeconds * 1000).toISOString();
+      await updateExecutionByLease(admin, claimed, leaseToken, {
+        last_heartbeat_at: now,
+        heartbeat_at: now,
+        poll_count: pollCount,
+        stdout_offset: pollResult.stdoutOffset,
+        stderr_offset: pollResult.stderrOffset,
+        next_poll_at: nextPollAt,
+        progress: pollResult.progress ?? claimed.progress,
+      });
+      const messageId = await publishExecutionProcessMessage({
+        executionId: claimed.id,
+        pollCount,
+        delaySeconds: pollDelaySeconds,
+      });
+      await updateExecutionByLease(admin, claimed, leaseToken, {
+        queue_message_id: messageId,
+        lease_token: null,
+        lease_expires_at: null,
+        lease_until: null,
+      });
+      return;
+    }
+    // pollResult === null (E2B error) and not past TTL: fall through to terminate below.
+    // This is safer than rescheduling when we can't confirm the sandbox is healthy.
   }
 
+  // Either: no sandbox_id, E2B poll failed (null), or TTL elapsed.
+  // Terminate and finalize.
   await killSandboxExecution(claimed.sandbox_id, claimed.sandbox_pid);
-  if (reason === "ttl") {
-    await finalizeExecution(admin, claimed, leaseToken, "timed_out", "Execution exceeded SANDBOX_TIMEOUT_MS", null, {
-      timed_out_at: new Date().toISOString(),
-    }).catch(() => undefined);
-    return;
-  }
-
-  await finalizeExecution(admin, claimed, leaseToken, "timed_out", "Execution exceeded SANDBOX_TIMEOUT_MS", null, {
+  const elapsedMs = claimed.started_at ? Date.now() - Date.parse(claimed.started_at) : Infinity;
+  const terminalMsg =
+    reason === "ttl" || !Number.isFinite(elapsedMs) || elapsedMs >= executionTtlMs()
+      ? "Execution exceeded maximum execution time"
+      : "Execution exceeded SANDBOX_TIMEOUT_MS";
+  await finalizeExecution(admin, claimed, leaseToken, "timed_out", terminalMsg, null, {
     timed_out_at: new Date().toISOString(),
   }).catch(() => undefined);
 }

@@ -37,8 +37,10 @@ describe("sweepExecutions — noHeartbeatRunning sweep", () => {
 
 // ── Fix-2: hardDeadlineRunning sweep ─────────────────────────────────────────
 describe("sweepExecutions — hardDeadlineRunning catch-all", () => {
-  it("hardDeadlineBefore uses sandboxTimeoutMs * 1.5", () => {
-    expect(src).toContain("sandboxTimeoutMs() * 1.5");
+  it("hardDeadlineBefore uses executionTtlMs * 1.5 (updated from sandboxTimeoutMs for 30min runs)", () => {
+    // After the sandbox-30min upgrade, the hard deadline is 1.5x executionTtlMs
+    // (default 2400s → 3600s) so that 30min legitimate runs are not prematurely killed.
+    expect(src).toContain("executionTtlMs() * 1.5");
   });
 
   it("uses forceFinalizeExecution to transition stuck rows", () => {
