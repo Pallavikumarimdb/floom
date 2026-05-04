@@ -349,10 +349,10 @@ function IC({ children }: { children: ReactNode }) {
 function TocSidebar({ activeId }: { activeId: string }) {
   return (
     <aside
-      className="hidden lg:block w-52 flex-shrink-0"
+      className="hidden lg:block w-52 flex-shrink-0 self-start sticky top-[64px]"
       aria-label="Table of contents"
     >
-      <div className="sticky top-[80px] max-h-[calc(100vh-100px)] overflow-y-auto">
+      <div className="max-h-[calc(100vh-80px)] overflow-y-auto">
         <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-neutral-400">
           On this page
         </p>

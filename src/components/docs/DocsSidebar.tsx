@@ -50,10 +50,10 @@ export function DocsSidebar() {
 
   return (
     <aside
-      className="hidden lg:block w-52 flex-shrink-0"
+      className="hidden lg:block w-52 flex-shrink-0 self-start sticky top-[64px]"
       aria-label="Docs navigation"
     >
-      <div className="sticky top-[80px] max-h-[calc(100vh-100px)] overflow-y-auto">
+      <div className="max-h-[calc(100vh-80px)] overflow-y-auto">
         <nav>
           {DOCS_NAV.map((section) => (
             <div key={section.group} className="mb-5">

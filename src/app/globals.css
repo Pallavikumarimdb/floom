@@ -24,8 +24,8 @@
   --accent-soft: #ecfdf5;
   --accent-hover: #065f46;
   --accent-border: #d1fae5;
-  --terminal-bg: #1b1a17;
-  --terminal-ink: #f1efe9;
+  --terminal-bg: #f0ede6;
+  --terminal-ink: #2a2520;
   --success: #1a7f37;
   --warning: #b05513;
   --studio: #f5f4f0;
@@ -40,7 +40,7 @@
   --code: #1b1a17;
   --code-text: #e8e6e0;
   --code-mute: #7a766e;
-  --code-accent: #6ee7b7;
+  --code-accent: #047857;
   --radius-pill: 8px;
   --radius-chip: 6px;
   --radius-button: 10px;

@@ -25,7 +25,7 @@ export default function DocsLayout({ children }: { children: ReactNode }) {
       <div className="border-t border-[#ded8cc] bg-[#faf9f5]">
         <div className="mx-auto max-w-6xl px-5 py-4">
           <p className="text-xs text-neutral-400">
-            Last updated: 2026-05-04 · Floom v0.3
+            Last updated: 2026-05-04 · Floom v0.4
           </p>
         </div>
       </div>

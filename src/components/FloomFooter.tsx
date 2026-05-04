@@ -79,8 +79,8 @@ export function FloomFooter({ hideTagline = false }: FloomFooterProps) {
               src="/floom-mark-glow.svg"
               alt=""
               aria-hidden="true"
-              width={20}
-              height={20}
+              width={16}
+              height={16}
               style={{ display: 'inline-block' }}
             />
             <span>

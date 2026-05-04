@@ -305,7 +305,7 @@ npx @floomhq/cli@latest deploy`,
               <button
                 type="button"
                 onClick={() => copy(publishCommand, "command")}
-                style={{ flexShrink: 0, fontSize: 11, fontWeight: 600, color: copied === 'command' ? '#fff' : 'var(--code-accent)', background: 'transparent', border: `1px solid ${copied === 'command' ? 'var(--code-accent)' : 'rgba(110,231,183,0.3)'}`, borderRadius: 5, padding: '4px 10px', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}
+                style={{ flexShrink: 0, fontSize: 11, fontWeight: 600, color: 'var(--code-accent)', background: 'transparent', border: '1px solid var(--accent-border)', borderRadius: 5, padding: '4px 10px', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}
               >
                 {copied === "command" ? "✓ Copied" : "Copy"}
               </button>

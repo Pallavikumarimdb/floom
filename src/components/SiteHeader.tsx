@@ -39,8 +39,8 @@ const MUTED = '#585550';
 const BG = '#fafaf8';
 
 const WORDMARK_SIZE = 17;
-const MARK_SIZE_DEFAULT = 22;
-const MARK_SIZE_COMPACT = 18;
+const MARK_SIZE_DEFAULT = 17;
+const MARK_SIZE_COMPACT = 15;
 
 const signInStyle: CSSProperties = {
   display: 'inline-flex',
