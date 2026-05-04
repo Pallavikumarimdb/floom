@@ -742,3 +742,45 @@ textarea:focus-visible {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ── Dark mode overrides ─────────────────────────────────── */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #111110;
+    --card: #1a1917;
+    --ink: #e8e6e1;
+    --muted: #8a8680;
+    --line: #2a2826;
+    --accent: #10b77f;
+    --accent-soft: #0a2e22;
+    --accent-hover: #0ea371;
+    --accent-border: #0d3d2a;
+    --terminal-bg: #161513;
+    --terminal-ink: #c8c4bc;
+    --success: #34c465;
+    --warning: #e09040;
+    --studio: #161513;
+    --line-hover: #3a3834;
+    --line-soft: #1e1c1a;
+    --warning-soft: #2a1e0a;
+    --danger: #e05a3a;
+    --danger-soft: #2a140e;
+    --danger-border: #3d1c12;
+    --shadow-2: 0 1px 2px rgba(0, 0, 0, 0.3), 0 1px 3px rgba(0, 0, 0, 0.25);
+    --shadow-3: 0 1px 3px rgba(0, 0, 0, 0.3), 0 4px 20px rgba(0, 0, 0, 0.4);
+    --code: #0d0c0a;
+    --code-text: #e8e6e0;
+    --code-mute: #5a5650;
+    --code-accent: #10b77f;
+    --background: var(--bg);
+    --foreground: var(--ink);
+  }
+
+  .topbar {
+    background: rgba(17, 17, 16, 0.92);
+  }
+
+  .topbar-links .btn-signin {
+    background: var(--card);
+  }
+}

@@ -92,7 +92,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
-        <meta name="color-scheme" content="light" />
+        <meta name="color-scheme" content="light dark" />
       </head>
       <body className="min-h-screen bg-white text-slate-900">
         <SkipLink />
