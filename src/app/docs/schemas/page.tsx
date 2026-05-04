@@ -44,7 +44,7 @@ const outputModes = `# With output_schema declared:
 # Floom returns the parsed JSON directly
 
 # No output_schema, plain stdout:
-# Floom returns { "stdout": "<last 4 KB>", "exit_code": 0 }`;
+# Floom captures the last 4 KB of stdout as the output field`;
 
 const schemaEnumExample = `{
   "type": "string",

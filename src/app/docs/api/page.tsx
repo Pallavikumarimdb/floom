@@ -19,10 +19,11 @@ curl -X POST https://floom.dev/api/apps/my-private-app/run \\
   -d '{"inputs":{"text":"Run this securely"}}'`;
 
 const apiResponseExample = `{
-  "status": "ok",
-  "output": { "action_items": ["Ship by Friday", "Review PR #42"] },
-  "exit_code": 0,
-  "duration_ms": 3412
+  "execution_id": "exec_abc123",
+  "status": "queued",
+  "output": null,
+  "error": null,
+  "view_token": "<view-token>"
 }`;
 
 const asyncFireAndForgetExample = `# Fire-and-forget — returns 202 immediately
