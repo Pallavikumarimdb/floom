@@ -21,6 +21,9 @@ import { authorizeExecutionRead, isTerminalExecutionStatus, normalizeExecutionSt
 // UUID v4 pattern
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+// Prevents shared/CDN caches from storing user-private execution logs.
+const PRIVATE_CACHE = { "Cache-Control": "private, no-store" } as const;
+
 export type ExecutionEvent = {
   id: string;
   execution_id: string;
@@ -106,5 +109,5 @@ export async function GET(
     terminal,
   };
 
-  return NextResponse.json(response);
+  return NextResponse.json(response, { headers: PRIVATE_CACHE });
 }

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Troubleshooting · Floom",
+  title: "Troubleshooting",
   description: "Common issues and how to resolve them quickly.",
   alternates: { canonical: "https://floom.dev/docs/troubleshooting" },
   openGraph: {

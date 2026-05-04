@@ -21,6 +21,9 @@ type MyRunRow = {
   } | null;
 };
 
+// Prevents shared/CDN caches from storing user-private execution data.
+const PRIVATE_CACHE = { "Cache-Control": "private, no-store" } as const;
+
 export async function GET(req: NextRequest) {
   if (!hasSupabaseConfig()) {
     return NextResponse.json(
@@ -72,6 +75,6 @@ export async function GET(req: NextRequest) {
         progress: run.progress,
       })),
     },
-    { headers: { "Cache-Control": "private, no-store" } },
+    { headers: PRIVATE_CACHE },
   );
 }

@@ -16,6 +16,9 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 // importing from two places. (Submission routes import from here.)
 export { generateViewToken };
 
+// Prevents shared/CDN caches from storing user-private execution data.
+const PRIVATE_CACHE = { "Cache-Control": "private, no-store" } as const;
+
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -126,20 +129,26 @@ export async function GET(
 
   if (isRunner) {
     // Full execution: runner sees everything they need to reconstruct their run.
-    return NextResponse.json({
-      ...baseFields,
-      inputs: execution.input,
-      output: execution.output,
-      progress: execution.progress,
-      error: execution.error,
-      error_detail: execution.error_detail,
-    });
+    return NextResponse.json(
+      {
+        ...baseFields,
+        inputs: execution.input,
+        output: execution.output,
+        progress: execution.progress,
+        error: execution.error,
+        error_detail: execution.error_detail,
+      },
+      { headers: PRIVATE_CACHE },
+    );
   }
 
   // isOwner only: analytics shape — never inputs/output/error_detail.
-  return NextResponse.json({
-    ...baseFields,
-    // Sanitized error code only — no detail string.
-    error_code: execution.error ? (execution.error.slice(0, 64) ?? null) : null,
-  });
+  return NextResponse.json(
+    {
+      ...baseFields,
+      // Sanitized error code only — no detail string.
+      error_code: execution.error ? (execution.error.slice(0, 64) ?? null) : null,
+    },
+    { headers: PRIVATE_CACHE },
+  );
 }

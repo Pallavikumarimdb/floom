@@ -12,10 +12,20 @@ const STATUS_API_ORIGIN =
 
 export const metadata: Metadata = {
   title: "Status",
-  description: "Live status of Floom services.",
+  description: "Live system health for floom.dev — database, app runtime, queue, email delivery, and API.",
   alternates: { canonical: `${SITE_URL}/status` },
   // Don't index — the page is purely real-time, no canonical content for crawlers.
   robots: { index: false, follow: true },
+  openGraph: {
+    title: "Status · Floom",
+    description: "Live system health for floom.dev.",
+    url: `${SITE_URL}/status`,
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Status · Floom",
+  },
 };
 
 export const dynamic = "force-dynamic";

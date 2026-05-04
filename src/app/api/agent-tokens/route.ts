@@ -8,6 +8,10 @@ const MAX_AGENT_TOKEN_NAME_LENGTH = 80;
 const DEFAULT_MAX_ACTIVE_AGENT_TOKENS_PER_USER = 10;
 const ALLOWED_SCOPES = ["read", "run", "publish"] as const;
 
+// All responses that expose user-private data carry explicit Cache-Control so
+// shared caches (CDNs, proxies) never store bearer-auth'd content.
+const PRIVATE_CACHE = { "Cache-Control": "private, no-store" } as const;
+
 export async function GET(req: NextRequest) {
   if (!hasAgentTokenConfig()) {
     return NextResponse.json(
@@ -32,7 +36,10 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Failed to list agent tokens" }, { status: 500 });
   }
 
-  return NextResponse.json({ agent_tokens: data ?? [] });
+  return NextResponse.json(
+    { agent_tokens: data ?? [] },
+    { headers: PRIVATE_CACHE },
+  );
 }
 
 export async function POST(req: NextRequest) {
@@ -101,10 +108,10 @@ export async function POST(req: NextRequest) {
 
   const { token, record } = await createAgentToken(admin, caller.userId, name, scopes);
 
-  return NextResponse.json({
-    token,
-    agent_token: record,
-  });
+  return NextResponse.json(
+    { token, agent_token: record },
+    { headers: PRIVATE_CACHE },
+  );
 }
 
 function readPositiveIntegerEnv(name: string, fallback: number) {
