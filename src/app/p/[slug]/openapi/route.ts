@@ -34,36 +34,33 @@ export async function GET(
       return NextResponse.json({ error: "App not found" }, { status: 404 });
     }
   } else {
-    const admin = createAdminClient();
-    const { data: app, error } = await admin
-      .from("apps")
-      .select(
-        "name, description, public, app_versions(input_schema, output_schema)"
-      )
-      .eq("slug", slug)
-      .order("version", { foreignTable: "app_versions", ascending: false })
-      .limit(1, { foreignTable: "app_versions" })
-      .maybeSingle();
+    // Use the existing /api/apps/[slug] route which already handles public/private
+    // access and returns input_schema + output_schema. This avoids duplicating the
+    // Supabase query pattern and reuses the proven access-control logic.
+    const appApiUrl = new URL(`/api/apps/${slug}`, SITE_URL).toString();
+    const appRes = await fetch(appApiUrl, { next: { revalidate: 0 } });
 
-    if (error || !app) {
+    if (!appRes.ok) {
       return NextResponse.json({ error: "App not found" }, { status: 404 });
     }
+
+    const appData = (await appRes.json()) as {
+      name: string;
+      description?: string | null;
+      public: boolean;
+      input_schema?: SchemaMap | null;
+      output_schema?: SchemaMap | null;
+    };
 
     // Only expose spec for public apps via this unauthenticated endpoint.
-    if (!app.public) {
+    if (!appData.public) {
       return NextResponse.json({ error: "App not found" }, { status: 404 });
     }
 
-    appName = (app.name as string) ?? slug;
-    appDescription = (app.description as string) ?? "";
-    const versions = app.app_versions as
-      | Array<{
-          input_schema: SchemaMap | null;
-          output_schema: SchemaMap | null;
-        }>
-      | undefined;
-    inputSchema = versions?.[0]?.input_schema ?? null;
-    outputSchema = versions?.[0]?.output_schema ?? null;
+    appName = appData.name ?? slug;
+    appDescription = appData.description ?? "";
+    inputSchema = appData.input_schema ?? null;
+    outputSchema = appData.output_schema ?? null;
   }
 
   // Build the run endpoint URL.
