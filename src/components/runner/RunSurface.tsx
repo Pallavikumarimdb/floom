@@ -122,12 +122,23 @@ export function RunSurface({ app, initialRun, initialInputs, examplePrefillInput
   // when its JSON Schema declares format: "password". Names match
   // case-insensitively to tolerate both `GEMINI_API_KEY` (manifest convention)
   // and `gemini_api_key` (input_schema convention).
+  //
+  // Pragmatic name heuristic for the common case where the API doesn't
+  // surface manifest.secrets_needed and the schema doesn't set
+  // format:password (e.g. gemini-chat-fede with `api_key`). Without this,
+  // the most common credential field on Floom — an API key — renders in the
+  // clear. The pattern is intentionally narrow to avoid false positives on
+  // benign fields.
+  const SECRET_NAME_PATTERN = /(?:^|_)(?:api[_-]?key|secret|token|password|access[_-]?key|private[_-]?key)(?:$|_)/i;
   const secretNames = useMemo(() => {
     const declared = (app.manifest?.secrets_needed ?? []) as ReadonlyArray<string>;
     return new Set(declared.map((s) => s.toLowerCase()));
   }, [app.manifest?.secrets_needed]);
   const isSecretField = useCallback(
-    (f: RunField) => f.format === 'password' || secretNames.has(f.name.toLowerCase()),
+    (f: RunField) =>
+      f.format === 'password' ||
+      secretNames.has(f.name.toLowerCase()) ||
+      SECRET_NAME_PATTERN.test(f.name),
     [secretNames],
   );
   const [revealedSecrets, setRevealedSecrets] = useState<Record<string, boolean>>({});
