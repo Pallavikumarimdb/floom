@@ -57,7 +57,8 @@ type RunState =
       submittedAt: number;
     }
   | { kind: 'ok'; output: unknown; ms: number }
-  | { kind: 'error'; message: string; phase?: string; detail?: string };
+  | { kind: 'error'; message: string; phase?: string; detail?: string }
+  | { kind: 'missing-composio'; toolkits: string[]; action: 'sign-in' | 'connect'; url: string };
 
 type ApiRunError = {
   phase?: string;
@@ -323,6 +324,19 @@ export function RunSurface({ app, initialRun, initialInputs, examplePrefillInput
         | ExecutionSnapshot
         | null;
       const ms = Math.round(performance.now() - t0);
+      // 412: app requires a Composio connection the runner hasn't set up yet.
+      if (res.status === 412) {
+        const body = data as unknown as { error?: string; toolkits?: string[]; next?: { action: string; url: string } } | null;
+        if (body?.error === 'missing_composio_connection' && Array.isArray(body.toolkits) && body.next) {
+          setState({
+            kind: 'missing-composio',
+            toolkits: body.toolkits,
+            action: body.next.action as 'sign-in' | 'connect',
+            url: body.next.url,
+          });
+          return;
+        }
+      }
       const structuredError =
         data && typeof data.error === 'object' && data.error !== null ? data.error as ApiRunError : null;
       if (!res.ok || !data) {
@@ -801,6 +815,41 @@ export function RunSurface({ app, initialRun, initialInputs, examplePrefillInput
                   ? 'Check your inputs and try again.'
                   : 'Floom is having a moment; try again or DM us in Discord.'}
               </p>
+            </div>
+          )}
+          {state.kind === 'missing-composio' && (
+            <div
+              style={{
+                borderRadius: 8,
+                border: '1px solid #e0dbd0',
+                background: '#fafaf7',
+                padding: 16,
+              }}
+            >
+              <p style={{ fontSize: 13, color: '#2a2520', margin: '0 0 10px', lineHeight: 1.5, fontWeight: 600 }}>
+                This app needs your {state.toolkits.join(', ')} connection.
+              </p>
+              <p style={{ fontSize: 12.5, color: '#6b6660', margin: '0 0 12px', lineHeight: 1.5 }}>
+                {state.action === 'sign-in'
+                  ? 'Sign in to connect your account, then run the app again.'
+                  : `Connect ${state.toolkits.join(', ')} in your settings, then run the app again.`}
+              </p>
+              <a
+                href={state.url}
+                style={{
+                  display: 'inline-block',
+                  padding: '8px 16px',
+                  background: 'var(--accent)',
+                  color: '#fff',
+                  borderRadius: 7,
+                  fontSize: 13,
+                  fontWeight: 600,
+                  textDecoration: 'none',
+                  fontFamily: 'inherit',
+                }}
+              >
+                {state.action === 'sign-in' ? 'Sign in to continue' : `Connect ${state.toolkits.join(', ')}`}
+              </a>
             </div>
           )}
         </div>
