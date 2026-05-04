@@ -196,7 +196,7 @@ export const floomTools: McpToolDefinition[] = [
   },
   {
     name: "find_candidate_apps",
-    description: "Scan a repository file map for directories that already contain floom.yaml and are ready, invalid, or need contract fixes for stock-E2B publish.",
+    description: "Scan repository files for floom.yaml manifests. Returns absolute paths and app slugs of Floom-deployable apps. Use this to find existing apps in a directory; does not do natural-language search.",
     inputSchema: {
       type: "object",
       properties: {
