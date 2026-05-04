@@ -324,13 +324,16 @@ export function RunSurface({ app, initialRun, initialInputs, examplePrefillInput
         | ExecutionSnapshot
         | null;
       const ms = Math.round(performance.now() - t0);
-      // 412: app requires a Composio connection the runner hasn't set up yet.
+      // 412: app requires an integration connection the runner hasn't set up yet.
       if (res.status === 412) {
         const body = data as unknown as { error?: string; toolkits?: string[]; next?: { action: string; url: string } } | null;
-        if (body?.error === 'missing_composio_connection' && Array.isArray(body.toolkits) && body.next) {
+        const isMissingIntegration =
+          body?.error === 'missing_integration' ||
+          body?.error === 'missing_composio_connection'; // legacy alias
+        if (isMissingIntegration && Array.isArray(body?.toolkits) && body?.next) {
           setState({
             kind: 'missing-composio',
-            toolkits: body.toolkits,
+            toolkits: body.toolkits!,
             action: body.next.action as 'sign-in' | 'connect',
             url: body.next.url,
           });

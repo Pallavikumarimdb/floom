@@ -153,7 +153,7 @@ function parseSharedFields(data: Record<string, unknown>) {
     output_schema: parseSchemaField(data.output_schema, "output_schema"),
     dependencies: parseDependencies(data.dependencies),
     secrets: parseSecrets(data.secrets),
-    integrations: parseIntegrations(data.integrations, data.composio),
+    integrations: parseIntegrations(data.integrations, data.composio as unknown),
     bundle_exclude: parseBundleExclude(data.bundle_exclude),
   };
 }
@@ -302,50 +302,84 @@ export function secretNames(secrets: ManifestSecret[] | undefined): string[] {
 const TOOLKIT_SLUG_RE = /^[a-z][a-z0-9-]{0,63}$/;
 
 /**
- * Parse the composio: field from floom.yaml.
+ * Parse a list of integration/toolkit slugs from a YAML field value.
  * Accepts a single string or an array of strings.
  * Each value must match ^[a-z][a-z0-9-]{0,63}$ (Composio provider slug format).
  *
  * Returns an empty array (not undefined) when absent -- matches the DB column default.
- *
- * Examples:
- *   composio: gmail
- *   composio:
- *     - gmail
- *     - slack
  */
-export function parseComposioToolkits(value: unknown): string[] {
+function parseToolkitSlugs(value: unknown, fieldName: string): string[] {
   if (value === undefined || value === null) {
     return [];
   }
 
   const raw: unknown[] = typeof value === "string" ? [value] : Array.isArray(value) ? value : null!;
   if (!Array.isArray(raw)) {
-    throw new Error("composio must be a toolkit slug string or an array of toolkit slug strings");
+    throw new Error(`${fieldName} must be a toolkit slug string or an array of toolkit slug strings`);
   }
 
   if (raw.length > 20) {
-    throw new Error("composio supports at most 20 toolkit entries");
+    throw new Error(`${fieldName} supports at most 20 toolkit entries`);
   }
 
   const slugs = raw.map((item, idx): string => {
     if (typeof item !== "string" || item.trim() === "") {
-      throw new Error(`composio[${idx}] must be a non-empty string`);
+      throw new Error(`${fieldName}[${idx}] must be a non-empty string`);
     }
     const slug = item.trim().toLowerCase();
     if (!TOOLKIT_SLUG_RE.test(slug)) {
       throw new Error(
-        `composio toolkit slug "${slug}" is invalid -- must start with a lowercase letter and contain only lowercase letters, digits, and hyphens`
+        `${fieldName} toolkit slug "${slug}" is invalid -- must start with a lowercase letter and contain only lowercase letters, digits, and hyphens`
       );
     }
     return slug;
   });
 
   if (new Set(slugs).size !== slugs.length) {
-    throw new Error("composio must not contain duplicate toolkit slugs");
+    throw new Error(`${fieldName} must not contain duplicate toolkit slugs`);
   }
 
   return slugs;
+}
+
+/**
+ * Parse the integrations: field (preferred) or the deprecated composio: field.
+ *
+ * If both are present, throws an error asking the author to pick one.
+ * If only composio: is present, returns its value (backwards compat — no error).
+ *
+ * Examples (preferred):
+ *   integrations: gmail
+ *   integrations:
+ *     - gmail
+ *     - slack
+ *
+ * Deprecated (still accepted):
+ *   composio: gmail
+ */
+export function parseIntegrations(integrationsRaw: unknown, composioRaw?: unknown): string[] {
+  const hasIntegrations = integrationsRaw !== undefined && integrationsRaw !== null;
+  const hasComposio = composioRaw !== undefined && composioRaw !== null;
+
+  if (hasIntegrations && hasComposio) {
+    throw new Error(
+      "Both 'integrations:' and 'composio:' are declared in floom.yaml. Remove 'composio:' — it is deprecated in favour of 'integrations:'."
+    );
+  }
+
+  if (hasComposio && !hasIntegrations) {
+    // Silent acceptance: existing apps continue to work unchanged.
+    return parseToolkitSlugs(composioRaw, "composio");
+  }
+
+  return parseToolkitSlugs(integrationsRaw, "integrations");
+}
+
+/**
+ * @deprecated Use parseIntegrations instead.
+ */
+export function parseComposioToolkits(value: unknown): string[] {
+  return parseToolkitSlugs(value, "composio");
 }
 
 function parseBundleExclude(value: unknown): string[] | undefined {

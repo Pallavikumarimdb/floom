@@ -259,7 +259,8 @@ export async function POST(
       if (e instanceof MissingComposioConnectionError) {
         return NextResponse.json(
           {
-            error: "missing_composio_connection",
+            error: "missing_integration",
+            legacy_error: "missing_composio_connection",
             toolkits: e.toolkits,
             next: e.reason === "sign-in"
               ? { action: "sign-in", url: "/login" }

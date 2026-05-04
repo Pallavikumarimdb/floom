@@ -289,6 +289,8 @@ export async function POST(req: NextRequest) {
       output_schema: validated.outputSchema,
       dependencies: storedBundle.dependencies,
       secrets: validated.manifest.secrets ?? [],
+      // Store integrations under the 'composio' DB column (internal name, stable).
+      composio: validated.manifest.integrations ?? [],
     };
 
     const { error: versionError } = await admin.from("app_versions").insert(versionPayload);
