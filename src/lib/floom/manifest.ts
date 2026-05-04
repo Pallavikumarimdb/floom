@@ -1,4 +1,4 @@
-export type SecretScope = "shared" | "per-runner";
+export type SecretScope = "shared" | "per_runner";
 
 export type ManifestSecret = {
   name: string;
@@ -241,11 +241,22 @@ function parseDependencies(value: unknown): ManifestDependencies | undefined {
 }
 
 /**
+ * Normalize scope string to the canonical DB form.
+ * "per-runner" (hyphen) is accepted as a legacy alias for "per_runner" (underscore).
+ * All other values pass through unchanged (validation happens at the call site).
+ */
+function normalizeScope(raw: unknown): SecretScope {
+  if (raw === "per-runner") return "per_runner"; // legacy alias
+  return raw as SecretScope;
+}
+
+/**
  * Parse the secrets field from floom.yaml.
  * Accepts two forms (backwards compat):
  *   - bare string: "OPENAI_API_KEY"  -> { name, scope: "shared" }
- *   - object form: { name: "OPENAI_API_KEY", scope: "per-runner" }
- * Default scope for object form with no explicit scope = "per-runner".
+ *   - object form: { name: "OPENAI_API_KEY", scope: "per_runner" }
+ * Default scope for object form with no explicit scope = "per_runner".
+ * Legacy: scope: "per-runner" (hyphen) is accepted as alias for "per_runner".
  */
 export function parseSecrets(value: unknown): ManifestSecret[] | undefined {
   if (value === undefined) {
@@ -274,10 +285,10 @@ export function parseSecrets(value: unknown): ManifestSecret[] | undefined {
         throw new Error("secrets object must have a valid uppercase name");
       }
       const scopeRaw = obj.scope;
-      if (scopeRaw !== undefined && scopeRaw !== "shared" && scopeRaw !== "per-runner") {
-        throw new Error(`secrets scope must be "shared" or "per-runner"`);
+      if (scopeRaw !== undefined && scopeRaw !== "shared" && scopeRaw !== "per_runner" && scopeRaw !== "per-runner") {
+        throw new Error(`secrets scope must be "shared" or "per_runner"`);
       }
-      const scope: SecretScope = (scopeRaw as SecretScope) ?? "per-runner";
+      const scope: SecretScope = normalizeScope(scopeRaw ?? "per_runner");
       return { name, scope };
     }
     throw new Error("secrets must contain only uppercase environment variable names or {name, scope} objects");

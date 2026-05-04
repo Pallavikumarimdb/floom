@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Sync the floomit skill to all consumer locations on Federico's Mac.
-# Run from the floom-minimal repo root after updating skills/floomit/SKILL.md.
+# Run from the floom repo root after updating skills/floomit/SKILL.md.
 set -e
 
 SOURCE="$(cd "$(dirname "$0")/.." && pwd)/skills/floomit/SKILL.md"

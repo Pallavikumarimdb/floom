@@ -62,7 +62,7 @@ Steps 8 (authed me/runs) requires an agent token for a dedicated test workspace.
 ### Add it to GitHub
 
 ```bash
-gh secret set FLOOM_TEST_TOKEN --repo floomhq/floom-minimal
+gh secret set FLOOM_TEST_TOKEN --repo floomhq/floom
 # Paste the token value when prompted
 ```
 
@@ -78,7 +78,7 @@ anonymous checks (steps 1-7, 9-13) still run.
 bash scripts/virgin-agent-journey.sh https://floom.dev
 
 # Against a Vercel preview
-bash scripts/virgin-agent-journey.sh https://floom-minimal-git-my-branch-floomhq.vercel.app
+bash scripts/virgin-agent-journey.sh https://floom-git-my-branch-floomhq.vercel.app
 
 # Against localhost
 FLOOM_TEST_TOKEN=your-local-token \

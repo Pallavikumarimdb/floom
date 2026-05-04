@@ -37,7 +37,7 @@ Full Kimi output saved to `/tmp/virgin-kimi-<timestamp>.txt` for triage.
 bash scripts/virgin-kimi-walk.sh https://floom.dev
 
 # Against a preview deploy
-bash scripts/virgin-kimi-walk.sh https://floom-minimal-git-my-branch-floomhq.vercel.app
+bash scripts/virgin-kimi-walk.sh https://floom-git-my-branch-floomhq.vercel.app
 
 # Against localhost
 bash scripts/virgin-kimi-walk.sh http://localhost:3000
@@ -65,8 +65,8 @@ need to be installed on the CI runner.
 
 Add secrets:
 ```bash
-gh secret set AX41_SSH_KEY --repo floomhq/floom-minimal
-gh secret set AX41_HOST --repo floomhq/floom-minimal
+gh secret set AX41_SSH_KEY --repo floomhq/floom
+gh secret set AX41_HOST --repo floomhq/floom
 ```
 
 ## Interpreting results

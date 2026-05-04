@@ -121,7 +121,7 @@ export async function resolveRuntimeSecrets(
   }
 
   const sharedSecrets = secrets.filter((s) => s.scope === "shared");
-  const perRunnerSecrets = secrets.filter((s) => s.scope === "per-runner");
+  const perRunnerSecrets = secrets.filter((s) => s.scope === "per_runner");
 
   // Gate: anon callers cannot use per-runner-secret apps.
   if (perRunnerSecrets.length > 0 && !callerId) {
@@ -217,13 +217,18 @@ export function parseManifestSecrets(raw: unknown): ManifestSecret[] {
       const obj = item as Record<string, unknown>;
       const name = typeof obj.name === "string" ? obj.name : "";
       const scopeRaw = obj.scope as string | undefined;
+      // Accept "per-runner" (hyphen) as legacy alias — normalize to "per_runner".
       const scope: SecretScope =
-        scopeRaw === "shared" || scopeRaw === "per-runner" ? scopeRaw : "per-runner";
+        scopeRaw === "shared"
+          ? "shared"
+          : scopeRaw === "per_runner" || scopeRaw === "per-runner"
+          ? "per_runner"
+          : "per_runner";
       return { name, scope };
     }
     // Malformed entry (number, null, etc): coerce to a per-runner secret. The
     // safer default — never silently grant a malformed entry shared scope.
-    return { name: String(item), scope: "per-runner" };
+    return { name: String(item), scope: "per_runner" };
   });
 }
 

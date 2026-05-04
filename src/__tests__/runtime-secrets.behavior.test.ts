@@ -66,39 +66,39 @@ describe("parseManifestSecrets", () => {
     expect(result).toEqual([{ name: "GMAIL_USER", scope: "shared" }]);
   });
 
-  it("object form with scope: per-runner → scope=per-runner", () => {
+  it("object form with scope: per-runner (legacy hyphen) → normalized to per_runner", () => {
     const result = parseManifestSecrets([{ name: "MY_TOKEN", scope: "per-runner" }]);
-    expect(result).toEqual([{ name: "MY_TOKEN", scope: "per-runner" }]);
+    expect(result).toEqual([{ name: "MY_TOKEN", scope: "per_runner" }]);
   });
 
-  it("object form without scope → defaults to per-runner (not shared)", () => {
+  it("object form without scope → defaults to per_runner (not shared)", () => {
     const result = parseManifestSecrets([{ name: "MY_TOKEN" }]);
-    expect(result[0]?.scope).toBe("per-runner");
+    expect(result[0]?.scope).toBe("per_runner");
   });
 
-  it("object form with invalid scope → defaults to per-runner", () => {
+  it("object form with invalid scope → defaults to per_runner", () => {
     const result = parseManifestSecrets([{ name: "MY_TOKEN", scope: "global" }]);
-    expect(result[0]?.scope).toBe("per-runner");
+    expect(result[0]?.scope).toBe("per_runner");
   });
 
-  it("malformed entry (number) → coerced to per-runner, NOT shared", () => {
+  it("malformed entry (number) → coerced to per_runner, NOT shared", () => {
     const result = parseManifestSecrets([42 as unknown]);
-    expect(result[0]?.scope).toBe("per-runner");
+    expect(result[0]?.scope).toBe("per_runner");
   });
 
-  it("malformed entry (null) → coerced to per-runner, NOT shared", () => {
+  it("malformed entry (null) → coerced to per_runner, NOT shared", () => {
     const result = parseManifestSecrets([null]);
-    expect(result[0]?.scope).toBe("per-runner");
+    expect(result[0]?.scope).toBe("per_runner");
   });
 
   it("mixed array (string + object) is handled element by element", () => {
     const result = parseManifestSecrets([
       "SHARED_KEY",
-      { name: "RUNNER_KEY", scope: "per-runner" },
+      { name: "RUNNER_KEY", scope: "per_runner" },
     ]);
     expect(result).toEqual([
       { name: "SHARED_KEY", scope: "shared" },
-      { name: "RUNNER_KEY", scope: "per-runner" },
+      { name: "RUNNER_KEY", scope: "per_runner" },
     ]);
   });
 });
@@ -317,9 +317,9 @@ describe("resolveRuntimeSecrets", () => {
     expect(result).toEqual({ ok: true, envs: {}, missing: [] });
   });
 
-  it("returns AnonPerRunnerSecretError when anon caller requests per-runner secrets", async () => {
+  it("returns AnonPerRunnerSecretError when anon caller requests per_runner secrets", async () => {
     const admin = buildAdmin({});
-    const secrets = [{ name: "MY_TOKEN", scope: "per-runner" }];
+    const secrets = [{ name: "MY_TOKEN", scope: "per_runner" }];
     const result = await resolveRuntimeSecrets(admin, secrets, "app-1", "owner-1", null);
     expect(isAnonPerRunnerError(result)).toBe(true);
     if (isAnonPerRunnerError(result)) {

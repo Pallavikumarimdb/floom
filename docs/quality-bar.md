@@ -209,7 +209,7 @@ Do not call this 100/100 until all are verified:
 - browser screenshots for local and live
 - live Vercel deploy serves current commit
 - at least two independent agents run the token-to-publish flow
-- comparison against archived `floom-minimal-archive`
+- comparison against archived `floom-legacy` (was: `floom-minimal-archive`)
 
 ## Claim Measurement Bar
 
