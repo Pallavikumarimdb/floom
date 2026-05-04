@@ -9,11 +9,11 @@ const securityHeaders = [
       "base-uri 'self'",
       "object-src 'none'",
       "frame-ancestors 'none'",
-      "img-src 'self' data: blob: https://*.googleusercontent.com https://logos.composio.dev",
+      "img-src 'self' data: blob: https://*.googleusercontent.com https://*.composio.dev",
       "font-src 'self' data:",
       "style-src 'self' 'unsafe-inline'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
-      "connect-src 'self' https://*.supabase.co https://*.vercel.app https://*.sentry.io https://*.ingest.sentry.io",
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://va.vercel-scripts.com",
+      "connect-src 'self' https://*.supabase.co https://*.vercel.app https://*.sentry.io https://*.ingest.sentry.io https://va.vercel-scripts.com",
       "form-action 'self'",
     ].join("; "),
   },
@@ -21,7 +21,7 @@ const securityHeaders = [
   { key: "X-Frame-Options", value: "DENY" },
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-  { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+  { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), payment=(), usb=()" },
 ];
 
 const tracedServerExternalPackages = [
