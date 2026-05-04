@@ -443,7 +443,7 @@ Discovery:
 - get_app_contract — Self-contained walkthrough for AI agents new to Floom.
 - list_app_templates — Browse scaffolding templates (e.g. multi_file_python, csv_stats).
 - get_app_template — Fetch a template by key and return its file map.
-- find_candidate_apps — Search for apps that match a natural-language task description.
+- find_candidate_apps — Scan repository files for floom.yaml manifests. Returns absolute paths and slugs (file scan, not natural-language search).
 
 Apps:
 - list_apps — List all apps owned by the authenticated user.

@@ -41,7 +41,7 @@ Add Floom to your MCP client config, then call tools directly.
 
 Key MCP tools:
 - \`get_app_contract\` — self-contained walkthrough; call this first if you are new to Floom
-- \`find_candidate_apps\` — search for apps that match a natural-language task
+- \`find_candidate_apps\` — scan a directory for floom.yaml files; returns paths and slugs (file scan, not natural-language search)
 - \`run_app\` — run any public or owned app by slug; returns output synchronously
 - \`publish_app\` — deploy an app from a file map (no local filesystem required)
 - \`list_app_templates\` — browse scaffolding templates

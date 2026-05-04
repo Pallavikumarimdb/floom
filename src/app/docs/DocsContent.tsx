@@ -210,7 +210,7 @@ const mcpToolsExample = `# Auth
 # get_app_contract     — self-contained walkthrough for AI agents new to Floom
 # list_app_templates   — browse scaffolding templates (e.g. multi_file_python, csv_stats)
 # get_app_template     — fetch a template by key and return its file map
-# find_candidate_apps  — search for apps that match a natural-language task description
+# find_candidate_apps  — scan a directory for floom.yaml files (file scan, not natural-language search)
 
 # Apps
 # list_apps            — list all apps owned by the authenticated user
