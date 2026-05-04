@@ -154,11 +154,18 @@ export async function sweepExecutions(admin: SupabaseClient, baseUrl?: string) {
     .limit(50)
     .returns<ExecutionRow[]>();
 
-  for (const execution of staleQueued ?? []) {
-    await forceFinalizeExecution(admin, execution, "timed_out", "Execution exceeded SANDBOX_TIMEOUT_MS", null, {
-      timed_out_at: new Date().toISOString(),
-    });
-  }
+  // Parallelize all per-execution operations with Promise.allSettled.
+  // Each execution is independent: there are no ordering constraints between
+  // rows and no shared mutable state. Promise.allSettled ensures one failure
+  // doesn't abort the rest of the sweep.
+
+  await Promise.allSettled(
+    (staleQueued ?? []).map((execution) =>
+      forceFinalizeExecution(admin, execution, "timed_out", "Execution exceeded SANDBOX_TIMEOUT_MS", null, {
+        timed_out_at: new Date().toISOString(),
+      })
+    )
+  );
 
   // Rows with a stale last_heartbeat_at (heartbeat was set but stopped updating).
   // The `.or` guard excludes rows already covered by the TTL sweep below so we
@@ -173,9 +180,11 @@ export async function sweepExecutions(admin: SupabaseClient, baseUrl?: string) {
     .limit(50)
     .returns<ExecutionRow[]>();
 
-  for (const execution of heartbeatStaleRunning ?? []) {
-    await recoverOrTerminateStaleRunning(admin, execution, "stale_heartbeat");
-  }
+  await Promise.allSettled(
+    (heartbeatStaleRunning ?? []).map((execution) =>
+      recoverOrTerminateStaleRunning(admin, execution, "stale_heartbeat")
+    )
+  );
 
   const { data: ttlRunning } = await admin
     .from("executions")
@@ -185,9 +194,11 @@ export async function sweepExecutions(admin: SupabaseClient, baseUrl?: string) {
     .limit(50)
     .returns<ExecutionRow[]>();
 
-  for (const execution of ttlRunning ?? []) {
-    await recoverOrTerminateStaleRunning(admin, execution, "ttl");
-  }
+  await Promise.allSettled(
+    (ttlRunning ?? []).map((execution) =>
+      recoverOrTerminateStaleRunning(admin, execution, "ttl")
+    )
+  );
 
   // Workers that died before ever setting last_heartbeat_at.
   // These fall through both heartbeatStaleRunning and ttlRunning because NULL
@@ -202,9 +213,11 @@ export async function sweepExecutions(admin: SupabaseClient, baseUrl?: string) {
     .limit(50)
     .returns<ExecutionRow[]>();
 
-  for (const execution of noHeartbeatRunning ?? []) {
-    await recoverOrTerminateStaleRunning(admin, execution, "stale_heartbeat");
-  }
+  await Promise.allSettled(
+    (noHeartbeatRunning ?? []).map((execution) =>
+      recoverOrTerminateStaleRunning(admin, execution, "stale_heartbeat")
+    )
+  );
 
   // Hard catch-all: any running row whose effective age exceeds 1.5x
   // executionTtlMs * 1.5 is force-transitioned to timed_out regardless of heartbeat
@@ -219,19 +232,21 @@ export async function sweepExecutions(admin: SupabaseClient, baseUrl?: string) {
     .limit(50)
     .returns<ExecutionRow[]>();
 
-  for (const execution of hardDeadlineRunning ?? []) {
-    await forceFinalizeExecution(
-      admin,
-      execution,
-      "timed_out",
-      "execution stuck — sandbox unresponsive",
-      null,
-      { timed_out_at: new Date().toISOString(), error_phase: "sweep" }
-    );
-    if (execution.sandbox_id) {
-      await killSandboxExecution(execution.sandbox_id, execution.sandbox_pid).catch(() => undefined);
-    }
-  }
+  await Promise.allSettled(
+    (hardDeadlineRunning ?? []).map(async (execution) => {
+      await forceFinalizeExecution(
+        admin,
+        execution,
+        "timed_out",
+        "execution stuck — sandbox unresponsive",
+        null,
+        { timed_out_at: new Date().toISOString(), error_phase: "sweep" }
+      );
+      if (execution.sandbox_id) {
+        await killSandboxExecution(execution.sandbox_id, execution.sandbox_pid).catch(() => undefined);
+      }
+    })
+  );
 
   const { data: staleLeases } = await admin
     .from("executions")
@@ -241,21 +256,22 @@ export async function sweepExecutions(admin: SupabaseClient, baseUrl?: string) {
     .limit(50)
     .returns<ExecutionRow[]>();
 
-  for (const execution of staleLeases ?? []) {
-    if (isTerminalExecutionStatus(execution.status)) {
-      continue;
-    }
-    const { error: clearError } = await admin.rpc("clear_execution_lease", { p_execution_id: execution.id });
-    if (clearError) {
-      continue;
-    }
-    await publishExecutionProcessMessage({
-      executionId: execution.id,
-      pollCount: execution.poll_count + 1,
-      delaySeconds: 0,
-      baseUrl,
-    }).catch(() => undefined);
-  }
+  await Promise.allSettled(
+    (staleLeases ?? [])
+      .filter((execution) => !isTerminalExecutionStatus(execution.status))
+      .map(async (execution) => {
+        const { error: clearError } = await admin.rpc("clear_execution_lease", { p_execution_id: execution.id });
+        if (clearError) {
+          return;
+        }
+        await publishExecutionProcessMessage({
+          executionId: execution.id,
+          pollCount: execution.poll_count + 1,
+          delaySeconds: 0,
+          baseUrl,
+        }).catch(() => undefined);
+      })
+  );
 
   return {
     stale_queued: staleQueued?.length ?? 0,
