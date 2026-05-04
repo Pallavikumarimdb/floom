@@ -562,7 +562,13 @@ function MobileStackedDemo() {
         <div style={MOBILE_RUN_BODY}>
           <div style={MOBILE_RUN_INPUT_ROW}>
             <span style={MOBILE_RUN_INPUT_LABEL}>Meeting notes</span>
-            <div style={MOBILE_RUN_INPUT_BOX}>Action: Sarah sends launch notes by Friday</div>
+            <div style={MOBILE_RUN_INPUT_BOX}>
+              Alice: Let&rsquo;s go through the launch checklist.<br />
+              Bob: Deploy script ready but staging keeps failing.<br />
+              Sarah: I&rsquo;ll check Friday morning, send me the logs.<br />
+              Marie: I&rsquo;ll have marketing copy draft by Wednesday.<br />
+              Bob: I&rsquo;ll draft 3 launch tweet options by Thursday.
+            </div>
           </div>
           <div style={MOBILE_SCORE_ROW}>
             <span style={MOBILE_SCORE_BIG}>3</span>
@@ -572,15 +578,15 @@ function MobileStackedDemo() {
           <ul style={MOBILE_REASONS_LIST}>
             <li style={MOBILE_REASON_ITEM}>
               <span style={MOBILE_REASON_BULLET} aria-hidden="true" />
-              Sarah owns launch notes by Friday.
+              Sarah: investigate staging env failure (Friday)
             </li>
             <li style={MOBILE_REASON_ITEM}>
               <span style={MOBILE_REASON_BULLET} aria-hidden="true" />
-              Mike owns beta checklist tomorrow.
+              Bob: send Sarah error logs (today), draft 3 tweet options (Thursday)
             </li>
             <li style={MOBILE_REASON_ITEM}>
               <span style={MOBILE_REASON_BULLET} aria-hidden="true" />
-              Priya owns demo QA before launch.
+              Marie: draft marketing copy (Wednesday)
             </li>
           </ul>
           <div style={MOBILE_RUN_SECONDARY}>
@@ -966,7 +972,7 @@ function DeploySurface({
                 <span key={i}>{i + 1}</span>
               ))}
             </div>
-            <pre style={{ ...CODE_PRE, opacity: 0.85 }}>
+            <pre style={{ ...CODE_PRE, opacity: 0.38 }}>
               {renderTokens(tokens, HANDLER_CODE.length)}
             </pre>
           </div>
@@ -1099,7 +1105,18 @@ function RunSurfaceDemo({
               <label style={RUN_FIELD}>
                 <span style={RUN_FIELD_LABEL}>Meeting notes</span>
                 <div style={RUN_FIELD_INPUT}>
-                  <span style={RUN_FIELD_INPUT_TEXT}>Action: Sarah sends launch notes by Friday</span>
+                  <span style={RUN_FIELD_INPUT_TEXT}>
+                    Alice: Let&rsquo;s go through the launch checklist.<br />
+                    Bob: Deploy script is ready but staging keeps failing.<br />
+                    Alice: Sarah, can you look at it Friday? You know that infra.<br />
+                    Sarah: Yes, I&rsquo;ll check Friday morning. Send me the logs.<br />
+                    Bob: I&rsquo;ll send them today. Also need final marketing copy.<br />
+                    Marie: I&rsquo;ll have a draft by Wednesday.<br />
+                    Alice: Bob, can you draft 3 launch tweet options by Thursday?<br />
+                    Bob: Sure, I&rsquo;ll put them in the doc.<br />
+                    Alice: Any other blockers?<br />
+                    Sarah: Just staging. After Friday we should be clear.
+                  </span>
                 </div>
               </label>
             </div>
@@ -1195,15 +1212,15 @@ function RunSurfaceDemo({
                     <ul style={RUN_REASONS_LIST}>
                       <li style={RUN_REASON_ITEM}>
                         <span style={RUN_REASON_BULLET} aria-hidden="true" />
-                        Sarah owns launch notes by Friday.
+                        Sarah: investigate staging env failure (Friday)
                       </li>
                       <li style={RUN_REASON_ITEM}>
                         <span style={RUN_REASON_BULLET} aria-hidden="true" />
-                        Mike owns beta checklist tomorrow.
+                        Bob: send Sarah error logs (today), draft 3 launch tweet options (Thursday)
                       </li>
                       <li style={RUN_REASON_ITEM}>
                         <span style={RUN_REASON_BULLET} aria-hidden="true" />
-                        Priya owns demo QA before launch.
+                        Marie: draft marketing copy (Wednesday)
                       </li>
                     </ul>
                   </div>
@@ -1656,7 +1673,8 @@ const DEPLOY_RIGHT: CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
   minHeight: 0,
-  background: '#faf8f3',
+  background: '#f0ede5',
+  opacity: 0.7,
 };
 
 // Pre-deploy wrapper — command + progress bar, fades out once done
@@ -1957,15 +1975,17 @@ const RUN_FIELD_INPUT: CSSProperties = {
   borderRadius: 8,
   padding: '9px 12px',
   display: 'flex',
-  alignItems: 'center',
+  alignItems: 'flex-start',
   minHeight: 36,
+  maxHeight: 140,
+  overflowY: 'hidden',
 };
 
 const RUN_FIELD_INPUT_TEXT: CSSProperties = {
   fontFamily: "'Inter', system-ui, sans-serif",
-  fontSize: 13,
+  fontSize: 11.5,
   color: '#2a2825',
-  lineHeight: 1.45,
+  lineHeight: 1.55,
 };
 
 const RUN_BUTTON: CSSProperties = {
