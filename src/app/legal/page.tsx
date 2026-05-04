@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { SiteHeader } from "@/components/SiteHeader";
 import { FloomFooter } from "@/components/FloomFooter";
+import { PageToC } from "@/components/PageToC";
 
 const SITE_URL = "https://floom.dev";
 
@@ -26,138 +27,158 @@ export const metadata: Metadata = {
 };
 
 function Section({
+  id,
   title,
   children,
 }: {
+  id: string;
   title: string;
   children: ReactNode;
 }) {
   return (
-    <section className="border-t border-[var(--line)] py-8">
+    <section id={id} className="border-t border-[var(--line)] py-8">
       <h2 className="text-2xl font-black tracking-tight text-[var(--ink)]">{title}</h2>
       <div className="mt-4 space-y-4 text-[var(--muted)]">{children}</div>
     </section>
   );
 }
 
+const TOC_ITEMS = [
+  { id: "service-status", label: "Service status" },
+  { id: "user-code", label: "User code" },
+  { id: "data-handled", label: "Data handled by Floom" },
+  { id: "private-public-apps", label: "Private and public apps" },
+  { id: "abuse", label: "Abuse and removal" },
+  { id: "cookies", label: "Cookies and tracking" },
+  { id: "pricing", label: "Pricing" },
+  { id: "outages", label: "Status and outages" },
+  { id: "security", label: "Security" },
+  { id: "contact", label: "Contact" },
+];
+
 export default function LegalPage() {
   return (
     <main id="main" className="min-h-screen overflow-x-hidden bg-[var(--bg)] text-[var(--ink)]">
       <SiteHeader />
 
-      <article className="mx-auto max-w-3xl px-5 py-14">
-        <p className="mb-3 text-sm font-semibold text-[var(--accent)]">
-          Floom alpha notice
-        </p>
-        <h1 className="text-4xl font-black tracking-tight text-[var(--ink)] sm:text-5xl">
-          Legal, privacy, and contact.
-        </h1>
-        <p className="mt-4 text-lg text-[var(--muted)]">
-          This page is a minimal alpha notice for testers using Floom.
-        </p>
+      <div className="mx-auto max-w-6xl px-5 py-14">
+        <div className="flex gap-14">
+          <PageToC items={TOC_ITEMS} />
+          <article className="min-w-0 flex-1 max-w-3xl pb-20">
+            <p className="mb-3 text-sm font-semibold text-[var(--accent)]">
+              Floom alpha notice
+            </p>
+            <h1 className="text-4xl font-black tracking-tight text-[var(--ink)] sm:text-5xl">
+              Legal, privacy, and contact.
+            </h1>
+            <p className="mt-4 text-lg text-[var(--muted)]">
+              This page is a minimal alpha notice for testers using Floom.
+            </p>
 
-        <Section title="Service status">
-          <p>
-            Floom is an alpha service for publishing small function-style apps.
-            Availability, limits, and supported runtimes may change during alpha.
-          </p>
-        </Section>
+            <Section id="service-status" title="Service status">
+              <p>
+                Floom is an alpha service for publishing small function-style apps.
+                Availability, limits, and supported runtimes may change during alpha.
+              </p>
+            </Section>
 
-        <Section title="User code">
-          <p>
-            Users are responsible for the code, inputs, outputs, and apps they
-            publish. Do not publish apps that process sensitive data unless the
-            data handling has been reviewed for that use case.
-          </p>
-        </Section>
+            <Section id="user-code" title="User code">
+              <p>
+                Users are responsible for the code, inputs, outputs, and apps they
+                publish. Do not publish apps that process sensitive data unless the
+                data handling has been reviewed for that use case.
+              </p>
+            </Section>
 
-        <Section title="Data handled by Floom">
-          <p>
-            Floom stores account records, app metadata, app bundles, app versions,
-            run records, and token metadata. Agent tokens are stored as hashes;
-            raw tokens are shown once at creation.
-          </p>
-          <p>
-            App inputs and outputs can be stored with execution records for run
-            history and debugging.
-          </p>
-        </Section>
+            <Section id="data-handled" title="Data handled by Floom">
+              <p>
+                Floom stores account records, app metadata, app bundles, app versions,
+                run records, and token metadata. Agent tokens are stored as hashes;
+                raw tokens are shown once at creation.
+              </p>
+              <p>
+                App inputs and outputs can be stored with execution records for run
+                history and debugging.
+              </p>
+            </Section>
 
-        <Section title="Private and public apps">
-          <p>
-            Apps are private by default. Apps with <code>public: true</code> in
-            the manifest can be viewed and run by anyone with the app URL.
-          </p>
-        </Section>
+            <Section id="private-public-apps" title="Private and public apps">
+              <p>
+                Apps are private by default. Apps with <code>public: true</code> in
+                the manifest can be viewed and run by anyone with the app URL.
+              </p>
+            </Section>
 
-        <Section title="Abuse and removal">
-          <p>
-            Apps that create abuse, privacy risk, security risk, or operational
-            risk may be disabled or removed during alpha.
-          </p>
-        </Section>
+            <Section id="abuse" title="Abuse and removal">
+              <p>
+                Apps that create abuse, privacy risk, security risk, or operational
+                risk may be disabled or removed during alpha.
+              </p>
+            </Section>
 
-        <Section title="Cookies and tracking">
-          <p>
-            Floom uses strictly necessary Supabase Auth session cookies after
-            sign-in and lightweight Vercel Analytics for aggregate product
-            metrics. We do not use advertising cookies or sell personal data.
-          </p>
-        </Section>
+            <Section id="cookies" title="Cookies and tracking">
+              <p>
+                Floom uses strictly necessary Supabase Auth session cookies after
+                sign-in and lightweight Vercel Analytics for aggregate product
+                metrics. We do not use advertising cookies or sell personal data.
+              </p>
+            </Section>
 
-        <Section title="Pricing">
-          <p>
-            Public apps and public runs are free during alpha. There is no
-            payment, no card on file, and no automatic charge.
-          </p>
-          <p className="text-sm text-[var(--muted)] opacity-80">
-            Pricing for private apps, dependencies, and higher run limits will
-            be announced before billing starts. Anyone using Floom today owes
-            nothing.
-          </p>
-        </Section>
+            <Section id="pricing" title="Pricing">
+              <p>
+                Public apps and public runs are free during alpha. There is no
+                payment, no card on file, and no automatic charge.
+              </p>
+              <p className="text-sm text-[var(--muted)] opacity-80">
+                Pricing for private apps, dependencies, and higher run limits will
+                be announced before billing starts. Anyone using Floom today owes
+                nothing.
+              </p>
+            </Section>
 
-        <Section title="Status and outages">
-          <p>
-            For live service health, visit{" "}
-            <a
-              href="/status"
-              className="font-semibold text-[var(--accent)] underline underline-offset-2"
-            >
-              /status
-            </a>
-            . For release notes and outage context, follow{" "}
-            <a
-              href="https://github.com/floomhq/floom"
-              className="font-semibold text-[var(--accent)] underline underline-offset-2"
-            >
-              floomhq/floom
-            </a>{" "}
-            on GitHub.
-          </p>
-        </Section>
+            <Section id="outages" title="Status and outages">
+              <p>
+                For live service health, visit{" "}
+                <a
+                  href="/status"
+                  className="font-semibold text-[var(--accent)] underline underline-offset-2"
+                >
+                  /status
+                </a>
+                . For release notes and outage context, follow{" "}
+                <a
+                  href="https://github.com/floomhq/floom"
+                  className="font-semibold text-[var(--accent)] underline underline-offset-2"
+                >
+                  floomhq/floom
+                </a>{" "}
+                on GitHub.
+              </p>
+            </Section>
 
-        <Section title="Security">
-          <p>
-            For security reports, email{" "}
-            <code>security@floom.dev</code>. See{" "}
-            <a
-              href="https://github.com/floomhq/floom/blob/main/SECURITY.md"
-              className="font-semibold text-[var(--accent)] underline underline-offset-2"
-            >
-              SECURITY.md
-            </a>{" "}
-            for scope and disclosure policy.
-          </p>
-        </Section>
+            <Section id="security" title="Security">
+              <p>
+                For security reports, email{" "}
+                <code>security@floom.dev</code>. See{" "}
+                <a
+                  href="https://github.com/floomhq/floom/blob/main/SECURITY.md"
+                  className="font-semibold text-[var(--accent)] underline underline-offset-2"
+                >
+                  SECURITY.md
+                </a>{" "}
+                for scope and disclosure policy.
+              </p>
+            </Section>
 
-        <Section title="Contact">
-          <p>
-            For access, deletion, or abuse reports, contact{" "}
-            <code>team@floom.dev</code>.
-          </p>
-        </Section>
-      </article>
+            <Section id="contact" title="Contact">
+              <p>
+                For access, deletion, or abuse reports, contact{" "}
+                <code>team@floom.dev</code>.
+              </p>
+            </Section>
+          </article>
+        </div>
+      </div>
       <FloomFooter />
     </main>
   );
