@@ -1,7 +1,6 @@
 # Contributing
 
-Floom is in alpha. We welcome bug reports and focused fixes that improve the
-verified v0.1 launch path:
+Floom is in active development. We welcome bug reports and focused fixes across:
 
 - browser-authorized CLI setup
 - single-file Python app publishing

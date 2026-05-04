@@ -33,7 +33,7 @@ Please include:
 Do not include raw secrets in GitHub issues, pull requests, screenshots, or
 public logs.
 
-## Floom v0.1 security primitives
+## Security primitives
 
 - app runs execute in isolated E2B sandboxes
 - HTTPS, CSP, HSTS, X-Frame-Options, and Permissions-Policy headers are active
