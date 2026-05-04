@@ -150,7 +150,7 @@ export default async function ApiPage({ params }: Props) {
 
   const runEndpoint = `${SITE_URL}/api/apps/${slug}/run`;
   const pollEndpoint = `${SITE_URL}/api/runs/{execution_id}`;
-  const openApiUrl = `${SITE_URL}/p/${slug}/api/openapi.json`;
+  const openApiUrl = `${SITE_URL}/p/${slug}/openapi`;
 
   // Build example input object from schema fields.
   const exampleInputs: Record<string, unknown> =

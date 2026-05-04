@@ -4,7 +4,7 @@ import { hasSupabaseConfig, demoApp } from "@/lib/demo-app";
 import { SITE_URL } from "@/lib/config/origin";
 
 /**
- * GET /p/[slug]/api/openapi.json
+ * GET /p/[slug]/openapi
  *
  * Returns an OpenAPI 3.1 spec for a public app, generated from its input_schema
  * and output_schema (or sensible defaults when schemas are not stored).
@@ -41,12 +41,16 @@ export async function GET(
         "name, description, public, app_versions(input_schema, output_schema)"
       )
       .eq("slug", slug)
-      .eq("public", true)
       .order("version", { foreignTable: "app_versions", ascending: false })
       .limit(1, { foreignTable: "app_versions" })
       .maybeSingle();
 
     if (error || !app) {
+      return NextResponse.json({ error: "App not found" }, { status: 404 });
+    }
+
+    // Only expose spec for public apps via this unauthenticated endpoint.
+    if (!app.public) {
       return NextResponse.json({ error: "App not found" }, { status: 404 });
     }
 
