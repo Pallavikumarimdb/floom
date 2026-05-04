@@ -37,7 +37,7 @@ export async function GET(req: NextRequest) {
   }
 
   if (!callerHasScope(caller, "read")) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: "Read scope required" }, { status: 403 });
   }
 
   const url = new URL(req.url);
@@ -56,19 +56,22 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Failed to load runs" }, { status: 500 });
   }
 
-  return NextResponse.json({
-    runs: (data ?? []).map((run) => ({
-      id: run.id,
-      app_slug: run.apps?.slug ?? run.app_id,
-      status: normalizeExecutionStatus(run.status),
-      inputs: run.input,
-      output: run.output,
-      error: run.error,
-      error_detail: run.error_detail,
-      created_at: run.created_at,
-      started_at: run.started_at,
-      completed_at: run.completed_at,
-      progress: run.progress,
-    })),
-  });
+  return NextResponse.json(
+    {
+      runs: (data ?? []).map((run) => ({
+        id: run.id,
+        app_slug: run.apps?.slug ?? run.app_id,
+        status: normalizeExecutionStatus(run.status),
+        inputs: run.input,
+        output: run.output,
+        error: run.error,
+        error_detail: run.error_detail,
+        created_at: run.created_at,
+        started_at: run.started_at,
+        completed_at: run.completed_at,
+        progress: run.progress,
+      })),
+    },
+    { headers: { "Cache-Control": "private, no-store" } },
+  );
 }
