@@ -70,6 +70,13 @@ export interface PermalinkInitialApp {
   public?: boolean;
 }
 
+/** Shape returned by /api/apps/[slug]/source */
+type AppSourceData =
+  | { kind: 'single_file'; filename: string; content: string }
+  | { kind: 'tarball'; message: string }
+  | { kind: 'single_file_too_large'; message: string }
+  | { kind: 'error'; message: string };
+
 export default function AppPermalinkPage({ initialApp }: { initialApp?: PermalinkInitialApp }) { // exported as default so the server page can dynamic-import without renaming
   const params = useParams();
   const slug = params?.slug as string | undefined;
@@ -142,6 +149,11 @@ export default function AppPermalinkPage({ initialApp }: { initialApp?: Permalin
   const [confettiFire, setConfettiFire] = useState(false);
   const [celebrate, setCelebrate] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
+
+  // Source tab: lazy-fetch real source code on first activation.
+  const [sourceData, setSourceData] = useState<AppSourceData | null>(null);
+  const [sourceFetching, setSourceFetching] = useState(false);
+  const sourceFetchedRef = useRef(false);
 
   // Helper to update URL search params without full navigation.
   const updateSearchParams = useCallback(
@@ -436,6 +448,26 @@ export default function AppPermalinkPage({ initialApp }: { initialApp?: Permalin
     });
     return () => cancelAnimationFrame(raf);
   }, [app, activeTab, runIdFromUrl, initialRun, initialRunLoading, rerunLoading]);
+
+  // Fetch real source code when the Source tab is first opened.
+  useEffect(() => {
+    if (activeTab !== 'source') return;
+    if (sourceFetchedRef.current) return;
+    if (!app?.slug) return;
+    sourceFetchedRef.current = true;
+    setSourceFetching(true);
+    fetch(`/api/apps/${app.slug}/source`)
+      .then(async (res) => {
+        const json = await res.json() as AppSourceData | { error: string };
+        if ('error' in json) {
+          setSourceData({ kind: 'error', message: (json as { error: string }).error });
+        } else {
+          setSourceData(json as AppSourceData);
+        }
+      })
+      .catch(() => setSourceData({ kind: 'error', message: 'Could not load source.' }))
+      .finally(() => setSourceFetching(false));
+  }, [activeTab, app?.slug]);
 
   const initialSurfaceLoading = initialRunLoading || rerunLoading;
 
@@ -1519,22 +1551,9 @@ export default function AppPermalinkPage({ initialApp }: { initialApp?: Permalin
         </section>
         )}
 
-        {/* Source tab. v0.1 contract: repo card, manifest card, API automation card. */}
+        {/* Source tab. v0.4: shows real source code fetched from /api/apps/[slug]/source */}
         {activeTab === 'source' && (
           <section id="tabpanel-source" role="tabpanel" aria-labelledby="tab-source" data-testid="tab-content-source">
-            {!githubRepo && (
-              <p
-                data-testid="source-no-repo-note"
-                style={{
-                  fontSize: 12.5,
-                  color: 'var(--muted)',
-                  margin: '0 0 14px',
-                  lineHeight: 1.55,
-                }}
-              >
-                Source not publicly linked. Check with the app creator.
-              </p>
-            )}
             <div
               style={{
                 display: 'grid',
@@ -1589,7 +1608,7 @@ export default function AppPermalinkPage({ initialApp }: { initialApp?: Permalin
                 </div>
               )}
 
-              {/* Spec card */}
+              {/* Source code card — actual handler fetched from /api/apps/[slug]/source */}
               <div
                 data-testid="source-spec-card"
                 style={{
@@ -1600,44 +1619,49 @@ export default function AppPermalinkPage({ initialApp }: { initialApp?: Permalin
                 }}
               >
                 <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10.5, color: 'var(--muted)', letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 600, marginBottom: 8 }}>
-                  Spec (floom.yaml)
+                  {sourceData?.kind === 'single_file' ? sourceData.filename : 'Source'}
                 </div>
-                <p style={{ fontSize: 12.5, color: 'var(--muted)', margin: '0 0 10px', lineHeight: 1.5 }}>
-                  New apps publish whole directories on stock E2B. Legacy Python handler manifests still work unchanged.
-                </p>
-                <SourceSnippet
-                  value={(app as AppDetail & { handler?: string | null }).handler
-                    ? [
-                        `name: ${app.name}`,
-                        `slug: ${app.slug}`,
-                        'runtime: python',
-                        'entrypoint: app.py',
-                        'handler: run',
-                        `public: ${app.public ? 'true' : 'false'}`,
-                        'input_schema: input.schema.json',
-                        'output_schema: output.schema.json',
-                      ].join('\n')
-                    : [
-                        `name: ${app.name}`,
-                        `slug: ${app.slug}`,
-                        `public: ${app.public ? 'true' : 'false'}`,
-                        'input_schema: ./input.schema.json',
-                        'output_schema: ./output.schema.json',
-                        '# command: python app.py',
-                      ].join('\n')}
-                />
+
+                {sourceFetching && (
+                  <p style={{ fontSize: 12.5, color: 'var(--muted)', margin: 0, lineHeight: 1.55 }}>
+                    Loading&hellip;
+                  </p>
+                )}
+
+                {!sourceFetching && sourceData?.kind === 'single_file' && (
+                  <SourceSnippet value={sourceData.content} />
+                )}
+
+                {!sourceFetching && (sourceData?.kind === 'tarball' || sourceData?.kind === 'single_file_too_large') && (
+                  <p style={{ fontSize: 12.5, color: 'var(--muted)', margin: '0 0 10px', lineHeight: 1.55 }}>
+                    {sourceData.message}
+                  </p>
+                )}
+
+                {!sourceFetching && sourceData?.kind === 'error' && (
+                  <p style={{ fontSize: 12.5, color: 'var(--muted)', margin: '0 0 10px', lineHeight: 1.55 }}>
+                    {sourceData.message}
+                  </p>
+                )}
+
+                {!sourceFetching && !sourceData && (
+                  <p style={{ fontSize: 12.5, color: 'var(--muted)', margin: '0 0 10px', lineHeight: 1.55 }}>
+                    Source not available.
+                  </p>
+                )}
+
                 <a
                   href={`${typeof window !== 'undefined' ? window.location.origin : ''}/api/apps/${app.slug}`}
                   target="_blank"
                   rel="noreferrer"
-                  style={{ marginTop: 10, display: 'inline-block', fontSize: 12.5, color: 'var(--accent)', fontWeight: 600, textDecoration: 'none' }}
+                  style={{ marginTop: 12, display: 'inline-block', fontSize: 12.5, color: 'var(--accent)', fontWeight: 600, textDecoration: 'none' }}
                 >
                   View app metadata &rarr;
                 </a>
               </div>
             </div>
 
-            {/* API automation card (full width) */}
+            {/* API card (full width) */}
             <div
               data-testid="source-api-card"
               style={{
@@ -1650,11 +1674,18 @@ export default function AppPermalinkPage({ initialApp }: { initialApp?: Permalin
               <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10.5, color: 'var(--muted)', letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 600, marginBottom: 8 }}>
                 API
               </div>
-              <h3 style={{ fontSize: 14, fontWeight: 600, margin: '0 0 8px' }}>Run this app from HTTP clients.</h3>
+              <h3 style={{ fontSize: 14, fontWeight: 600, margin: '0 0 4px' }}>Run directly via HTTP</h3>
+              {/* Direct endpoint URL — copyable for callers who just need the URL */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '0 0 12px', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 12.5, color: 'var(--muted)' }}>Endpoint:</span>
+                <CopyableUrl
+                  url={`${typeof window !== 'undefined' ? window.location.origin : ''}/api/apps/${app.slug}/run`}
+                />
+              </div>
               <p style={{ fontSize: 13, color: 'var(--muted)', margin: '0 0 12px', lineHeight: 1.55 }}>
                 {app.public
-                  ? 'This public app can be called anonymously. Add an agent token only for private apps.'
-                  : 'This private app needs an owner agent token.'}
+                  ? 'This public app can be called without authentication.'
+                  : 'This private app requires a Floom agent token.'}
               </p>
               <SourceSnippet
                 value={
@@ -2108,6 +2139,66 @@ function SourceSnippet({ value }: { value: string }) {
           fontFamily: 'inherit',
           cursor: 'pointer',
           flexShrink: 0,
+        }}
+      >
+        {copied ? 'Copied' : 'Copy'}
+      </button>
+    </div>
+  );
+}
+
+/**
+ * Inline copyable URL. Used on the Source tab API card so creators and
+ * callers can grab the run endpoint without reading the full curl command.
+ */
+function CopyableUrl({ url }: { url: string }) {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = () => {
+    try {
+      void navigator.clipboard.writeText(url).then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1500);
+      });
+    } catch { /* ignore */ }
+  };
+  return (
+    <div
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 6,
+        background: 'var(--studio, #f5f4f0)',
+        border: '1px solid var(--line)',
+        borderRadius: 7,
+        padding: '4px 8px',
+      }}
+    >
+      <code
+        style={{
+          fontFamily: 'JetBrains Mono, ui-monospace, monospace',
+          fontSize: 11.5,
+          color: 'var(--ink)',
+          wordBreak: 'break-all',
+        }}
+      >
+        {url}
+      </code>
+      <button
+        type="button"
+        onClick={handleCopy}
+        aria-label="Copy endpoint URL"
+        style={{
+          background: 'var(--card)',
+          color: copied ? 'var(--muted)' : 'var(--accent)',
+          border: `1px solid ${copied ? 'var(--line)' : 'rgba(4,120,87,0.35)'}`,
+          borderRadius: 5,
+          padding: '3px 8px',
+          fontSize: 11,
+          fontWeight: 600,
+          fontFamily: 'inherit',
+          cursor: 'pointer',
+          flexShrink: 0,
+          whiteSpace: 'nowrap',
         }}
       >
         {copied ? 'Copied' : 'Copy'}
