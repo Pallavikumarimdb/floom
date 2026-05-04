@@ -7,6 +7,16 @@ import { NextResponse } from "next/server";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+// In-memory cache per Vercel instance. Resets on cold start.
+// With multiple instances each gets its own cache — BetterStack still
+// detects outages within ~30-60s (one TTL window).
+interface StatusCacheEntry {
+  result: { overall: string; checks: Check[]; checked_at: string };
+  ts: number;
+}
+let statusCache: StatusCacheEntry | null = null;
+const STATUS_CACHE_MS = 30_000;
+
 interface Check {
   name: string;
   status: "ok" | "degraded" | "down";
@@ -83,6 +93,14 @@ function cleanOrigin(rawOrigin: string | undefined): string | null {
 }
 
 export async function GET() {
+  const now = Date.now();
+  if (statusCache && now - statusCache.ts < STATUS_CACHE_MS) {
+    return NextResponse.json(statusCache.result, {
+      status: statusCache.result.overall === "down" ? 503 : 200,
+      headers: { "Cache-Control": "public, max-age=30" },
+    });
+  }
+
   const checks: Check[] = [];
 
   // Supabase Auth health requires the anon API key on hosted Supabase.
@@ -144,15 +162,11 @@ export async function GET() {
   const overall: "ok" | "degraded" | "down" =
     downCount > 0 ? "down" : degradedCount > 0 ? "degraded" : "ok";
 
-  return NextResponse.json(
-    {
-      overall,
-      checks,
-      checked_at: new Date().toISOString(),
-    },
-    {
-      status: overall === "down" ? 503 : 200,
-      headers: { "cache-control": "no-store" },
-    },
-  );
+  const result = { overall, checks, checked_at: new Date().toISOString() };
+  statusCache = { result, ts: Date.now() };
+
+  return NextResponse.json(result, {
+    status: overall === "down" ? 503 : 200,
+    headers: { "Cache-Control": "public, max-age=30" },
+  });
 }
