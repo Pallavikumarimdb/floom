@@ -1,0 +1,19 @@
+name: Doc freshness
+
+# Blocks merges that introduce stale strings into public-facing files.
+# Catches: obsolete version branding (v0.1/v0.2/v0.3 as current), old repo URLs,
+# stale deployment URLs, personal email/paths, internal hostnames.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  check:
+    name: Stale-string check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check doc freshness
+        run: bash scripts/check-doc-freshness.sh

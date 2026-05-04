@@ -103,3 +103,17 @@ If this file is older than 7 days or you suspect it's stale:
 curl -s "https://floom.dev/skills/floomit?raw=1"
 ```
 That always returns the version live in production.
+
+## CI gate: doc freshness
+
+PRs are blocked by the `doc-freshness` CI check if they introduce stale strings
+into public-facing files. If your PR is blocked, run:
+
+```bash
+npm run check-doc-freshness
+```
+
+It will print which file and line triggered, and why. Common fixes:
+- Remove `Floom v0.1/v0.2/v0.3` used as current branding (current version is v0.4).
+- Replace `floomhq/floom-minimal` with `floomhq/floom`.
+- Remove personal emails or internal filesystem paths.

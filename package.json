@@ -16,7 +16,8 @@
     "test:e2e": "tsx scripts/test-fake-run.mjs",
     "test:integration-stock-e2b": "tsx scripts/test-stock-e2b-integration.mjs",
     "check-migration-drift": "tsx scripts/check-migration-drift.ts",
-    "check-floomit-skill": "node scripts/check-floomit-skill.mjs"
+    "check-floomit-skill": "node scripts/check-floomit-skill.mjs",
+    "check-doc-freshness": "bash scripts/check-doc-freshness.sh"
   },
   "dependencies": {
     "@fontsource/inter": "^5.2.8",

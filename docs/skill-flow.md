@@ -6,7 +6,7 @@ Current launch claim:
 
 > Local Python function to secure live Floom app in about 60 seconds after Floom account and agent-token setup.
 
-Current v0.1 host:
+Current host:
 
 ```bash
 export FLOOM_API_URL="https://floom.dev"
@@ -15,7 +15,7 @@ export FLOOM_TOKEN="<agent-token>"
 
 ## Supported App Contract
 
-Agents can ask the Floom MCP tool `get_app_contract` for the current v0.1 contract
+Agents can ask the Floom MCP tool `get_app_contract` for the current app contract
 and `list_app_templates` / `get_app_template` for useful copy-paste app bundles
 before generating an app.
 
