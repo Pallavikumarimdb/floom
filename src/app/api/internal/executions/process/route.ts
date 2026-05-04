@@ -21,6 +21,10 @@ export async function POST(req: NextRequest) {
   if (!verified) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  if (verified === "duplicate") {
+    // Already processed this delivery — ack to QStash so it stops retrying.
+    return NextResponse.json({ ok: true, skipped: "duplicate_delivery" }, { status: 200 });
+  }
 
   const body = JSON.parse(rawBody) as { execution_id?: unknown; phase?: unknown };
   if (typeof body.execution_id !== "string" || body.phase !== "process") {

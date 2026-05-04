@@ -1,5 +1,6 @@
 import { Client, Receiver } from "@upstash/qstash";
 import type { NextRequest } from "next/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export type ProcessExecutionMessage = {
   execution_id: string;
@@ -54,7 +55,19 @@ export async function publishSweepMessage(baseUrl?: string) {
   });
 }
 
-export async function verifyQstashRequest(req: NextRequest, rawBody: string) {
+/**
+ * Verify a QStash webhook request.
+ *
+ * Returns false for signature failure.
+ * Returns "duplicate" when the message has already been processed (replay).
+ * Returns true when the request is valid and has not been seen before.
+ *
+ * Replay protection uses the `upstash-message-id` header as the dedup key.
+ * This header is set by QStash on every delivery and is stable across retries
+ * of the same message. If no message-id header is present (local dev / test),
+ * replay protection is skipped but the signature must still pass.
+ */
+export async function verifyQstashRequest(req: NextRequest, rawBody: string): Promise<boolean | "duplicate"> {
   const signature = req.headers.get("upstash-signature");
   if (!signature) {
     return false;
@@ -66,7 +79,7 @@ export async function verifyQstashRequest(req: NextRequest, rawBody: string) {
   });
 
   try {
-    return await receiver.verify({
+    await receiver.verify({
       signature,
       body: rawBody,
       url: req.url,
@@ -76,6 +89,33 @@ export async function verifyQstashRequest(req: NextRequest, rawBody: string) {
   } catch {
     return false;
   }
+
+  // Replay protection: insert the upstash-message-id into qstash_seen_jti.
+  // A unique-constraint violation (23505) means this delivery was already
+  // processed — return "duplicate" so callers can ack without re-processing.
+  const messageId = req.headers.get("upstash-message-id");
+  if (messageId) {
+    const admin = createAdminClient();
+    // Lazy cleanup: delete entries older than 10 min to bound table growth.
+    await admin
+      .from("qstash_seen_jti")
+      .delete()
+      .lt("seen_at", new Date(Date.now() - 10 * 60 * 1000).toISOString());
+
+    const { error } = await admin
+      .from("qstash_seen_jti")
+      .insert({ jti: messageId });
+
+    if (error?.code === "23505") {
+      return "duplicate";
+    }
+    if (error) {
+      // DB unavailable — fail open (signature already verified, proceed).
+      console.error("[qstash] replay-check insert failed:", error.message);
+    }
+  }
+
+  return true;
 }
 
 export function resolveWorkerBaseUrl(baseUrl?: string) {

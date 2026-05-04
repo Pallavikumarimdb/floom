@@ -61,6 +61,10 @@ function isUniqueConflict(error: { code?: string }) {
   return error.code === "23505";
 }
 
+// Allowlist for x-forwarded-host when FLOOM_ORIGIN is not configured.
+// Prevents open-redirect on non-Vercel deploys / staging misconfigs.
+const ALLOWED_FORWARDED_HOST_RE = /^([a-z0-9-]+\.)*(floom\.dev|vercel\.app)$/i;
+
 function resolvePublicOrigin(req: NextRequest) {
   const configuredOrigin =
     process.env.FLOOM_ORIGIN ||
@@ -77,7 +81,7 @@ function resolvePublicOrigin(req: NextRequest) {
 
   const forwardedProto = req.headers.get("x-forwarded-proto")?.split(",")[0]?.trim();
   const forwardedHost = req.headers.get("x-forwarded-host")?.split(",")[0]?.trim();
-  if (forwardedHost) {
+  if (forwardedHost && ALLOWED_FORWARDED_HOST_RE.test(forwardedHost)) {
     return `${forwardedProto || "https"}://${forwardedHost}`;
   }
 

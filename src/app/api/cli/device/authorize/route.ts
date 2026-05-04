@@ -7,6 +7,9 @@ import { createAgentToken } from "@/lib/supabase/agent-tokens";
 import { resolveAuthCaller } from "@/lib/supabase/auth";
 
 const DEFAULT_MAX_ACTIVE_AGENT_TOKENS_PER_USER = 10;
+// Rate limit: 10 authorize attempts per user per minute to prevent user_code enumeration.
+const CLI_DEVICE_AUTHORIZE_RATE_LIMIT = 10;
+const CLI_DEVICE_AUTHORIZE_WINDOW_SECONDS = 60;
 
 export async function POST(req: NextRequest) {
   if (!hasCliDeviceAuthConfig()) {
@@ -23,6 +26,26 @@ export async function POST(req: NextRequest) {
   const caller = await resolveAuthCaller(req, admin);
   if (!caller || caller.kind !== "user") {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // Rate limit per user to prevent user_code enumeration (8-char codes, brute-force risk).
+  const rateLimitKey = `cli-device-authorize:user:${caller.userId}`;
+  const { data: rateLimitAllowed, error: rateLimitError } = await admin.rpc(
+    "check_public_run_rate_limit",
+    {
+      p_rate_key: rateLimitKey,
+      p_limit: CLI_DEVICE_AUTHORIZE_RATE_LIMIT,
+      p_window_seconds: CLI_DEVICE_AUTHORIZE_WINDOW_SECONDS,
+    }
+  );
+  if (rateLimitError) {
+    return NextResponse.json({ error: "Rate limit check failed" }, { status: 503 });
+  }
+  if (rateLimitAllowed !== true) {
+    return NextResponse.json(
+      { error: "Too many authorization attempts. Please wait before trying again." },
+      { status: 429, headers: { "Retry-After": String(CLI_DEVICE_AUTHORIZE_WINDOW_SECONDS) } }
+    );
   }
 
   const body = await req.json().catch(() => ({}));

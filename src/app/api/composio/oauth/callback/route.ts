@@ -1,6 +1,20 @@
+import { timingSafeEqual } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { resolveAuthCaller } from "@/lib/supabase/auth";
+
+/**
+ * Timing-safe comparison for hex-encoded nonces.
+ * Returns false for any length mismatch or invalid hex input.
+ */
+function safeCompareHex(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  try {
+    return timingSafeEqual(Buffer.from(a, "hex"), Buffer.from(b, "hex"));
+  } catch {
+    return false;
+  }
+}
 
 // Composio redirects here after the user completes (or cancels) OAuth.
 // Query params from Composio: connectedAccountId (the composio account id), status, state (nonce)
@@ -45,9 +59,10 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  // Verify CSRF state nonce when it was set on the pending row
+  // Verify CSRF state nonce when it was set on the pending row.
+  // Use a timing-safe comparison to prevent timing-based nonce enumeration.
   if (pendingRow.state_nonce !== null && pendingRow.state_nonce !== undefined) {
-    if (!returnedState || returnedState !== pendingRow.state_nonce) {
+    if (!returnedState || !safeCompareHex(returnedState, pendingRow.state_nonce)) {
       // Delete the pending row to prevent reuse and log the attempt
       await admin
         .from("composio_connections")
