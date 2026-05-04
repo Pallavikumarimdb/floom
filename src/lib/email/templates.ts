@@ -8,28 +8,27 @@
 // <style> tags; Outlook ignores half the CSS spec).
 //
 // Palette mirrors src/app/globals.css tokens:
-//   --bg:     #f8f5ef   (cream page background)
-//   --band:   #f5f5f3   (warm header band)
-//   --card:   #ffffff
-//   --line:   #eceae3
-//   --ink:    #1c1a14   (near-black, never pure #000)
-//   --muted:  #6b6659
+//   --bg:          #fafaf8  (warm off-white page background)
+//   --line-soft:   #f1efe9  (header band — same family as --studio #f5f4f0)
+//   --card:        #ffffff
+//   --line:        #e8e6e0
+//   --ink:         #0e0e0c  (near-black, never pure #000)
+//   --muted:       #585550
 //
-// Typography: Georgia serif for display headings (web-safe Fraunces
-// stand-in), system sans for body.
+// Typography: Inter for all text — matches --font-display on the site.
+// Georgia is intentionally NOT used; the site brand is Inter everywhere.
 
 // ─────────────────────────────────────────────────────────────────────────
 // Palette + typography constants
 // ─────────────────────────────────────────────────────────────────────────
 
-const EMAIL_BG = "#f8f5ef";
-const EMAIL_BAND = "#f5f5f3";
-const EMAIL_CARD = "#ffffff";
-const EMAIL_LINE = "#eceae3";
-const EMAIL_INK = "#1c1a14";
-const EMAIL_MUTED = "#6b6659";
-const SERIF =
-  "Georgia, 'Times New Roman', serif";
+// Synced to globals.css :root tokens — update both together if palette changes.
+const EMAIL_BG = "#fafaf8";    // --bg
+const EMAIL_BAND = "#f1efe9";  // --line-soft (warm header band)
+const EMAIL_CARD = "#ffffff";  // --card
+const EMAIL_LINE = "#e8e6e0";  // --line
+const EMAIL_INK = "#0e0e0c";   // --ink
+const EMAIL_MUTED = "#585550"; // --muted
 const SANS =
   "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
 
@@ -86,7 +85,8 @@ function baseLayout({
   const logoPng = `${assetBase}/brand/logo-email.png?v=${cacheBust}`;
   const logoPng2x = `${assetBase}/brand/logo-email@2x.png?v=${cacheBust}`;
 
-  const logoBlock = `<img src="${escapeHtml(logoPng)}" srcset="${escapeHtml(logoPng)} 1x, ${escapeHtml(logoPng2x)} 2x" width="220" height="66" alt="Floom" style="display:block;border:0;outline:none;text-decoration:none;width:220px;height:66px;max-width:100%;">`;
+  // logo-email.png is 200×60px; @2x is 400×120px.
+  const logoBlock = `<img src="${escapeHtml(logoPng)}" srcset="${escapeHtml(logoPng)} 1x, ${escapeHtml(logoPng2x)} 2x" width="200" height="60" alt="Floom" style="display:block;border:0;outline:none;text-decoration:none;width:200px;height:60px;max-width:100%;">`;
 
   const unsubscribeBlock = unsubscribeUrl
     ? `<br><a href="${escapeHtml(unsubscribeUrl)}" style="color:${EMAIL_MUTED};text-decoration:underline;">Unsubscribe</a>`
@@ -112,7 +112,7 @@ ${logoBlock}
 </td></tr>
 
 <tr><td style="background:${EMAIL_CARD};border:1px solid ${EMAIL_LINE};border-top:none;border-radius:0 0 14px 14px;padding:40px 40px 44px;">
-<h1 style="margin:0 0 24px;font-family:${SERIF};font-size:28px;line-height:1.2;font-weight:600;letter-spacing:-0.02em;color:${EMAIL_INK};">${heading}</h1>
+<h1 style="margin:0 0 24px;font-family:${SANS};font-size:28px;line-height:1.2;font-weight:600;letter-spacing:-0.02em;color:${EMAIL_INK};">${heading}</h1>
 ${body}
 </td></tr>
 
@@ -227,14 +227,15 @@ export function renderWelcomeEmail(input: WelcomeTemplateInput): {
 } {
   const subject = "Your Floom account is live";
   const greeting = input.name ? `Hi ${escapeHtml(input.name)},` : "Hi,";
-  const appsUrl = `${input.publicUrl.replace(/\/+$/, "")}/tokens`;
+  // Send new users to root — the authenticated home page shows studio.
+  const appsUrl = `${input.publicUrl.replace(/\/+$/, "")}`;
 
   const body = [
     bodyParagraph(greeting),
     bodyParagraph(
       "Floom turns Claude-built apps into shareable URLs. No servers, no deployment, no setup. Anyone can run your app from a link or call it via API.",
     ),
-    ctaButton(appsUrl, "Open Floom →"),
+    ctaButton(appsUrl, "Open Floom"),
     bodyParagraph("Three things you can do in your first 60 seconds:"),
     `<ol style="font-family:${SANS};font-size:15px;line-height:1.7;margin:0 0 16px;padding-left:20px;color:${EMAIL_INK};">` +
       "<li>Open Floom and describe your app</li>" +
