@@ -2,8 +2,7 @@ import type { Metadata } from "next";
 import { SiteHeader } from "@/components/SiteHeader";
 import { FloomFooter } from "@/components/FloomFooter";
 import { PageToC } from "@/components/PageToC";
-
-const SITE_URL = "https://floom.dev";
+import { SITE_URL } from "@/lib/config/origin";
 
 export const metadata: Metadata = {
   title: "Privacy Policy",

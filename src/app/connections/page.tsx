@@ -2,8 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import ConnectionsPage from "./ConnectionsPage";
-
-const SITE_URL = "https://floom.dev";
+import { SITE_URL } from "@/lib/config/origin";
 
 export const metadata: Metadata = {
   title: "Connections",

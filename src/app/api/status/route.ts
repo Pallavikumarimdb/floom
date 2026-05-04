@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { siteOrigin } from "@/lib/config/origin";
 
 // /api/status — health probe surface used by /status page + external monitoring.
 // Returns { overall: "ok" | "degraded" | "down", checks: [...] } as JSON.
@@ -26,11 +27,7 @@ interface Check {
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-const FLOOM_ORIGIN =
-  cleanOrigin(process.env.FLOOM_ORIGIN) ??
-  cleanOrigin(process.env.NEXT_PUBLIC_FLOOM_ORIGIN) ??
-  cleanOrigin(process.env.NEXT_PUBLIC_APP_URL) ??
-  "https://floom.dev";
+const FLOOM_ORIGIN = siteOrigin();
 
 interface ProbeOptions {
   timeoutMs?: number;
@@ -78,17 +75,6 @@ async function probe(name: string, url: string, options: ProbeOptions = {}): Pro
       latency_ms: Date.now() - t0,
       detail: err instanceof Error ? err.message : "unreachable",
     };
-  }
-}
-
-function cleanOrigin(rawOrigin: string | undefined): string | null {
-  if (!rawOrigin) return null;
-  try {
-    const origin = new URL(rawOrigin);
-    if (!["https:", "http:"].includes(origin.protocol)) return null;
-    return origin.origin;
-  } catch {
-    return null;
   }
 }
 

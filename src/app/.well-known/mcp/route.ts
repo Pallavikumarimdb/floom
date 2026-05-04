@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
+import { siteOrigin } from "@/lib/config/origin";
 
 export const runtime = "edge";
 
 export function GET() {
-  const origin = process.env.FLOOM_ORIGIN || process.env.NEXT_PUBLIC_FLOOM_ORIGIN || process.env.NEXT_PUBLIC_APP_URL || "https://floom.dev";
-  const base = origin.replace(/\/$/, "");
+  const base = siteOrigin();
 
   return NextResponse.json(
     {

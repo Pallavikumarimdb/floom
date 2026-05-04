@@ -1,6 +1,5 @@
 import type { MetadataRoute } from "next";
-
-const SITE = "https://floom.dev";
+import { SITE_URL as SITE } from "@/lib/config/origin";
 
 // All /docs/<slug> sub-pages added in PR #69. Keep in sync with
 // src/app/docs/*/page.tsx files.

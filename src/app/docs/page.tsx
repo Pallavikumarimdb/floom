@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { safeJsonLd } from "@/lib/seo/json-ld";
-
-const SITE_URL = "https://floom.dev";
+import { SITE_URL } from "@/lib/config/origin";
 
 // JSON-LD: marks the docs as an authoritative TechArticle so LLMs and search
 // engines understand this is structured developer documentation.

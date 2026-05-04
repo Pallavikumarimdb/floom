@@ -3,12 +3,12 @@ import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 import { SkipLink } from "@/components/SkipLink";
 import { safeJsonLd } from "@/lib/seo/json-ld";
+import { SITE_URL } from "@/lib/config/origin";
 
 const SITE_NAME = "Floom";
 const SITE_TAGLINE = "Localhost to live in 60 seconds";
 const SITE_DESCRIPTION =
   "Publish small AI apps from anywhere. Public URL, REST API, MCP for agents.";
-const SITE_URL = "https://floom.dev";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),

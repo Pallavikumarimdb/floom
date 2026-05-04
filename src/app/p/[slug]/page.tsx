@@ -4,13 +4,12 @@ import AppPermalinkPage, { type PermalinkInitialApp } from "./AppPermalinkPage";
 import { demoApp, hasBrowserAuthConfig, hasSupabaseConfig } from "@/lib/demo-app";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { safeJsonLd } from "@/lib/seo/json-ld";
+import { SITE_URL } from "@/lib/config/origin";
 
 // ISR: public app pages are cached at the CDN for 5 minutes.
 // Private app pages still opt into dynamic rendering (cookies() is called
 // only for the owner-check path, so public slugs get the cache benefit).
 export const revalidate = 300;
-
-const SITE_URL = "https://floom.dev";
 
 interface Props {
   params: Promise<{ slug: string }>;
