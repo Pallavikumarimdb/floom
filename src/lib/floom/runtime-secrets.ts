@@ -221,7 +221,9 @@ export function parseManifestSecrets(raw: unknown): ManifestSecret[] {
         scopeRaw === "shared" || scopeRaw === "per-runner" ? scopeRaw : "per-runner";
       return { name, scope };
     }
-    return { name: String(item), scope: "shared" };
+    // Malformed entry (number, null, etc): coerce to a per-runner secret. The
+    // safer default — never silently grant a malformed entry shared scope.
+    return { name: String(item), scope: "per-runner" };
   });
 }
 

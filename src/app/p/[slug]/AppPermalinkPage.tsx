@@ -23,6 +23,7 @@ import { ShareModal } from '@/components/share/ShareModal';
 import { SkillModal } from '@/components/share/SkillModal';
 import { Download as DownloadIcon } from 'lucide-react';
 import { ApiError } from '@/api/client';
+import { safeJsonLd } from '@/lib/seo/json-ld';
 import { useSession } from '@/hooks/useSession';
 import type { ActionSpec, AppDetail, ReviewSummary, RunRecord } from '@/lib/types';
 import {
@@ -591,7 +592,7 @@ export default function AppPermalinkPage({ initialApp }: { initialApp?: Permalin
     const script = document.createElement('script');
     script.id = 'jsonld-app';
     script.type = 'application/ld+json';
-    script.textContent = JSON.stringify({
+    script.textContent = safeJsonLd({
       '@context': 'https://schema.org',
       '@type': 'SoftwareApplication',
       name: app.name,
