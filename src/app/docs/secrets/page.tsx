@@ -10,6 +10,13 @@ export const metadata: Metadata = {
 const secretsExample = `# Set a secret via stdin (never echoed to shell history)
 npx @floomhq/cli@latest secrets set my-app OPENAI_API_KEY --value-stdin`;
 
+const perRunnerExample = `secrets:
+  - name: GEMINI_API_KEY          # scope: per_runner is the default`;
+
+const sharedExample = `secrets:
+  - name: GEMINI_API_KEY
+    scope: shared                  # creator's key injected for every runner`;
+
 const secretsRest = `# REST equivalent
 curl -X PUT https://floom.dev/api/apps/my-app/secrets \\
   -H 'Authorization: Bearer YOUR_AGENT_TOKEN' \\
@@ -57,11 +64,37 @@ export default function SecretsPage() {
         </CodeBlock>
       </Section>
 
+      <Section id="scopes" title="Secret scopes: per_runner (default) vs shared">
+        <p className="mb-4">
+          Every secret has a <IC>scope</IC> that controls whose value is injected at run time.
+        </p>
+        <p className="font-semibold text-[#11110f] mb-1">per_runner (default)</p>
+        <p className="mb-3 text-neutral-600">
+          Each user who runs the app provides their own value. Their value is encrypted and isolated from other users. This is the safe default and requires no explicit declaration.
+        </p>
+        <CodeBlock label="floom.yaml: per_runner (default)">{perRunnerExample}</CodeBlock>
+        <p className="font-semibold text-[#11110f] mb-1 mt-6">shared (demo-subsidy mode)</p>
+        <p className="mb-3 text-neutral-600">
+          Your value is injected for every caller of the app, including anonymous visitors. Use this when you want to run a public demo and absorb the API cost yourself.
+        </p>
+        <CodeBlock label="floom.yaml: shared scope">{sharedExample}</CodeBlock>
+        <div className="mt-4 rounded-md border border-amber-300 bg-amber-50 p-4 text-sm">
+          <p className="font-semibold text-amber-800 mb-1">Cost warning</p>
+          <p className="text-amber-700">
+            With <IC>scope: shared</IC>, your API keys are charged for every run by every caller — including anonymous visitors. Real spending happens against your quota at whatever rate strangers use the app. Always pair shared secrets with rate limits. If you are unsure, leave the default <IC>per_runner</IC>: each runner brings their own keys and your costs stay your own.
+          </p>
+        </div>
+        <p className="mt-4 text-neutral-600">
+          When you run <IC>floom deploy</IC> with a shared secret, the CLI prints a plain-text warning and asks you to confirm. In non-interactive (CI) environments, pass <IC>--accept-shared-secrets</IC> to proceed.
+        </p>
+      </Section>
+
       <Section id="rules" title="Rules">
         <ul className="list-disc space-y-2 pl-5">
           <li>Secret values are never visible in logs or the browser UI.</li>
           <li>Values are scoped to a single app slug, not shared across apps.</li>
           <li>Declaring a secret name in <IC>floom.yaml</IC> is required; the value must be set separately before the first run that needs it.</li>
+          <li><IC>scope: per_runner</IC> is the default. Use <IC>scope: shared</IC> only for demo apps you want to subsidize.</li>
         </ul>
       </Section>
     </>

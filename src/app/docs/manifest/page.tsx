@@ -28,9 +28,12 @@ output_schema: ./output.schema.json
 # Make the app publicly runnable without auth.
 public: true
 # Secret names to inject as env vars at run time. Values are set separately.
+# Default scope is per_runner: each runner provides their own value.
+# Use scope: shared to inject your own key for every caller (demo-subsidy mode).
 secrets:
-  - GEMINI_API_KEY
-  - OPENAI_API_KEY
+  - OPENAI_API_KEY                     # scope: per_runner (default)
+  - name: GEMINI_API_KEY
+    scope: shared                       # creator's key injected for every runner
 # Optional: additional pip deps installed before the run command.
 # dependencies:
 #   python: ./requirements.txt --require-hashes
@@ -57,7 +60,7 @@ const FIELDS = [
   ["input_schema", "No", "Relative path to a JSON Schema file. Floom validates inputs before running."],
   ["output_schema", "No", "Relative path to a JSON Schema file. Floom validates stdout output against this."],
   ["public", "No", "true = anyone can run without auth. Default: false."],
-  ["secrets", "No", "List of secret names. Values set via CLI or REST, injected as env vars at run time."],
+  ["secrets", "No", "List of secret names (or objects with name + optional scope). Values set via CLI or REST, injected as env vars at run time. Default scope: per_runner. Use scope: shared to inject your own key for every caller."],
   ["dependencies.python", "No", "Path to requirements.txt, optionally with --require-hashes."],
   ["bundle_exclude", "No", "List of paths/globs to skip when building the bundle."],
 ];
