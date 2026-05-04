@@ -5,6 +5,11 @@ import { demoApp, hasBrowserAuthConfig, hasSupabaseConfig } from "@/lib/demo-app
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient as createServerSupabaseClient } from "@/lib/supabase/server";
 
+// ISR: public app pages are cached at the CDN for 5 minutes.
+// Private app pages still opt into dynamic rendering (cookies() is called
+// only for the owner-check path, so public slugs get the cache benefit).
+export const revalidate = 300;
+
 const SITE_URL = "https://floom.dev";
 
 interface Props {
@@ -51,7 +56,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   // If no description was found from any source, emit a minimal fallback so
   // OG/Twitter cards are never blank. For not-found apps, use a generic message.
   if (!appDescription) {
-    appDescription = appFound ? `${appName} on Floom` : "This Floom app does not exist.";
+    appDescription = appFound
+      ? `Run ${appName} on Floom — Claude apps as shareable URLs with REST API and MCP support.`
+      : "This Floom app does not exist.";
   }
 
   // Title is bare app name; layout.tsx metadata.title.template adds " · Floom".
