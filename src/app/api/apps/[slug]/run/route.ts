@@ -44,6 +44,11 @@ const DEFAULT_PUBLIC_RUN_RATE_LIMIT_MAX = 20;
 const DEFAULT_AUTHED_RUN_RATE_LIMIT_MAX = 60;
 const DEFAULT_PUBLIC_RUN_APP_RATE_LIMIT_MAX = 500;
 const DEFAULT_PUBLIC_RUN_RATE_LIMIT_WINDOW_SECONDS = 60;
+// Demo apps share a single GEMINI key — apply tighter caps so anon abuse
+// doesn't burn the shared quota.
+const DEMO_PUBLIC_RUN_RATE_LIMIT_MAX = 5;
+const DEMO_PUBLIC_RUN_APP_RATE_LIMIT_MAX = 100;
+const DEMO_PUBLIC_RUN_RATE_LIMIT_WINDOW_SECONDS = 3600;
 
 type LatestVersion = {
   id: string;
@@ -165,19 +170,24 @@ export async function POST(
   if (!isOwner) {
     // Authenticated non-owners get a higher per-caller limit (60/60s vs 20/60s).
     const isAuthedCaller = caller?.kind === "user" || caller?.kind === "agent_token";
+    const isDemo = Boolean(app.is_demo);
     const rateLimit = await checkPublicRunRateLimit(
       admin,
       app.id,
       getRunCallerKey(caller, req.headers),
-      isAuthedCaller
+      isAuthedCaller,
+      isDemo
     );
     if (!rateLimit.allowed) {
-      const retryAfterSeconds = String(
-        readPositiveIntegerEnv(
-          "FLOOM_PUBLIC_RUN_RATE_LIMIT_WINDOW_SECONDS",
-          DEFAULT_PUBLIC_RUN_RATE_LIMIT_WINDOW_SECONDS
-        )
-      );
+      // Retry-After reflects the actual window (demo uses 1h, normal uses global env/default).
+      const retryAfterSeconds = isDemo
+        ? String(DEMO_PUBLIC_RUN_RATE_LIMIT_WINDOW_SECONDS)
+        : String(
+            readPositiveIntegerEnv(
+              "FLOOM_PUBLIC_RUN_RATE_LIMIT_WINDOW_SECONDS",
+              DEFAULT_PUBLIC_RUN_RATE_LIMIT_WINDOW_SECONDS
+            )
+          );
       return NextResponse.json(
         { error: rateLimit.error },
         { status: rateLimit.status, headers: { "Retry-After": retryAfterSeconds } }
@@ -633,7 +643,8 @@ async function checkPublicRunRateLimit(
   admin: ReturnType<typeof createAdminClient>,
   appId: string,
   callerKey: string,
-  isAuthedCaller = false
+  isAuthedCaller = false,
+  isDemo = false
 ): Promise<
   | { allowed: true }
   | {
@@ -642,13 +653,23 @@ async function checkPublicRunRateLimit(
       error: string;
     }
 > {
-  const windowSeconds = readPositiveIntegerEnv(
-    "FLOOM_PUBLIC_RUN_RATE_LIMIT_WINDOW_SECONDS",
-    DEFAULT_PUBLIC_RUN_RATE_LIMIT_WINDOW_SECONDS
-  );
-  const callerLimit = isAuthedCaller
-    ? readPositiveIntegerEnv("FLOOM_AUTHED_RUN_RATE_LIMIT_MAX", DEFAULT_AUTHED_RUN_RATE_LIMIT_MAX)
-    : readPositiveIntegerEnv("FLOOM_PUBLIC_RUN_RATE_LIMIT_MAX", DEFAULT_PUBLIC_RUN_RATE_LIMIT_MAX);
+  // Demo apps share a single key and use fixed, tighter caps (5/hr per caller,
+  // 100/hr per app) regardless of env var overrides. Non-demo apps use the
+  // global env-var-overrideable defaults.
+  const windowSeconds = isDemo
+    ? DEMO_PUBLIC_RUN_RATE_LIMIT_WINDOW_SECONDS
+    : readPositiveIntegerEnv(
+        "FLOOM_PUBLIC_RUN_RATE_LIMIT_WINDOW_SECONDS",
+        DEFAULT_PUBLIC_RUN_RATE_LIMIT_WINDOW_SECONDS
+      );
+  const callerLimit = isDemo
+    ? DEMO_PUBLIC_RUN_RATE_LIMIT_MAX
+    : isAuthedCaller
+      ? readPositiveIntegerEnv("FLOOM_AUTHED_RUN_RATE_LIMIT_MAX", DEFAULT_AUTHED_RUN_RATE_LIMIT_MAX)
+      : readPositiveIntegerEnv("FLOOM_PUBLIC_RUN_RATE_LIMIT_MAX", DEFAULT_PUBLIC_RUN_RATE_LIMIT_MAX);
+  const appLimit = isDemo
+    ? DEMO_PUBLIC_RUN_APP_RATE_LIMIT_MAX
+    : readPositiveIntegerEnv("FLOOM_PUBLIC_RUN_APP_RATE_LIMIT_MAX", DEFAULT_PUBLIC_RUN_APP_RATE_LIMIT_MAX);
   const checks = [
     {
       key: getPublicRunRateLimitKey(appId, callerKey),
@@ -656,10 +677,7 @@ async function checkPublicRunRateLimit(
     },
     {
       key: getPublicRunAppRateLimitKey(appId),
-      limit: readPositiveIntegerEnv(
-        "FLOOM_PUBLIC_RUN_APP_RATE_LIMIT_MAX",
-        DEFAULT_PUBLIC_RUN_APP_RATE_LIMIT_MAX
-      ),
+      limit: appLimit,
     },
   ];
 
