@@ -59,7 +59,11 @@ export async function GET(req: NextRequest) {
   return NextResponse.redirect(new URL(safeNext, publicOrigin));
 }
 
-// Shared: send welcome email and mark welcome_email_sent_at in user_metadata.
+// P1-4: Send welcome email with idempotency via INSERT-or-skip on
+// welcome_email_log (PRIMARY KEY user_id). Two concurrent callbacks for the
+// same user both attempt an INSERT; the winning insert fires the email and the
+// losing insert gets a unique_violation (SQLSTATE 23505) and skips. Replaces
+// the read-modify-write on user_metadata which had a TOCTOU race.
 // Returns true if the email was sent, false if skipped (already sent).
 // source: caller label for logging ("email-otp" | "oauth").
 async function sendWelcomeEmailIdempotent(
@@ -67,11 +71,23 @@ async function sendWelcomeEmailIdempotent(
   publicOrigin: string,
   _source: string,
 ): Promise<boolean> {
-  if (user.user_metadata?.welcome_email_sent_at) return false;
+  const admin = createAdminClient();
 
+  // Attempt to claim the "send slot" atomically.
+  const { error: logError } = await admin
+    .from("welcome_email_log")
+    .insert({ user_id: user.id });
+
+  if (logError) {
+    // 23505 = unique_violation: email already sent. Any other error: skip silently.
+    return false;
+  }
+
+  // We won the race — send the welcome email.
+  const meta = user.user_metadata ?? {};
   const name =
-    (user.user_metadata?.full_name as string | undefined) ??
-    (user.user_metadata?.name as string | undefined) ??
+    (meta.full_name as string | undefined) ??
+    (meta.name as string | undefined) ??
     null;
 
   const { subject, html, text } = renderWelcomeEmail({
@@ -80,14 +96,6 @@ async function sendWelcomeEmailIdempotent(
   });
 
   await sendEmail({ to: user.email, subject, html, text });
-
-  const admin = createAdminClient();
-  await admin.auth.admin.updateUserById(user.id, {
-    user_metadata: {
-      ...user.user_metadata,
-      welcome_email_sent_at: new Date().toISOString(),
-    },
-  });
 
   return true;
 }
