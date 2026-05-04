@@ -211,7 +211,7 @@ export default function LandingV17PageMvp() {
             You&apos;re signed in.
           </span>
           <Link
-            href="/settings/agent-tokens"
+            href="/docs/quickstart"
             data-testid="landing-resume-cta"
             style={{
               fontWeight: 600,
@@ -222,7 +222,7 @@ export default function LandingV17PageMvp() {
               gap: 4,
             }}
           >
-            Manage your tokens →
+            Open the quickstart →
           </Link>
         </div>
       )}
@@ -318,8 +318,12 @@ export default function LandingV17PageMvp() {
               to calm the hero, but Flagged: it as "too low" —
               hero box stays clean (no demo INSIDE it) but the demo
               should still anchor near hero so it reads as proof, not
-              filler. Full variant kept its placement here. */}
-          <HeroDemo />
+              filler. Full variant kept its placement here.
+              Mobile (<md): hidden — 580px fixed canvas overflows 375px
+              viewport. Hero H1 + CTAs are the primary mobile experience. */}
+          <div className="hidden md:block">
+            <HeroDemo />
+          </div>
         </section>
 
         {/* HOW IT WORKS — 3 steps */}
