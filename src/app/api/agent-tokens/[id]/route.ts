@@ -4,6 +4,8 @@ import { resolveAuthCaller } from "@/lib/supabase/auth";
 import { revokeAgentToken } from "@/lib/supabase/agent-tokens";
 import { hasAgentTokenConfig } from "@/lib/demo-app";
 
+const PRIVATE_CACHE = { "Cache-Control": "private, no-store" } as const;
+
 export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -18,18 +20,18 @@ export async function DELETE(
   const admin = createAdminClient();
   const caller = await resolveAuthCaller(req, admin);
   if (!caller) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: PRIVATE_CACHE });
   }
 
   const { id } = await params;
 
   if (caller.kind === "agent_token" && caller.agentTokenId !== id) {
-    return NextResponse.json({ error: "Agent tokens can only revoke themselves" }, { status: 403 });
+    return NextResponse.json({ error: "Agent tokens can only revoke themselves" }, { status: 403, headers: PRIVATE_CACHE });
   }
 
   const revoked = await revokeAgentToken(admin, caller.userId, id);
   if (!revoked) {
-    return NextResponse.json({ error: "Active token not found" }, { status: 404 });
+    return NextResponse.json({ error: "Active token not found" }, { status: 404, headers: PRIVATE_CACHE });
   }
 
   return NextResponse.json({ ok: true });

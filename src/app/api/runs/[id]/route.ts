@@ -40,7 +40,7 @@ export async function GET(
   const bearerToken = getBearerToken(req);
   const caller = await resolveAuthCaller(req, admin);
   if (bearerToken && !caller) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: PRIVATE_CACHE });
   }
 
   const { data: execution, error: executionError } = await admin

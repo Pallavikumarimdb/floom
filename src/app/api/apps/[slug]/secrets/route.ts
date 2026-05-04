@@ -165,11 +165,11 @@ async function requireOwnedApp(req: NextRequest, slug: string, scope: "read" | "
   const admin = createAdminClient();
   const caller = await resolveAuthCaller(req, admin);
   if (!caller) {
-    return { response: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
+    return { response: NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: PRIVATE_CACHE }) };
   }
 
   if (!callerHasScope(caller, scope)) {
-    return { response: NextResponse.json({ error: `Missing ${scope} scope` }, { status: 403 }) };
+    return { response: NextResponse.json({ error: `Missing ${scope} scope` }, { status: 403, headers: PRIVATE_CACHE }) };
   }
 
   const { data: app, error } = await admin
@@ -179,11 +179,11 @@ async function requireOwnedApp(req: NextRequest, slug: string, scope: "read" | "
     .maybeSingle();
 
   if (error || !app) {
-    return { response: NextResponse.json({ error: "App not found" }, { status: 404 }) };
+    return { response: NextResponse.json({ error: "App not found" }, { status: 404, headers: PRIVATE_CACHE }) };
   }
 
   if ((app as OwnedApp).owner_id !== caller.userId) {
-    return { response: NextResponse.json({ error: "App not found" }, { status: 404 }) };
+    return { response: NextResponse.json({ error: "App not found" }, { status: 404, headers: PRIVATE_CACHE }) };
   }
 
   return { admin, caller, app: app as OwnedApp };

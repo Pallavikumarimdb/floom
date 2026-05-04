@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
   const admin = createAdminClient();
   const caller = await resolveAuthCaller(req, admin);
   if (!caller || caller.kind !== "user") {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: PRIVATE_CACHE });
   }
 
   const { data, error } = await admin
@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
   const admin = createAdminClient();
   const caller = await resolveAuthCaller(req, admin);
   if (!caller || caller.kind !== "user") {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: PRIVATE_CACHE });
   }
 
   const body = await req.json().catch(() => ({}));

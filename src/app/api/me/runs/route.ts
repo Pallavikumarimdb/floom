@@ -36,11 +36,11 @@ export async function GET(req: NextRequest) {
   const bearerToken = getBearerToken(req);
   const caller = await resolveAuthCaller(req, admin);
   if (!caller || (bearerToken && !caller)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: PRIVATE_CACHE });
   }
 
   if (!callerHasScope(caller, "read")) {
-    return NextResponse.json({ error: "Read scope required" }, { status: 403 });
+    return NextResponse.json({ error: "Read scope required" }, { status: 403, headers: PRIVATE_CACHE });
   }
 
   const url = new URL(req.url);
