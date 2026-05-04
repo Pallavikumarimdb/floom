@@ -1729,10 +1729,12 @@ function findCandidateApps(args: JsonObject): McpToolResult {
           }
         }
 
-        if (manifest.input_schema) {
+        // Path-reference schemas: verify the file exists in the file map.
+        // Inline-object schemas: already embedded in the manifest — no file needed.
+        if (manifest.input_schema && typeof manifest.input_schema === "string") {
           validateCandidateSchema(files, joinPath(appDir, manifest.input_schema), "input_schema", errors);
         }
-        if (manifest.output_schema) {
+        if (manifest.output_schema && typeof manifest.output_schema === "string") {
           validateCandidateSchema(files, joinPath(appDir, manifest.output_schema), "output_schema", errors);
         }
 
@@ -2276,11 +2278,23 @@ function buildLegacyPublishFiles(
     return outputSchemaResult;
   }
 
+  // Resolve schema file paths. When the manifest has inline schema objects they
+  // are already embedded in floom.yaml (via manifestToYaml), so we still write
+  // schema files for the bundle to ensure the server-side validator can find them
+  // at the expected paths. Use the declared path when it's a string; otherwise
+  // fall back to the conventional default names.
+  const inputSchemaFilePath = typeof manifest.input_schema === "string"
+    ? manifest.input_schema
+    : "input.schema.json";
+  const outputSchemaFilePath = typeof manifest.output_schema === "string"
+    ? manifest.output_schema
+    : "output.schema.json";
+
   const files: Record<string, string> = {
     "floom.yaml": manifestToYaml(manifest),
     [manifest.entrypoint]: source,
-    [manifest.input_schema ?? "input.schema.json"]: JSON.stringify(inputSchemaResult.schema, null, 2),
-    [manifest.output_schema ?? "output.schema.json"]: JSON.stringify(outputSchemaResult.schema, null, 2),
+    [inputSchemaFilePath]: JSON.stringify(inputSchemaResult.schema, null, 2),
+    [outputSchemaFilePath]: JSON.stringify(outputSchemaResult.schema, null, 2),
   };
 
   const requirements = args.requirements;

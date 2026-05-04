@@ -9,16 +9,28 @@ export type ManifestDependencies = {
   python?: string;
 };
 
+/**
+ * Schema field: either a relative-path string (e.g. "./input.schema.json")
+ * or an inline JSON Schema object (embedded directly in floom.yaml).
+ *
+ * Inline form is the default and preferred — no separate file needed.
+ * Path form is the legacy escape hatch for very large or shared schemas.
+ */
+export type SchemaField = string | Record<string, unknown>;
+
 type SharedManifestFields = {
   mode: "stock_e2b" | "legacy_python";
   name?: string;
   slug: string;
   description?: string;
   public?: boolean;
-  input_schema?: string;
-  output_schema?: string;
+  input_schema?: SchemaField;
+  output_schema?: SchemaField;
   dependencies?: ManifestDependencies;
   secrets?: ManifestSecret[];
+  /** Preferred field name for service integrations (Composio-backed). */
+  integrations?: string[];
+  /** @deprecated Use `integrations:` instead. Kept as alias for backwards compatibility. */
   composio?: string[];
   bundle_exclude?: string[];
 };
@@ -87,26 +99,42 @@ function optionalBoolean(value: unknown): boolean | undefined {
   return value;
 }
 
-function optionalRelativePath(value: unknown, field: string): string | undefined {
+/**
+ * Parse an input_schema or output_schema field from floom.yaml.
+ *
+ * Accepts two forms:
+ *   - string path: "./input.schema.json" — resolved at bundle-validate time (legacy)
+ *   - inline object: { type: "object", ... } — embedded directly in floom.yaml (default)
+ *
+ * Returns the value as-is (normalized path string or object), or undefined when absent.
+ * Path safety is checked here; JSON Schema validity is checked by schema.ts at bundle time.
+ */
+function parseSchemaField(value: unknown, field: string): SchemaField | undefined {
   if (value === undefined) {
     return undefined;
   }
 
-  if (typeof value !== "string" || value.trim() === "") {
-    throw new Error(`${field} must be a file path string`);
+  // Inline object — preferred form, no separate file needed
+  if (value !== null && typeof value === "object" && !Array.isArray(value)) {
+    return value as Record<string, unknown>;
   }
 
-  const normalized = value.trim().replace(/\\/g, "/");
-  if (
-    !RELATIVE_FILE_RE.test(normalized) ||
-    normalized.startsWith("/") ||
-    normalized.includes("../") ||
-    normalized === ".."
-  ) {
-    throw new Error(`${field} must stay inside the app directory`);
+  // Path reference — legacy escape hatch for large/shared schemas
+  if (typeof value === "string") {
+    const normalized = value.trim().replace(/\\/g, "/");
+    if (
+      normalized === "" ||
+      !RELATIVE_FILE_RE.test(normalized) ||
+      normalized.startsWith("/") ||
+      normalized.includes("../") ||
+      normalized === ".."
+    ) {
+      throw new Error(`${field} must stay inside the app directory`);
+    }
+    return normalized.startsWith("./") ? normalized.slice(2) : normalized;
   }
 
-  return normalized.startsWith("./") ? normalized.slice(2) : normalized;
+  throw new Error(`${field} must be a relative file path or an inline JSON Schema object`);
 }
 
 function parseSharedFields(data: Record<string, unknown>) {
@@ -121,11 +149,11 @@ function parseSharedFields(data: Record<string, unknown>) {
     slug: requiredString(data.slug, "slug"),
     description: optionalString(data.description),
     public: optionalBoolean(data.public),
-    input_schema: optionalRelativePath(data.input_schema, "input_schema"),
-    output_schema: optionalRelativePath(data.output_schema, "output_schema"),
+    input_schema: parseSchemaField(data.input_schema, "input_schema"),
+    output_schema: parseSchemaField(data.output_schema, "output_schema"),
     dependencies: parseDependencies(data.dependencies),
     secrets: parseSecrets(data.secrets),
-    composio: parseComposioToolkits(data.composio),
+    integrations: parseIntegrations(data.integrations, data.composio),
     bundle_exclude: parseBundleExclude(data.bundle_exclude),
   };
 }
@@ -215,7 +243,7 @@ function parseDependencies(value: unknown): ManifestDependencies | undefined {
 /**
  * Parse the secrets field from floom.yaml.
  * Accepts two forms (backwards compat):
- *   - bare string: "OPENAI_API_KEY"  → { name, scope: "shared" }
+ *   - bare string: "OPENAI_API_KEY"  -> { name, scope: "shared" }
  *   - object form: { name: "OPENAI_API_KEY", scope: "per-runner" }
  * Default scope for object form with no explicit scope = "per-runner".
  */
@@ -278,7 +306,7 @@ const TOOLKIT_SLUG_RE = /^[a-z][a-z0-9-]{0,63}$/;
  * Accepts a single string or an array of strings.
  * Each value must match ^[a-z][a-z0-9-]{0,63}$ (Composio provider slug format).
  *
- * Returns an empty array (not undefined) when absent — matches the DB column default.
+ * Returns an empty array (not undefined) when absent -- matches the DB column default.
  *
  * Examples:
  *   composio: gmail
@@ -307,7 +335,7 @@ export function parseComposioToolkits(value: unknown): string[] {
     const slug = item.trim().toLowerCase();
     if (!TOOLKIT_SLUG_RE.test(slug)) {
       throw new Error(
-        `composio toolkit slug "${slug}" is invalid — must start with a lowercase letter and contain only lowercase letters, digits, and hyphens`
+        `composio toolkit slug "${slug}" is invalid -- must start with a lowercase letter and contain only lowercase letters, digits, and hyphens`
       );
     }
     return slug;

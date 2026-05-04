@@ -67,13 +67,15 @@ export default function QuickstartPage() {
 
       <Section id="init" title="2. Scaffold">
         <p>
-          <IC>floom init</IC> generates three files in the current directory:
+          <IC>floom init</IC> generates two files in the current directory:
         </p>
         <ul className="list-disc space-y-1 pl-5">
-          <li><IC>floom.yaml</IC>: the app manifest</li>
-          <li><IC>app.py</IC>: a minimal Python app</li>
-          <li><IC>requirements.txt</IC>: empty, ready to fill</li>
+          <li><IC>floom.yaml</IC>: the app manifest — slug, command, and schemas all in one file</li>
+          <li><IC>app.py</IC>: a minimal Python handler</li>
         </ul>
+        <p className="mt-2 text-sm text-neutral-600">
+          Schemas are embedded directly in <IC>floom.yaml</IC> as YAML objects. No separate <IC>input.schema.json</IC> or <IC>output.schema.json</IC> files are created. Pass <IC>--split-schemas</IC> to generate the legacy four-file layout instead.
+        </p>
       </Section>
 
       <Section id="deploy" title="3. Deploy">

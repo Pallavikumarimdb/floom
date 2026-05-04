@@ -13,6 +13,7 @@ import {
 } from "./limits";
 import {
   type FloomManifest,
+  type SchemaField,
   isLegacyPythonManifest,
   parseManifest,
   resolveManifestDisplayName,
@@ -22,6 +23,7 @@ import {
 } from "./manifest";
 import {
   parseAndValidateJsonSchemaText,
+  validateJsonSchemaValue,
   type JsonObject,
 } from "./schema";
 import { validatePythonRequirementsText } from "./requirements";
@@ -415,13 +417,24 @@ async function loadSchemas(extractedDir: string, manifest: FloomManifest) {
 
 async function loadOptionalSchema(
   extractedDir: string,
-  relativePath: string | undefined,
+  schemaField: SchemaField | undefined,
   field: "input_schema" | "output_schema"
 ): Promise<JsonObject | null> {
-  if (!relativePath) {
+  if (schemaField === undefined || schemaField === null) {
     return null;
   }
 
+  // Inline object -- validate directly, no file read needed
+  if (typeof schemaField === "object") {
+    const result = validateJsonSchemaValue(schemaField, field);
+    if (!result.ok) {
+      throw new BundleValidationError("invalid_manifest", result.error);
+    }
+    return result.schema;
+  }
+
+  // Path reference -- read from the extracted bundle
+  const relativePath = schemaField as string;
   const schemaPath = resolveBundlePath(extractedDir, relativePath);
   const schemaText = await fs.readFile(schemaPath, "utf8").catch(() => {
     throw new BundleValidationError("invalid_manifest", `Missing ${field}: ${relativePath}`);

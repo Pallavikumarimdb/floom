@@ -21,10 +21,22 @@ export const metadata: Metadata = {
 const manifestFull = `slug: my-app
 # The command to run. Auto-detected from app.py / index.js if omitted.
 command: python app.py
-# Relative path to a JSON Schema file for inputs (optional but recommended).
-input_schema: ./input.schema.json
-# Relative path to a JSON Schema file for outputs (optional).
-output_schema: ./output.schema.json
+# Inline JSON Schema for inputs (preferred — no separate file needed).
+input_schema:
+  type: object
+  required: [text]
+  properties:
+    text:
+      type: string
+      title: Input text
+# Inline JSON Schema for outputs.
+output_schema:
+  type: object
+  required: [result]
+  properties:
+    result:
+      type: string
+      title: Result
 # Make the app publicly runnable without auth.
 public: true
 # Secret names to inject as env vars at run time. Values are set separately.
@@ -53,10 +65,14 @@ runtime: python
 entrypoint: app.py
 handler: run
 public: true
-input_schema: ./input.schema.json
+input_schema: ./input.schema.json   # path form still supported
 output_schema: ./output.schema.json
 dependencies:
   python: ./requirements.txt`;
+
+const pathRefExample = `# Path-reference form (escape hatch for very large or shared schemas)
+input_schema: ./input.schema.json
+output_schema: ./output.schema.json`;
 
 const composioExample = `# Single toolkit (shorthand):
 composio: gmail
@@ -80,8 +96,8 @@ const FIELDS = [
   ["slug", "Yes", "URL-safe identifier. Used in /p/:slug, API, and MCP calls."],
   ["name", "No", "Display name shown in the browser UI and app cards. Defaults to slug if omitted."],
   ["command", "No", "Shell command to run the app. Auto-detected from app.py or index.js if omitted."],
-  ["input_schema", "No", "Relative path to a JSON Schema file. Floom validates inputs before running."],
-  ["output_schema", "No", "Relative path to a JSON Schema file. Floom validates stdout output against this."],
+  ["input_schema", "No", "Inline JSON Schema object or relative path to a .json file. Floom validates inputs before running. Inline form is the default; path form is an escape hatch for very large schemas."],
+  ["output_schema", "No", "Inline JSON Schema object or relative path to a .json file. Floom validates stdout output against this. Same two-form support as input_schema."],
   ["public", "No", "true = anyone can run without auth. Default: false."],
   ["secrets", "No", "List of secret names (or objects with name + optional scope). Values set via CLI or REST, injected as env vars at run time. Default scope: per_runner. Use scope: shared to inject your own key for every caller."],
   ["composio", "No", "Toolkit slug or list of slugs (e.g. gmail, slack). Floom auto-injects COMPOSIO_CONNECTION_ID from the runner's active connection at run time. No manual copy step needed."],
@@ -124,6 +140,30 @@ export default function ManifestPage() {
             </tbody>
           </table>
         </div>
+      </Section>
+
+      <Section id="schemas" title="Inline vs. file schemas">
+        <p>
+          <IC>input_schema</IC> and <IC>output_schema</IC> accept two forms. The inline object form (default) keeps everything in one file:
+        </p>
+        <CodeBlock label="floom.yaml: inline schema (default)">{`input_schema:
+  type: object
+  required: [text]
+  properties:
+    text: { type: string, title: Input text }
+
+output_schema:
+  type: object
+  required: [result]
+  properties:
+    result: { type: string, title: Result }`}</CodeBlock>
+        <p className="mt-3">
+          The path-reference form is an escape hatch for very large schemas or shared schemas referenced across multiple apps:
+        </p>
+        <CodeBlock label="floom.yaml: path reference (escape hatch)">{pathRefExample}</CodeBlock>
+        <p className="mt-3 text-sm text-neutral-600">
+          Both forms are validated as JSON Schema at deploy time. Existing apps using path references deploy unchanged.
+        </p>
       </Section>
 
       <Section id="composio" title="Composio integrations">

@@ -9,8 +9,28 @@ const MEETING_YAML = `name: Meeting Action Items
 slug: meeting-action-items
 command: python app.py
 public: true
-input_schema: ./input.schema.json
-output_schema: ./output.schema.json`;
+input_schema:
+  type: object
+  required: [transcript]
+  additionalProperties: false
+  properties:
+    transcript:
+      type: string
+      format: textarea
+      title: Meeting notes
+      default: "Action: Sarah sends launch notes by Friday\\nMike owns beta checklist tomorrow"
+    default_owner:
+      type: string
+      title: Default owner
+      default: ""
+output_schema:
+  type: object
+  required: [count, items, actions, summary]
+  properties:
+    count: { type: integer }
+    items: { type: array, items: { type: object } }
+    actions: { type: array, items: { type: object } }
+    summary: { type: string }`;
 
 const MEETING_PY = `"""Meeting -> Action Items.
 
@@ -325,8 +345,19 @@ httpx==0.28.1`;
 const MULTI_YAML = `name: Multi-file Python
 slug: multi-file-python
 public: true
-input_schema: ./input.schema.json
-output_schema: ./output.schema.json`;
+input_schema:
+  type: object
+  required: [text]
+  additionalProperties: false
+  properties:
+    text: { type: string, title: Text to process }
+output_schema:
+  type: object
+  required: [preview, length, word_count]
+  properties:
+    preview: { type: string }
+    length: { type: integer }
+    word_count: { type: integer }`;
 
 const MULTI_APP_PY = `import json
 import os
@@ -378,7 +409,6 @@ const APPS: AppDef[] = [
     tabs: [
       { id: "yaml", label: "floom.yaml", content: MEETING_YAML },
       { id: "py", label: "app.py", content: MEETING_PY },
-      { id: "schema", label: "input.schema.json", content: MEETING_INPUT_SCHEMA },
     ],
   },
   {

@@ -335,16 +335,35 @@ async function createBundleFromLegacyUploads(
     throw new Error("Legacy upload compatibility requires runtime: python + entrypoint + handler");
   }
 
-  if (!inputSchemaFile || !outputSchemaFile) {
-    throw new Error("Legacy uploads require input_schema and output_schema files");
+  // For legacy uploads the manifest may declare schemas either as path strings
+  // (old CLI) or as inline objects (new CLI). When inline, no separate file is
+  // needed -- the schema is already embedded in the manifest and will be
+  // resolved by bundle.ts. When a path string, the file must be present.
+  const inputSchemaIsInline = manifest.input_schema !== undefined && typeof manifest.input_schema !== "string";
+  const outputSchemaIsInline = manifest.output_schema !== undefined && typeof manifest.output_schema !== "string";
+
+  if (!inputSchemaIsInline && !inputSchemaFile) {
+    throw new Error("Legacy uploads require an input_schema file (or use an inline input_schema object in floom.yaml)");
   }
+  if (!outputSchemaIsInline && !outputSchemaFile) {
+    throw new Error("Legacy uploads require an output_schema file (or use an inline output_schema object in floom.yaml)");
+  }
+
+  const inputSchemaPath = typeof manifest.input_schema === "string" ? manifest.input_schema : "input.schema.json";
+  const outputSchemaPath = typeof manifest.output_schema === "string" ? manifest.output_schema : "output.schema.json";
 
   const files: Record<string, string> = {
     "floom.yaml": manifestText,
     [manifest.entrypoint]: Buffer.from(await bundleFile.arrayBuffer()).toString("utf8"),
-    [manifest.input_schema ?? "input.schema.json"]: await inputSchemaFile.text(),
-    [manifest.output_schema ?? "output.schema.json"]: await outputSchemaFile.text(),
   };
+
+  // Only write schema files for path-reference form; inline schemas live in the manifest
+  if (!inputSchemaIsInline && inputSchemaFile) {
+    files[inputSchemaPath] = await inputSchemaFile.text();
+  }
+  if (!outputSchemaIsInline && outputSchemaFile) {
+    files[outputSchemaPath] = await outputSchemaFile.text();
+  }
 
   const dependencyConfig = manifest.dependencies?.python;
   if (dependencyConfig) {

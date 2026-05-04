@@ -1,7 +1,7 @@
 ---
 name: floomit
 description: How to use Floom v0.4 (hosted runtime for Python/TS apps). Thin pointer — fetch canonical docs from floom.dev/docs/<topic> for current truth; don't trust hardcoded knowledge.
-version: 0.4.1
+version: 0.4.2
 last_synced: 2026-05-04
 canonical_source: https://floom.dev/skills/floomit
 canonical_raw: https://floom.dev/skills/floomit?raw=1
@@ -44,6 +44,23 @@ Install CLI, scaffold, deploy, run — the full flow.
 ### Write or fix the manifest (floom.yaml)
 **Read:** https://floom.dev/docs/manifest
 All fields: slug, command, runtime, entrypoint, public, input_schema, output_schema, dependencies, secrets, composio, bundle_exclude. Both legacy and modern forms.
+
+**Single-file default:** input_schema and output_schema can be inline YAML objects — no separate .json files needed. Example:
+
+```yaml
+input_schema:
+  type: object
+  required: [text]
+  properties:
+    text: { type: string }
+output_schema:
+  type: object
+  required: [result]
+  properties:
+    result: { type: string }
+```
+
+Path-reference form (`input_schema: ./input.schema.json`) still works as an escape hatch.
 
 ### Configure secrets (shared vs per-runner)
 **Read:** https://floom.dev/docs/secrets
