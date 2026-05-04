@@ -107,7 +107,7 @@ const outputModes = `# With output_schema declared:
 # Floom returns the parsed JSON directly
 
 # No output_schema, plain stdout:
-# Floom returns { "stdout": "<last 4 KB>", "exit_code": 0 }`;
+# Floom captures the last 4 KB of stdout as the output field`;
 
 // Schema constraint examples (fix #8)
 const schemaEnumExample = `// Use this when a field must be one of a fixed set of values
@@ -182,10 +182,11 @@ curl -X POST https://floom.dev/api/apps/my-private-app/run \\
   -d '{"inputs":{"text":"Run this securely"}}'`;
 
 const apiResponseExample = `{
-  "status": "ok",
-  "output": { "action_items": ["Ship by Friday", "Review PR #42"] },
-  "exit_code": 0,
-  "duration_ms": 3412
+  "execution_id": "exec_abc123",
+  "status": "queued",
+  "output": null,
+  "error": null,
+  "view_token": "<view-token>"
 }`;
 
 const mcpConfigExample = `// Claude Desktop config
