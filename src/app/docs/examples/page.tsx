@@ -137,45 +137,53 @@ const MEETING_INPUT_SCHEMA = `{
 const PITCH_YAML = `name: Pitch Coach
 slug: pitch-coach
 description: Paste a startup pitch, get three direct critiques, three sharper rewrites, and a one-line TL;DR of the biggest issue.
-category: writing
-icon: megaphone
-actions:
-  coach:
-    label: Coach Pitch
-    inputs:
-      - name: pitch
-        label: Pitch
-        type: textarea
-        required: true
-        placeholder: e.g. We are a platform for AI apps that helps teams ship faster
-    outputs:
-      - name: harsh_truth
-        label: Harsh Truth
-        type: table
-      - name: rewrites
-        label: Rewrites
-        type: table
-      - name: one_line_tldr
-        label: Biggest Issue
-        type: text
-runtime: python
-python_dependencies:
-  - google-genai>=1.64.0,<2
-secrets_needed:
-  - GEMINI_API_KEY
-manifest_version: "2.0"`;
+command: python main.py
+public: true
+input_schema:
+  type: object
+  required: [pitch]
+  additionalProperties: false
+  properties:
+    pitch:
+      type: string
+      format: textarea
+      title: Pitch
+      description: Paste a single pitch blurb. 20–500 characters.
+      default: "We are a platform for AI apps that helps teams ship faster"
+output_schema:
+  type: object
+  required: [harsh_truth, rewrites, one_line_tldr]
+  properties:
+    harsh_truth:
+      type: array
+      items:
+        type: object
+        properties:
+          critique: { type: string }
+          vc_reaction: { type: string }
+    rewrites:
+      type: array
+      items:
+        type: object
+        properties:
+          angle: { type: string }
+          pitch: { type: string }
+          when_to_use: { type: string }
+    one_line_tldr: { type: string }
+secrets:
+  - name: GEMINI_API_KEY
+    scope: shared
+dependencies:
+  python: ./requirements.txt`;
 
 const PITCH_PY = `#!/usr/bin/env python3
 """Pitch Coach -- Floom demo app.
 
-Input:  { "action": "coach", "inputs": { "pitch": "..." } }
-Output: { "harsh_truth": [...], "rewrites": [...], "one_line_tldr": "..." }
-
-Floom runner contract:
-  stdout last line: __FLOOM_RESULT__{"ok": true, "outputs": {...}}
+Floom injects inputs via FLOOM_INPUTS env var (JSON).
+Print the result as JSON to stdout.
 """
 
-import json, os, sys
+import json, os
 from google import genai
 from google.genai import types
 
@@ -208,25 +216,20 @@ SCHEMA = {
     }
 }
 
-def main():
-    payload = json.loads(sys.argv[1] if len(sys.argv) > 1 else sys.stdin.read())
-    pitch = payload["inputs"]["pitch"].strip()
+inputs = json.loads(os.environ.get("FLOOM_INPUTS", "{}"))
+pitch = str(inputs.get("pitch") or "").strip()
 
-    client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
-    resp = client.models.generate_content(
-        model=DEFAULT_MODEL,
-        contents=f"Critique this pitch:\\n\\n{pitch}",
-        config=types.GenerateContentConfig(
-            system_instruction=SYSTEM_PROMPT,
-            response_mime_type="application/json",
-            response_schema=SCHEMA,
-        ),
-    )
-    result = json.loads(resp.text)
-    print("__FLOOM_RESULT__" + json.dumps({"ok": True, "outputs": result}))
-
-if __name__ == "__main__":
-    main()`;
+client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
+resp = client.models.generate_content(
+    model=DEFAULT_MODEL,
+    contents=f"Critique this pitch:\\n\\n{pitch}",
+    config=types.GenerateContentConfig(
+        system_instruction=SYSTEM_PROMPT,
+        response_mime_type="application/json",
+        response_schema=SCHEMA,
+    ),
+)
+print(json.dumps(json.loads(resp.text)))`;
 
 const PITCH_REQUIREMENTS = `google-genai>=1.64.0,<2`;
 
@@ -235,55 +238,45 @@ const PITCH_REQUIREMENTS = `google-genai>=1.64.0,<2`;
 const AUDIT_YAML = `name: AI Readiness Audit
 slug: ai-readiness-audit
 description: Paste one public HTTPS company URL, fetch the page, and return a strict AI-readiness score with 3 risks, 3 opportunities, and one concrete next step.
-category: research
-icon: gauge
-actions:
-  audit:
-    label: Run Audit
-    inputs:
-      - name: company_url
-        label: Company URL
-        type: url
-        required: true
-        placeholder: floom.dev
-    outputs:
-      - name: readiness_score
-        label: Readiness Score
-        type: number
-      - name: score_rationale
-        label: Score Rationale
-        type: text
-      - name: risks
-        label: Risks
-        type: json
-      - name: opportunities
-        label: Opportunities
-        type: json
-      - name: next_action
-        label: Next Action
-        type: text
-runtime: python
-python_dependencies:
-  - beautifulsoup4==4.13.4
-  - google-genai==1.64.0
-  - httpx==0.28.1
-secrets_needed:
-  - GEMINI_API_KEY
-timeout: 10s
-manifest_version: "2.0"`;
+command: python main.py
+public: true
+input_schema:
+  type: object
+  required: [company_url]
+  additionalProperties: false
+  properties:
+    company_url:
+      type: string
+      format: url
+      title: Company URL
+      default: "https://floom.dev"
+output_schema:
+  type: object
+  required: [readiness_score, score_rationale, risks, opportunities, next_action]
+  properties:
+    readiness_score: { type: integer, minimum: 1, maximum: 10 }
+    score_rationale: { type: string }
+    risks:
+      type: array
+      items: { type: string }
+    opportunities:
+      type: array
+      items: { type: string }
+    next_action: { type: string }
+secrets:
+  - name: GEMINI_API_KEY
+    scope: shared
+dependencies:
+  python: ./requirements.txt`;
 
 const AUDIT_PY = `#!/usr/bin/env python3
 """AI Readiness Audit -- Floom demo app.
 
-Fetches one public company URL, extracts the main page text, and scores
-how ready the company looks to ship AI products.
-
-Input:  { "action": "audit", "inputs": { "company_url": "https://floom.dev" } }
-Output: { "readiness_score": 8, "score_rationale": "...", "risks": [...],
-          "opportunities": [...], "next_action": "..." }
+Floom injects inputs via FLOOM_INPUTS env var (JSON).
+Print the result as JSON to stdout.
 """
 
-import asyncio, json, os, re, sys
+import asyncio, json, os, re
 import httpx
 from bs4 import BeautifulSoup
 from google import genai
@@ -314,27 +307,21 @@ async def fetch_page(url: str) -> str:
             tag.decompose()
         return re.sub(r"\\s+", " ", soup.get_text(" ", strip=True))[:6000]
 
-def main():
-    payload = json.loads(sys.argv[1] if len(sys.argv) > 1 else sys.stdin.read())
-    url = payload["inputs"]["company_url"].strip()
+inputs = json.loads(os.environ.get("FLOOM_INPUTS", "{}"))
+url = str(inputs.get("company_url") or "").strip()
 
-    page_text = asyncio.run(fetch_page(url))
+page_text = asyncio.run(fetch_page(url))
 
-    client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
-    resp = client.models.generate_content(
-        model=DEFAULT_MODEL,
-        contents=f"Score AI readiness for this company page:\\n\\n{page_text}",
-        config=types.GenerateContentConfig(
-            response_mime_type="application/json",
-            response_schema=SCHEMA,
-        ),
-    )
-    result = json.loads(resp.text)
-    result["company_url"] = url
-    print("__FLOOM_RESULT__" + json.dumps({"ok": True, "outputs": result}))
-
-if __name__ == "__main__":
-    main()`;
+client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
+resp = client.models.generate_content(
+    model=DEFAULT_MODEL,
+    contents=f"Score AI readiness for this company page:\\n\\n{page_text}",
+    config=types.GenerateContentConfig(
+        response_mime_type="application/json",
+        response_schema=SCHEMA,
+    ),
+)
+print(json.dumps(json.loads(resp.text)))`;
 
 const AUDIT_REQUIREMENTS = `beautifulsoup4==4.13.4
 google-genai==1.64.0
