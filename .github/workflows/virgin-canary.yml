@@ -1,0 +1,94 @@
+name: Virgin-agent canary
+
+# Runs the user-flow gate every 15 minutes against prod.
+# If it fails, opens a P0 issue. Closes the issue automatically on next pass.
+# Can also be triggered manually for on-demand smoke tests.
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: 'Target URL (default: https://floom.dev)'
+        required: false
+        default: 'https://floom.dev'
+
+jobs:
+  canary:
+    name: Prod canary
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run virgin-agent journey
+        run: |
+          URL="${{ github.event.inputs.base_url || 'https://floom.dev' }}"
+          bash scripts/virgin-agent-journey.sh "$URL"
+        env:
+          FLOOM_TEST_TOKEN: ${{ secrets.FLOOM_TEST_TOKEN }}
+
+      - name: Open P0 issue on failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Check if a canary P0 issue is already open to avoid duplicates.
+          OPEN=$(gh issue list \
+            --label "P0,canary" \
+            --state open \
+            --json number \
+            --jq 'length' 2>/dev/null || echo "0")
+
+          if [ "$OPEN" = "0" ]; then
+            gh issue create \
+              --title "P0: Prod canary FAILED — $(date -u '+%Y-%m-%d %H:%M UTC')" \
+              --body "## Prod canary failure
+
+          The virgin-agent journey gate failed on **https://floom.dev**.
+
+          **Time:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')
+          **Workflow run:** ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+          Check the Actions log for which step failed.
+
+          ### Steps
+          1. @floomhq/cli published on npm
+          2. /api/status reachable (core deps not down)
+          3. /api/apps/meeting-action-items metadata
+          4. /p/meeting-action-items renders
+          5. POST /api/apps/meeting-action-items/run accepted
+          6. Execution reaches terminal state
+          7. Output contains .actions
+          8. Authed /api/me/runs (if token set)
+          9. 404 on bogus slug
+          10. 400 on bad JSON body
+          11. 401 on unauthenticated /api/me/runs
+          12. /docs/quickstart renders
+          13. /mcp reachable
+
+          /cc @federicodeponte" \
+              --label "P0,canary"
+            echo "P0 issue opened."
+          else
+            echo "P0 issue already open ($OPEN). Skipping duplicate."
+          fi
+
+      - name: Close stale canary P0 on recovery
+        if: success()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Close any open canary P0 issues — prod has recovered.
+          gh issue list \
+            --label "P0,canary" \
+            --state open \
+            --json number \
+            --jq '.[].number' | \
+          while read -r NUM; do
+            gh issue close "$NUM" \
+              --comment "Canary recovered — all steps passed at $(date -u '+%Y-%m-%d %H:%M UTC')."
+            echo "Closed issue #$NUM"
+          done

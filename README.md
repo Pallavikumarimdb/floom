@@ -304,6 +304,7 @@ If `E2B_API_KEY` is not set, fake mode is available only outside production when
 - [x] Output validation via JSON Schema
 - [x] Build passes
 - [x] Live E2B verification
+- [x] Virgin-agent journey gate (CI + 15-min prod canary) — see [`docs/contributing/virgin-journey.md`](docs/contributing/virgin-journey.md)
 
 ## v0.1 Exclusions
 

@@ -1,0 +1,48 @@
+name: Virgin-agent journey
+
+# Runs the deterministic user-flow gate on every Vercel preview and prod deploy.
+# A failed gate on a preview deploy adds a blocking status check to the PR.
+# A failed gate on prod opens a P0 issue.
+
+on:
+  deployment_status:
+
+jobs:
+  gate:
+    name: User-flow gate
+    # Only run when Vercel has finished deploying (not on "pending" or "failure" states).
+    if: github.event.deployment_status.state == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run virgin-agent journey
+        run: bash scripts/virgin-agent-journey.sh "${{ github.event.deployment_status.target_url }}"
+        env:
+          FLOOM_TEST_TOKEN: ${{ secrets.FLOOM_TEST_TOKEN }}
+
+      # If the journey fails on a prod deploy, open a P0 issue automatically.
+      # Prod deploys target floom.dev; preview deploys target *.vercel.app.
+      - name: Open P0 issue on prod failure
+        if: >
+          failure() &&
+          contains(github.event.deployment_status.target_url, 'floom.dev')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh issue create \
+            --title "P0: Virgin journey FAILED on prod (deploy ${{ github.event.deployment.id }})" \
+            --body "## Prod deploy broke the user flow
+
+          **Deploy URL:** ${{ github.event.deployment_status.target_url }}
+          **Commit:** ${{ github.event.deployment.sha }}
+          **Triggered by:** ${{ github.triggering_actor }}
+          **Workflow run:** ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+          The virgin-agent journey gate failed immediately after a prod deploy.
+          Check the Actions log for the failing step, roll back if users are impacted.
+
+          /cc @federicodeponte" \
+            --label "P0,canary"
