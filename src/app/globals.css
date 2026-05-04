@@ -744,7 +744,13 @@ textarea:focus-visible {
 }
 
 /* ── Dark mode overrides ─────────────────────────────────── */
-@media (prefers-color-scheme: dark) {
+/* Default: light mode for everyone, regardless of OS preference. Federico
+   2026-05-04: light is the default; we'll add a future user-controlled
+   toggle (day/night/system) but until then keep one source of truth.
+   Dark variables stay defined so a future [data-theme="dark"] selector
+   can flip them without re-authoring. The @media block is disabled by
+   matching no-op selectors. */
+@media (prefers-color-scheme: dark) and (min-width: 999999px) {
   :root {
     --bg: #111110;
     --card: #1a1917;
