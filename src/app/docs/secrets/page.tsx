@@ -47,8 +47,14 @@ export default function SecretsPage() {
 
       <Section id="delete" title="Delete a secret">
         <p>
-          <IC>DELETE /api/apps/:slug/secrets/:name</IC> with an agent token that has <IC>publish</IC> scope. There is no CLI shortcut yet.
+          <IC>DELETE /api/apps/:slug/secrets</IC> with the secret name in the request body:
         </p>
+        <CodeBlock label="Delete a secret">
+          {`curl -X DELETE https://floom.dev/api/apps/<slug>/secrets \\
+  -H "Authorization: Bearer <token>" \\
+  -H "Content-Type: application/json" \\
+  -d '{"name":"GMAIL_USER"}'`}
+        </CodeBlock>
       </Section>
 
       <Section id="rules" title="Rules">

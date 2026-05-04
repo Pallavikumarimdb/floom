@@ -595,7 +595,7 @@ export default function DocsContent() {
                 <li>Use <IC>--value-stdin</IC> to keep the value out of shell history.</li>
                 <li>Names must be uppercase letters, digits, and underscores (e.g. <IC>OPENAI_API_KEY</IC>).</li>
                 <li>Undeclared secrets are never injected, even if the values exist.</li>
-                <li>Delete a secret: <IC>DELETE /api/apps/:slug/secrets/:name</IC> with an agent token.</li>
+                <li>Delete a secret: <IC>DELETE /api/apps/:slug/secrets</IC> with secret name in the request body and an agent token.</li>
               </ul>
             </Section>
 
