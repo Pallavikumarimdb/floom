@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { unstable_cache } from "next/cache";
 import AppPermalinkPage, { type PermalinkInitialApp } from "./AppPermalinkPage";
 import { demoApp, hasSupabaseConfig } from "@/lib/demo-app";
@@ -140,7 +141,14 @@ export default async function Page({ params }: Props) {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: safeJsonLd(appJsonLd) }}
       />
-      <AppPermalinkPage initialApp={initialApp} />
+      {/* AppPermalinkPage uses useSearchParams() which opts the page into dynamic
+          rendering without a Suspense boundary. Wrapping it in Suspense allows
+          Next.js to statically render the outer page shell (JSON-LD, metadata)
+          and stream the dynamic content after hydration, keeping the route
+          eligible for ISR caching (Cache-Control: public, s-maxage=300). */}
+      <Suspense>
+        <AppPermalinkPage initialApp={initialApp} />
+      </Suspense>
     </>
   );
 }
