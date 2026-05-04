@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import AppPermalinkPage, { type PermalinkInitialApp } from "./AppPermalinkPage";
 import { demoApp, hasBrowserAuthConfig, hasSupabaseConfig } from "@/lib/demo-app";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { createClient as createServerSupabaseClient } from "@/lib/supabase/server";
+import { safeJsonLd } from "@/lib/seo/json-ld";
 
 // ISR: public app pages are cached at the CDN for 5 minutes.
 // Private app pages still opt into dynamic rendering (cookies() is called
@@ -134,7 +134,7 @@ export default async function Page({ params }: Props) {
     <>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(appJsonLd) }}
+        dangerouslySetInnerHTML={{ __html: safeJsonLd(appJsonLd) }}
       />
       <AppPermalinkPage initialApp={initialApp ?? undefined} />
     </>
@@ -212,6 +212,10 @@ async function isUnavailablePermalink(slug: string) {
       return true;
     }
 
+    // Dynamic import keeps `cookies()` out of the static module graph so
+    // public app pages can be ISR-cached. The import only executes for
+    // private-app ownership checks (data.public !== true branch above).
+    const { createClient: createServerSupabaseClient } = await import("@/lib/supabase/server");
     const supabase = await createServerSupabaseClient();
     const { data: userData, error: userError } = await supabase.auth.getUser();
 
