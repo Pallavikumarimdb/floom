@@ -18,18 +18,23 @@ export const metadata: Metadata = {
   },
 };
 
+const installCommand = `# Recommended: install once, use 'floom' anywhere
+npm install -g @floomhq/cli@latest
+
+# Or skip the install and prefix every command with 'npx @floomhq/cli@latest'`;
+
 const launchCommand = `# 1. Authenticate (once per machine)
-npx @floomhq/cli@latest setup
+floom setup
 
 # 2. Scaffold a new app
 mkdir my-floom-app && cd my-floom-app
-npx @floomhq/cli@latest init --name "My App" --slug my-app --type custom
+floom init --name "My App" --slug my-app --type custom
 
 # 3. Deploy
-npx @floomhq/cli@latest deploy
+floom deploy
 
 # 4. Run it
-npx @floomhq/cli@latest run my-app '{"text":"hello"}' --json`;
+floom run my-app '{"text":"hello"}' --json`;
 
 export default function QuickstartPage() {
   return (
@@ -44,9 +49,16 @@ export default function QuickstartPage() {
         </p>
       </div>
 
+      <Section id="install" title="0. Install the CLI">
+        <p>
+          Install the CLI globally so you can use the <IC>floom</IC> command anywhere. If you skip this step, prefix every command in this guide with <IC>npx @floomhq/cli@latest</IC>.
+        </p>
+        <CodeBlock label="Terminal: install once">{installCommand}</CodeBlock>
+      </Section>
+
       <Section id="setup" title="1. Authenticate">
         <p>
-          Run <IC>npx @floomhq/cli@latest setup</IC> once per machine. It opens a browser page to link your Floom account. The token is saved to <IC>~/.floom/config.json</IC>.
+          Run <IC>floom setup</IC> once per machine. It opens a browser page to link your Floom account. The token is saved to <IC>~/.floom/config.json</IC>.
         </p>
         <p>
           In CI, set the <IC>FLOOM_API_KEY</IC> env var instead; no setup command needed.
