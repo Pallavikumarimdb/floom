@@ -34,6 +34,10 @@ export async function handleMcpRequest(
   context: McpToolContext
 ): Promise<JsonRpcResponse | JsonRpcResponse[] | null> {
   if (Array.isArray(payload)) {
+    const MAX_BATCH_SIZE = 10;
+    if (payload.length > MAX_BATCH_SIZE) {
+      return [errorResponse(null, -32600, `Batch too large: max ${MAX_BATCH_SIZE} requests per batch`)];
+    }
     const responses = await Promise.all(
       payload.map((item) => handleSingleRequest(item, context))
     );

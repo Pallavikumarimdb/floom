@@ -7,8 +7,19 @@ const SITE_URL = "https://floom.dev";
 export const metadata: Metadata = {
   title: "Terms of Service",
   description:
-    "Terms of Service for Floom, Inc.: acceptable use, intellectual property, disclaimers, and governing law.",
+    "Terms of service for Floom. What you can do with the platform, what we owe you, and what's not allowed.",
   alternates: { canonical: `${SITE_URL}/terms` },
+  openGraph: {
+    title: "Terms of Service · Floom",
+    description: "Terms of service for Floom. What you can do with the platform, what we owe you, and what's not allowed.",
+    url: `${SITE_URL}/terms`,
+    type: "article",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Terms of Service · Floom",
+    description: "Terms of service for Floom. What you can do with the platform, what we owe you, and what's not allowed.",
+  },
 };
 
 export default function TermsPage() {

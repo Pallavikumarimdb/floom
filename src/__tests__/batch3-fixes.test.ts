@@ -136,22 +136,32 @@ describe("unionKeys — covers all columns across heterogeneous rows", () => {
 // ── F1: anonymous read must not receive inputs / error_detail ───────────────
 // The route handler requires Next.js runtime + Supabase; we verify the
 // structural guarantee by checking that the cherry-picked code uses
-// conditional spreads keyed on isRunner (runner-only: inputs/error_detail never shown to app owners).
+// inputs/error_detail must be gated on isRunner (runner-only: never shown to app owners).
 describe("GET /api/runs/[id] — privacy: inputs/error_detail gated on isRunner", () => {
-  it("route source uses conditional spread for inputs (not unconditional)", async () => {
+  it("route source uses isRunner branch to gate inputs and error_detail", async () => {
     // Read source to verify structural guarantee without invoking the handler (needs Supabase).
     const { readFileSync } = await import("fs");
     const { resolve } = await import("path");
     const src = readFileSync(resolve("src/app/api/runs/[id]/route.ts"), "utf-8");
 
-    // Must NOT have unconditional `inputs: execution.input`
-    expect(src).not.toMatch(/^\s+inputs:\s+execution\.input,/m);
-    // Must have the conditional spread pattern (isRunner guard — runner sees own inputs, owner sees traffic only)
+    // Must have isRunner guard
     expect(src).toContain("isRunner");
     expect(src).toContain("execution.input");
+    // inputs must appear AFTER the isRunner branch guard
+    const isRunnerBranchIdx = src.indexOf("if (isRunner)");
+    const inputsIdx = src.indexOf("inputs: execution.input");
+    expect(isRunnerBranchIdx).toBeGreaterThan(-1);
+    expect(inputsIdx).toBeGreaterThan(isRunnerBranchIdx);
     // Same for error_detail
-    expect(src).not.toMatch(/^\s+error_detail:\s+execution\.error_detail,/m);
     expect(src).toContain("execution.error_detail");
+    const errorDetailIdx = src.indexOf("error_detail: execution.error_detail");
+    expect(errorDetailIdx).toBeGreaterThan(isRunnerBranchIdx);
+    // Owner fallback branch must NOT contain inputs or error_detail
+    const ownerFallbackIdx = src.indexOf("// isOwner only");
+    expect(ownerFallbackIdx).toBeGreaterThan(-1);
+    const ownerBranch = src.slice(ownerFallbackIdx);
+    expect(ownerBranch).not.toContain("inputs: execution.input");
+    expect(ownerBranch).not.toContain("error_detail: execution.error_detail");
   });
 });
 

@@ -5,7 +5,7 @@ import {
 } from "./limits";
 
 export type QuotaCheckResult =
-  | { allowed: true; reservedSeconds: number }
+  | { allowed: true; reservedSeconds: number; warningPercent?: number }
   | { allowed: false; retryAfterUnix: number; reason: "exhausted" | "unavailable" };
 
 type QuotaRpcRow = {
@@ -45,7 +45,16 @@ export async function reserveDailyQuota(
     return { allowed: false, retryAfterUnix, reason: "exhausted" };
   }
 
-  return { allowed: true, reservedSeconds: safeSeconds };
+  // Compute warning percent so callers can fire a soft-cap warning at 80%.
+  const appLimit = readPositiveIntegerEnv("FLOOM_APP_E2B_SECONDS_PER_DAY", DEFAULT_APP_E2B_SECONDS_PER_DAY);
+  const ownerLimit = readPositiveIntegerEnv("FLOOM_OWNER_E2B_SECONDS_PER_DAY", DEFAULT_OWNER_E2B_SECONDS_PER_DAY);
+  const appConsumed = Number(row.e2b_seconds_consumed ?? 0);
+  const ownerConsumed = Number(row.owner_e2b_seconds_consumed ?? 0);
+  const appPct = appLimit > 0 ? Math.round((appConsumed / appLimit) * 100) : 0;
+  const ownerPct = ownerLimit > 0 ? Math.round((ownerConsumed / ownerLimit) * 100) : 0;
+  const warningPercent = Math.max(appPct, ownerPct);
+
+  return { allowed: true, reservedSeconds: safeSeconds, warningPercent };
 }
 
 export async function recordQuotaUsage(

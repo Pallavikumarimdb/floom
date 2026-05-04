@@ -43,10 +43,28 @@ export async function GET(
   }
 
   if (req.headers.get("accept")?.includes("text/event-stream")) {
-    return streamExecution(req, auth.execution);
+    return streamExecution(req, auth.execution, auth.isRunner);
   }
 
-  return NextResponse.json(formatExecutionSnapshot(auth.execution));
+  const snapshot = formatExecutionSnapshot(auth.execution);
+
+  // Strangers: 404 (already gated by authorizeExecutionRead returning ok:false
+  // for private apps; for public apps canAccess=false means stranger).
+  if (!auth.isRunner && !auth.isOwner) {
+    return NextResponse.json({ error: "Execution not found" }, { status: 404 });
+  }
+
+  if (auth.isRunner) {
+    return NextResponse.json(snapshot);
+  }
+
+  // isOwner only: analytics shape — never inputs/output/error_detail/progress.
+  return NextResponse.json({
+    execution_id: snapshot.execution_id,
+    status: snapshot.status,
+    started_at: snapshot.started_at,
+    completed_at: snapshot.completed_at,
+  });
 }
 
 export async function DELETE(
@@ -136,7 +154,11 @@ export async function DELETE(
   );
 }
 
-function streamExecution(req: NextRequest, initialExecution: ExecutionRow) {
+function redactSnapshotForPublic(snapshot: ReturnType<typeof formatExecutionSnapshot>) {
+  return { ...snapshot, output: undefined, error: undefined, progress: undefined };
+}
+
+function streamExecution(req: NextRequest, initialExecution: ExecutionRow, canViewOutput: boolean) {
   const encoder = new TextEncoder();
   const admin = createAdminClient();
   const lastEventId = Number(req.headers.get("last-event-id") ?? 0);
@@ -152,8 +174,11 @@ function streamExecution(req: NextRequest, initialExecution: ExecutionRow) {
       };
       const keepalive = () => controller.enqueue(encoder.encode(": keepalive\n\n"));
 
+      const maybeRedact = (s: ReturnType<typeof formatExecutionSnapshot> | null) =>
+        s && !canViewOutput ? redactSnapshotForPublic(s) : s;
+
       controller.enqueue(encoder.encode("retry: 1000\n"));
-      send("snapshot", formatExecutionSnapshot(initialExecution));
+      send("snapshot", maybeRedact(formatExecutionSnapshot(initialExecution)));
 
       const deadline = Date.now() + 25_000;
       let keepaliveAt = Date.now() + 10_000;
@@ -174,7 +199,7 @@ function streamExecution(req: NextRequest, initialExecution: ExecutionRow) {
             continue;
           }
           const snapshot = await loadSnapshotForSse(admin, initialExecution.id);
-          send(name, snapshot, event.id);
+          send(name, maybeRedact(snapshot), event.id);
           if (snapshot && isTerminalExecutionStatus(snapshot.status)) {
             controller.close();
             return;
@@ -183,7 +208,7 @@ function streamExecution(req: NextRequest, initialExecution: ExecutionRow) {
 
         const snapshot = await loadSnapshotForSse(admin, initialExecution.id);
         if (snapshot && isTerminalExecutionStatus(snapshot.status)) {
-          send("completed", snapshot);
+          send("completed", maybeRedact(snapshot));
           controller.close();
           return;
         }

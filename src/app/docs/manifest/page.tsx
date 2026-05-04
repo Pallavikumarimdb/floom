@@ -3,8 +3,19 @@ import { IC, CodeBlock, Section } from "@/components/docs/DocsPrimitives";
 
 export const metadata: Metadata = {
   title: "Manifest reference",
-  description: "Every field in floom.yaml: slug, command, input_schema, output_schema, public, secrets, dependencies, bundle_exclude.",
+  description: "Reference for Floom app manifests. Inputs, outputs, secrets, runtime modes — everything you can declare in floom.yaml.",
   alternates: { canonical: "https://floom.dev/docs/manifest" },
+  openGraph: {
+    title: "Manifest reference · Floom",
+    description: "Reference for Floom app manifests. Inputs, outputs, secrets, runtime modes — everything you can declare in floom.yaml.",
+    url: "https://floom.dev/docs/manifest",
+    type: "article",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Manifest reference · Floom",
+    description: "Reference for Floom app manifests. Inputs, outputs, secrets, runtime modes — everything you can declare in floom.yaml.",
+  },
 };
 
 const manifestFull = `slug: my-app

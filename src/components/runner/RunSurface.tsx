@@ -77,6 +77,7 @@ type ExecutionSnapshot = {
   started_at?: string | null;
   completed_at?: string | null;
   progress?: unknown | null;
+  view_token?: string | null;
 };
 
 function fieldsFromSchema(schema: InputSchema | undefined) {
@@ -243,6 +244,15 @@ export function RunSurface({ app, initialRun, initialInputs, examplePrefillInput
     const timer = window.setTimeout(async () => {
       try {
         const headers = await authHeaders();
+        // Attach view_token for anon runners so they can poll their own run.
+        try {
+          const vt = localStorage.getItem(`floom_vt_${state.executionId}`);
+          if (vt && !headers.Authorization) {
+            headers.Authorization = `ViewToken ${vt}`;
+          }
+        } catch {
+          // localStorage unavailable — proceed without token (authed callers unaffected).
+        }
         const res = await fetch(`/api/executions/${state.executionId}`, { headers });
         const data = (await res.json().catch(() => null)) as ExecutionSnapshot | null;
         if (cancelled || !res.ok || !data) return;
@@ -331,6 +341,15 @@ export function RunSurface({ app, initialRun, initialInputs, examplePrefillInput
         });
         return;
       }
+      // Persist view_token so anon runners can re-access their run after a
+      // page refresh. The token is only ever returned on the submit response.
+      if (data.view_token && data.execution_id) {
+        try {
+          localStorage.setItem(`floom_vt_${data.execution_id}`, data.view_token);
+        } catch {
+          // localStorage unavailable (private browsing strict mode) — graceful degradation.
+        }
+      }
       applyExecutionSnapshot(data, ms);
     } catch (err) {
       setState({
@@ -399,7 +418,7 @@ export function RunSurface({ app, initialRun, initialInputs, examplePrefillInput
                 setValues((v) => ({ ...v, [f.name]: e.target.value }))
               }
               rows={5}
-              style={{ ...inputStyle, resize: 'vertical', fontFamily: "'JetBrains Mono', ui-monospace, monospace", fontSize: 12 }}
+              style={{ ...inputStyle, resize: 'vertical', fontFamily: "'JetBrains Mono', ui-monospace, monospace" }}
               placeholder={f.type === 'array' ? '[\n  ...\n]' : '{\n  ...\n}'}
             />
             <span style={{ fontSize: 11, color: 'var(--muted)' }}>JSON {f.type}</span>
@@ -426,7 +445,7 @@ export function RunSurface({ app, initialRun, initialInputs, examplePrefillInput
                 onChange={(e) =>
                   setValues((v) => ({ ...v, [f.name]: e.target.value }))
                 }
-                style={{ ...inputStyle, paddingRight: 64, fontFamily: "'JetBrains Mono', ui-monospace, monospace", fontSize: 12.5 }}
+                style={{ ...inputStyle, paddingRight: 64, fontFamily: "'JetBrains Mono', ui-monospace, monospace" }}
               />
               <button
                 type="button"
@@ -595,6 +614,7 @@ export function RunSurface({ app, initialRun, initialInputs, examplePrefillInput
               disabled={state.kind === 'active' || !canRun}
               style={{
                 padding: '9px 18px',
+                minHeight: 44,
                 background: 'var(--accent)',
                 color: '#fff',
                 border: 'none',
@@ -1105,7 +1125,9 @@ const inputStyle = {
   padding: '9px 12px',
   border: '1px solid var(--line)',
   borderRadius: 8,
-  fontSize: 13.5,
+  // iOS Safari auto-zooms any input/textarea with font-size < 16px on focus.
+  // 16px on mobile; desktop callers can override via spread if desired.
+  fontSize: 16,
   background: 'var(--card)',
   color: 'var(--ink)',
   outline: 'none',

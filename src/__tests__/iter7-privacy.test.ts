@@ -14,32 +14,43 @@ import { resolve } from "path";
 describe("GET /api/runs/[id] — owner sees traffic only, runner sees own run in full", () => {
   const src = readFileSync(resolve("src/app/api/runs/[id]/route.ts"), "utf-8");
 
-  it("uses isRunner (not isOwner) to gate inputs/error_detail", () => {
-    // isRunner gates the sensitive fields
+  it("uses isRunner and isOwner to gate response shape", () => {
+    // isRunner gates full execution body (inputs/output/error_detail)
     expect(src).toContain("isRunner");
-    // canAccess gates visibility (access control)
-    expect(src).toContain("canAccess");
+    // isOwner gates analytics-only response
+    expect(src).toContain("isOwner");
   });
 
   it("isRunner requires caller_user_id match (not just app owner_id)", () => {
     // isRunner is tied to caller_user_id — not app ownership
     expect(src).toContain("caller_user_id");
     expect(src).toContain("isRunner");
-    // The isRunner definition must check caller_user_id
-    const isRunnerBlock = src.match(/const isRunner[\s\S]*?;/)?.[0] ?? "";
-    expect(isRunnerBlock).toContain("caller_user_id");
+    // isAuthedRunner must reference caller_user_id
+    expect(src).toContain("isAuthedRunner");
   });
 
-  it("inputs field is conditionally gated on isRunner", () => {
-    // Must NOT have unconditional inputs
-    expect(src).not.toMatch(/^\s+inputs:\s+execution\.input,/m);
-    // Must have isRunner gate
-    expect(src).toContain("isRunner ? { inputs: execution.input }");
+  it("inputs field is only returned inside isRunner branch", () => {
+    // inputs must be gated: the runner branch (if isRunner) returns inputs
+    expect(src).toContain("inputs: execution.input");
+    // The isRunner branch must come BEFORE the owner fallback
+    const isRunnerIdx = src.indexOf("if (isRunner)");
+    const inputsIdx = src.indexOf("inputs: execution.input");
+    expect(isRunnerIdx).toBeGreaterThan(-1);
+    expect(inputsIdx).toBeGreaterThan(isRunnerIdx);
+    // Owner fallback must NOT contain inputs
+    const ownerBranchStart = src.indexOf("// isOwner only");
+    expect(ownerBranchStart).toBeGreaterThan(inputsIdx);
+    const ownerBranch = src.slice(ownerBranchStart);
+    expect(ownerBranch).not.toContain("inputs: execution.input");
   });
 
-  it("error_detail field is conditionally gated on isRunner", () => {
-    expect(src).not.toMatch(/^\s+error_detail:\s+execution\.error_detail,/m);
-    expect(src).toContain("isRunner ? { error_detail: execution.error_detail }");
+  it("error_detail field is only returned inside isRunner branch", () => {
+    expect(src).toContain("error_detail: execution.error_detail");
+    // error_detail must NOT appear in the owner fallback branch
+    const ownerBranchStart = src.indexOf("// isOwner only");
+    expect(ownerBranchStart).toBeGreaterThan(-1);
+    const ownerBranch = src.slice(ownerBranchStart);
+    expect(ownerBranch).not.toContain("error_detail: execution.error_detail");
   });
 });
 

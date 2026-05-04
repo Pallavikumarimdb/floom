@@ -303,7 +303,15 @@ export default function AppPermalinkPage({ initialApp }: { initialApp?: Permalin
     setInitialRunLoading(true);
     setRunNotFound(false);
     // Data seam: getRun(runIdFromUrl) → fetch('/api/runs/' + runIdFromUrl)
-    fetch(`/api/runs/${runIdFromUrl}`)
+    // Attach view_token for anon runners so they can re-access their own run.
+    const runFetchHeaders: Record<string, string> = {};
+    try {
+      const vt = localStorage.getItem(`floom_vt_${runIdFromUrl}`);
+      if (vt) runFetchHeaders.Authorization = `ViewToken ${vt}`;
+    } catch {
+      // localStorage unavailable — proceed without token.
+    }
+    fetch(`/api/runs/${runIdFromUrl}`, { headers: runFetchHeaders })
       .then(async (res) => {
         if (!res.ok) {
           if (res.status === 404) throw new ApiError('Run not found', 404);

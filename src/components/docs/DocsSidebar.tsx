@@ -40,6 +40,7 @@ export const DOCS_NAV = [
       { href: "/docs/examples", label: "Examples" },
       { href: "/docs/limits", label: "Limits" },
       { href: "/docs/faq", label: "FAQ" },
+      { href: "/docs/troubleshooting", label: "Troubleshooting" },
     ],
   },
 ] as const;

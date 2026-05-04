@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 
 export const metadata: Metadata = {
   title: "FAQ",
@@ -64,6 +65,16 @@ export default function FaqPage() {
             <p className="mt-1 text-neutral-600">{a}</p>
           </div>
         ))}
+      </div>
+
+      <div className="mt-10 pt-8 border-t border-[#ded8cc]">
+        <p className="text-sm text-neutral-500">
+          Something looks wrong rather than just confusing?{" "}
+          <Link href="/docs/troubleshooting" className="text-emerald-700 font-medium hover:underline">
+            See the troubleshooting guide
+          </Link>{" "}
+          for step-by-step fixes for common broken states.
+        </p>
       </div>
     </>
   );

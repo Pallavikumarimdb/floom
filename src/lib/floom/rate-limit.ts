@@ -23,8 +23,13 @@ export function getPublicRunAppRateLimitKey(appId: string) {
 }
 
 export function getPublicRunCallerKey(headers: Headers) {
-  const forwardedFor = headers.get("x-forwarded-for")?.split(",")[0]?.trim();
-  const directIp = forwardedFor || headers.get("x-real-ip") || headers.get("cf-connecting-ip");
+  // x-vercel-forwarded-for is set by Vercel infrastructure and is NOT
+  // client-overridable, unlike x-forwarded-for which clients can spoof.
+  const vercelFwd = headers.get("x-vercel-forwarded-for")?.split(",")[0]?.trim();
+  const cfIp = headers.get("cf-connecting-ip"); // future Cloudflare-in-front scenario
+  const realIp = headers.get("x-real-ip");
+  const directIp = vercelFwd || cfIp || realIp;
+  // Deliberately exclude x-forwarded-for: clients can set it and bypass rate limits.
   const userAgent = headers.get("user-agent") || "";
   if (!directIp && !userAgent) {
     return PUBLIC_ANONYMOUS_RATE_LIMIT_ID;

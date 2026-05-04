@@ -37,14 +37,14 @@ export async function POST(req: NextRequest) {
 
   let response: Awaited<ReturnType<typeof handleMcpRequest>>;
   try {
-    // Resolve the real caller IP: prefer cf-connecting-ip (Cloudflare), then
-    // the first hop of x-forwarded-for, then x-real-ip. This is forwarded
-    // through to any proxy requests (e.g. run_app) so rate limits apply per
-    // actual client, not per MCP server internal address.
+    // Resolve the real caller IP. x-vercel-forwarded-for is set by Vercel
+    // infrastructure and is NOT client-overridable, unlike x-forwarded-for
+    // which clients can spoof to bypass rate limits. cf-connecting-ip covers a
+    // future Cloudflare-in-front scenario. x-forwarded-for is excluded.
+    const vercelFwd = req.headers.get("x-vercel-forwarded-for")?.split(",")[0]?.trim();
     const cfIp = req.headers.get("cf-connecting-ip");
-    const forwardedFor = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
     const realIp = req.headers.get("x-real-ip");
-    const callerIp = cfIp || forwardedFor || realIp || undefined;
+    const callerIp = vercelFwd || cfIp || realIp || undefined;
     response = await handleMcpRequest(payload, {
       baseUrl: resolveMcpForwardOrigin(req.url) ?? "",
       authorization: req.headers.get("authorization") ?? undefined,

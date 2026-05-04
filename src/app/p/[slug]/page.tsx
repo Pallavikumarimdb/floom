@@ -16,11 +16,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   let appName = slug;
   let appDescription = "";
+  let appFound = false;
   try {
     const res = await fetch(`${SITE_URL}/api/apps/${slug}`, {
       next: { revalidate: 300 },
     });
     if (res.ok) {
+      appFound = true;
       const data = (await res.json()) as {
         name?: string;
         description?: string;
@@ -47,14 +49,15 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   }
 
   // If no description was found from any source, emit a minimal fallback so
-  // OG/Twitter cards are never blank.
+  // OG/Twitter cards are never blank. For not-found apps, use a generic message.
   if (!appDescription) {
-    appDescription = `${appName} on Floom`;
+    appDescription = appFound ? `${appName} on Floom` : "This Floom app does not exist.";
   }
 
   // Title is bare app name; layout.tsx metadata.title.template adds " · Floom".
-  const title = appName;
-  const fullTitle = `${appName} · Floom`;
+  // For not-found apps, use a generic title.
+  const title = appFound ? appName : "Not found";
+  const fullTitle = `${title} · Floom`;
   const url = `${SITE_URL}/p/${slug}`;
   const ogImage = `${SITE_URL}/p/${slug}/opengraph-image`;
 

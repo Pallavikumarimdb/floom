@@ -493,7 +493,6 @@ Five working apps you can run now or use as a starting point:
 
 1. Meeting action items — https://floom.dev/p/meeting-action-items
    Paste a meeting transcript; get back a list of action items and a summary. Uses Gemini.
-   Source: https://github.com/floomhq/floom/tree/main/cli-npm/templates/meeting_action_items
 
 2. Invoice calculator — https://floom.dev/p/invoice-calculator
    Enter line items and hourly rates; get a formatted invoice total with tax breakdown.
@@ -503,11 +502,9 @@ Five working apps you can run now or use as a starting point:
 
 4. CSV stats — https://floom.dev/p/csv-stats
    Upload a CSV; get column types, row count, min/max, mean, and null counts.
-   Source: https://github.com/floomhq/floom/tree/main/cli-npm/templates/csv_stats
 
 5. Multi-file Python — https://floom.dev/p/multi-file-python
    Starter template: multi-file Python app with helpers, shared logic, and requirements.txt.
-   Source: https://github.com/floomhq/floom/tree/main/cli-npm/templates/multi_file_python
 
 ---
 

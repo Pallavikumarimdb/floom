@@ -240,8 +240,7 @@ import os
 from composio import ComposioToolSet
 
 toolset = ComposioToolSet(entity_id=os.environ["COMPOSIO_CONNECTION_ID"])
-tools = toolset.get_tools(actions=["GMAIL_SEND_EMAIL"])
-# TODO: auto-injection from active connection is on the roadmap`;
+tools = toolset.get_tools(actions=["GMAIL_SEND_EMAIL"])`;
 
 const asyncFireAndForgetExample = `# Fire-and-forget — returns 202 immediately
 curl -X POST https://floom.dev/api/apps/my-app/run \\
@@ -325,7 +324,7 @@ function CodeBlock({ children, label }: { children: string; label?: string }) {
       {label && (
         <div className="text-xs font-semibold text-neutral-400 mb-1.5 tracking-wide">{label}</div>
       )}
-      <pre className="max-w-full whitespace-pre-wrap break-words rounded-xl border border-[#e0dbd0] bg-[#f5f4ed] p-4 text-sm leading-7 text-[#2a2520] font-mono">
+      <pre className="max-w-full overflow-x-auto whitespace-pre-wrap break-words rounded-xl border border-[#e0dbd0] bg-[#f5f4ed] p-4 text-sm leading-7 text-[#2a2520] font-mono">
         <code>{children}</code>
       </pre>
       <button
@@ -678,6 +677,9 @@ export default function DocsContent() {
                 Apps that need to call external services can use Floom Connections, powered by Composio. Connect your accounts once via OAuth in Settings, then reference the connection in your app as an env var.
               </p>
               <CodeBlock label="Python app using Gmail">{composioExample}</CodeBlock>
+              <p className="text-sm text-neutral-600 mt-3">
+                Today you set your connection ID manually as an app secret. Auto-injection — where Floom reads your active connection at run time so apps don't need a manual copy step — is on the roadmap for v0.5.
+              </p>
               {/* Fix #5: updated connections list with 77 providers */}
               <p>
                 77 managed-auth providers available, including <strong>Gmail</strong>, <strong>Slack</strong>, <strong>GitHub</strong>, <strong>Notion</strong>, <strong>Linear</strong>, <strong>Google Calendar</strong>, <strong>HubSpot</strong>, <strong>Stripe</strong>, <strong>Salesforce</strong>, <strong>Asana</strong>, <strong>Airtable</strong>, <strong>Discord</strong>, <strong>Zoom</strong>, <strong>Trello</strong>, <strong>Figma</strong>, <strong>Mailchimp</strong>, <strong>Outlook</strong>, <strong>Google Drive</strong>, <strong>Google Docs</strong>, <strong>Google Sheets</strong>, <strong>Calendly</strong>, <strong>Sentry</strong>, <strong>Supabase</strong>, and more. See the full list at <a href="/connections" className="underline">floom.dev/connections</a>.
@@ -735,16 +737,6 @@ export default function DocsContent() {
                         >
                           Run app
                         </Link>
-                        {app.template && (
-                          <a
-                            href={`https://github.com/floomhq/floom/tree/main/cli-npm/templates/${app.template}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="rounded-md border border-[#ded8cc] px-3 py-1.5 text-xs font-semibold text-neutral-700 hover:border-neutral-400 transition-colors whitespace-nowrap"
-                          >
-                            View source
-                          </a>
-                        )}
                       </div>
                     </div>
                   </div>

@@ -224,6 +224,27 @@ export function SiteHeader({ compact = false, onStudioMenuOpen }: Props = {}) {
             >
               floom<span aria-hidden="true" style={{ color: '#10b981' }}>.</span>
             </span>
+            <span
+              aria-label="Beta"
+              style={{
+                display: 'inline-block',
+                fontSize: 9,
+                fontWeight: 600,
+                letterSpacing: '0.06em',
+                lineHeight: 1,
+                color: MUTED,
+                border: '1px solid rgba(88,85,80,0.35)',
+                borderRadius: 3,
+                padding: '2px 4px',
+                textTransform: 'uppercase',
+                marginLeft: 2,
+                verticalAlign: 'middle',
+                position: 'relative',
+                top: -1,
+              }}
+            >
+              Beta
+            </span>
           </Link>
 
           {/* Studio-only mobile sidebar toggle */}

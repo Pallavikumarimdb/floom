@@ -18,6 +18,9 @@ export const metadata: Metadata = {
   description: SITE_DESCRIPTION,
   applicationName: SITE_NAME,
   authors: [{ name: "Floom" }],
+  alternates: {
+    canonical: SITE_URL,
+  },
   openGraph: {
     type: "website",
     siteName: SITE_NAME,
@@ -41,6 +44,7 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: "/favicon.ico",
+    apple: "/apple-icon",
   },
 };
 

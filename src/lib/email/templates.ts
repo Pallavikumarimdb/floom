@@ -86,7 +86,7 @@ function baseLayout({
   const logoPng = `${assetBase}/brand/logo-email.png?v=${cacheBust}`;
   const logoPng2x = `${assetBase}/brand/logo-email@2x.png?v=${cacheBust}`;
 
-  const logoBlock = `<img src="${escapeHtml(logoPng)}" srcset="${escapeHtml(logoPng)} 1x, ${escapeHtml(logoPng2x)} 2x" width="200" height="60" alt="Floom" style="display:block;border:0;outline:none;text-decoration:none;width:200px;height:60px;max-width:100%;">`;
+  const logoBlock = `<img src="${escapeHtml(logoPng)}" srcset="${escapeHtml(logoPng)} 1x, ${escapeHtml(logoPng2x)} 2x" width="220" height="66" alt="Floom" style="display:block;border:0;outline:none;text-decoration:none;width:220px;height:66px;max-width:100%;">`;
 
   const unsubscribeBlock = unsubscribeUrl
     ? `<br><a href="${escapeHtml(unsubscribeUrl)}" style="color:${EMAIL_MUTED};text-decoration:underline;">Unsubscribe</a>`
@@ -107,19 +107,17 @@ ${preheaderBlock}
 <tr><td align="center">
 <table role="presentation" width="560" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;width:100%;">
 
-<tr><td style="background:${EMAIL_BAND};border:1px solid ${EMAIL_LINE};border-bottom:none;border-radius:12px 12px 0 0;padding:24px 28px;">
+<tr><td style="background:${EMAIL_BAND};border:1px solid ${EMAIL_LINE};border-bottom:none;border-radius:14px 14px 0 0;padding:28px 32px;">
 ${logoBlock}
 </td></tr>
 
-<tr><td style="background:${EMAIL_CARD};border:1px solid ${EMAIL_LINE};border-top:1px solid ${EMAIL_LINE};border-radius:0 0 12px 12px;padding:36px 36px 40px;">
-<h1 style="margin:0 0 20px;font-family:${SERIF};font-size:26px;line-height:1.25;font-weight:600;letter-spacing:-0.01em;color:${EMAIL_INK};">${heading}</h1>
+<tr><td style="background:${EMAIL_CARD};border:1px solid ${EMAIL_LINE};border-top:none;border-radius:0 0 14px 14px;padding:40px 40px 44px;">
+<h1 style="margin:0 0 24px;font-family:${SERIF};font-size:28px;line-height:1.2;font-weight:600;letter-spacing:-0.02em;color:${EMAIL_INK};">${heading}</h1>
 ${body}
 </td></tr>
 
-<tr><td style="padding:24px 4px 4px;font-family:${SANS};font-size:12px;line-height:1.6;color:${EMAIL_MUTED};">
-<strong style="color:${EMAIL_INK};font-weight:600;">Floom</strong>: the runtime for agentic work.<br>
-<a href="https://floom.dev" style="color:${EMAIL_MUTED};text-decoration:underline;">floom.dev</a><br>
-Questions? Just reply to this email, or write <a href="mailto:team@floom.dev" style="color:${EMAIL_MUTED};text-decoration:underline;">team@floom.dev</a>.${unsubscribeBlock}
+<tr><td style="padding:28px 4px 4px;font-family:${SANS};font-size:12px;line-height:1.6;color:${EMAIL_MUTED};">
+<a href="https://floom.dev" style="color:${EMAIL_INK};font-weight:600;text-decoration:none;">Floom</a> &middot; <a href="mailto:team@floom.dev" style="color:${EMAIL_MUTED};text-decoration:underline;">team@floom.dev</a>${unsubscribeBlock}
 </td></tr>
 
 </table>
@@ -132,7 +130,7 @@ Questions? Just reply to this email, or write <a href="mailto:team@floom.dev" st
 function ctaButton(href: string, label: string): string {
   const safeHref = escapeHtml(href);
   const safeLabel = escapeHtml(label);
-  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:24px 0;"><tr><td style="border-radius:8px;background:${EMAIL_INK};"><a href="${safeHref}" style="display:inline-block;background:${EMAIL_INK};color:#ffffff;text-decoration:none;padding:13px 22px;border-radius:8px;font-family:${SANS};font-size:14px;font-weight:600;letter-spacing:-0.005em;">${safeLabel}</a></td></tr></table>`;
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:28px 0 8px;"><tr><td style="border-radius:8px;background:${EMAIL_INK};"><a href="${safeHref}" style="display:inline-block;background:${EMAIL_INK};color:#ffffff;text-decoration:none;padding:14px 28px;border-radius:8px;font-family:${SANS};font-size:15px;font-weight:600;letter-spacing:-0.01em;">${safeLabel}</a></td></tr></table>`;
 }
 
 function fallbackLink(href: string): string {
@@ -151,6 +149,68 @@ function mutedParagraph(html: string): string {
 // ─────────────────────────────────────────────────────────────────────────
 // Templates
 // ─────────────────────────────────────────────────────────────────────────
+
+
+// --- Quota warning (80% soft cap) ---
+
+export interface QuotaWarningTemplateInput {
+  name?: string | null;
+  publicUrl: string;
+  percentUsed: number;
+  resetAtUtc: string;
+}
+
+export function renderQuotaWarningEmail(input: QuotaWarningTemplateInput): {
+  subject: string;
+  html: string;
+  text: string;
+} {
+  const subject = `Floom: ${input.percentUsed}% of today's compute used`;
+  const greeting = input.name ? `Hi ${escapeHtml(input.name)},` : "Hi,";
+  const safeReset = escapeHtml(input.resetAtUtc);
+  const appsUrl = `${input.publicUrl.replace(/\/+$/, "")}/studio`;
+
+  const body = [
+    bodyParagraph(greeting),
+    bodyParagraph(
+      `Your apps have used <strong>${input.percentUsed}%</strong> of your daily E2B compute quota. ` +
+      `Your quota resets at midnight UTC on <strong>${safeReset}</strong>.`,
+    ),
+    bodyParagraph(
+      "When you reach 100%, new runs will be blocked until the reset. Review your apps and pause any running over-budget.",
+    ),
+    ctaButton(appsUrl, "View your apps"),
+    mutedParagraph(
+      "Need a higher quota? Reply to this email — we can sort it out.",
+    ),
+  ].join("\n");
+
+  const text = [
+    input.name ? `Hi ${input.name},` : "Hi,",
+    "",
+    `Your apps have used ${input.percentUsed}% of your daily E2B compute quota.`,
+    `Quota resets at midnight UTC on ${input.resetAtUtc}.`,
+    "",
+    "When you reach 100%, new runs will be blocked until the reset.",
+    "",
+    appsUrl,
+    "",
+    "Need a higher quota? Reply to this email.",
+    "",
+    "Floom",
+    "team@floom.dev",
+  ].join("\n");
+
+  return {
+    subject,
+    html: baseLayout({
+      heading: `${input.percentUsed}% of daily quota used`,
+      body,
+      preheader: `Your Floom apps have used ${input.percentUsed}% of today's compute budget.`,
+    }),
+    text,
+  };
+}
 
 // --- Welcome (first sign-up) ---
 
@@ -231,7 +291,7 @@ export function renderAppPublishedEmail(input: AppPublishedTemplateInput): {
     ctaButton(input.appUrl, "Open your app"),
     fallbackLink(input.appUrl),
     mutedParagraph(
-      "Need to update it? Push a new version with <code style=\"font-family:monospace;font-size:12px;\">floom publish</code>; the URL stays the same.",
+      "Need to update it? Push a new version with <code style=\"font-family:monospace;font-size:12px;\">floom deploy</code>; the URL stays the same.",
     ),
   ].join("\n");
 
@@ -241,7 +301,7 @@ export function renderAppPublishedEmail(input: AppPublishedTemplateInput): {
     `"${input.appName}" is live on Floom:`,
     input.appUrl,
     "",
-    "Need to update it? Run `floom publish`; the URL stays the same.",
+    "Need to update it? Run `floom deploy`; the URL stays the same.",
     "",
     "Floom",
     "team@floom.dev",

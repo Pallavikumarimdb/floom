@@ -7,8 +7,19 @@ const SITE_URL = "https://floom.dev";
 export const metadata: Metadata = {
   title: "Privacy Policy",
   description:
-    "Privacy Policy for Floom, Inc.: what data we collect, how we use it, and your rights.",
+    "How Floom collects, uses, and protects your data. GDPR-friendly, US-incorporated.",
   alternates: { canonical: `${SITE_URL}/privacy` },
+  openGraph: {
+    title: "Privacy Policy · Floom",
+    description: "How Floom collects, uses, and protects your data. GDPR-friendly, US-incorporated.",
+    url: `${SITE_URL}/privacy`,
+    type: "article",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Privacy Policy · Floom",
+    description: "How Floom collects, uses, and protects your data. GDPR-friendly, US-incorporated.",
+  },
 };
 
 export default function PrivacyPage() {

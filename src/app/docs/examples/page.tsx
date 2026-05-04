@@ -68,16 +68,6 @@ export default function ExamplesPage() {
                 >
                   Run app
                 </Link>
-                {app.template && (
-                  <a
-                    href={`https://github.com/floomhq/floom/tree/main/cli-npm/templates/${app.template}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="rounded-md border border-[#ded8cc] px-3 py-1.5 text-xs font-semibold text-neutral-700 hover:border-neutral-400 transition-colors whitespace-nowrap"
-                  >
-                    View source
-                  </a>
-                )}
               </div>
             </div>
           </div>

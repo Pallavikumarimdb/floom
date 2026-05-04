@@ -22,6 +22,11 @@ import {
 } from "@/lib/floom/executions";
 import { MAX_BUNDLE_BYTES, MAX_SOURCE_BYTES } from "@/lib/floom/limits";
 import { publishExecutionProcessMessage } from "@/lib/floom/queue";
+
+// E2B Free tier: 1 concurrent sandbox. When it's busy, requeue instead of
+// failing immediately. Cap at MAX_INFRA_ATTEMPTS to avoid infinite loops.
+const MAX_INFRA_ATTEMPTS = 30;
+const INFRA_RETRY_DELAY_SECONDS = 10;
 import { readRuntimeDependencies } from "@/lib/floom/requirements";
 import { resolveRuntimeSecrets } from "@/lib/floom/runtime-secrets";
 import { redactExactSecretValues, redactSecretOutput } from "@/lib/floom/schema";
@@ -341,6 +346,16 @@ async function startExecution(
     }
 
     if (runnerResult.kind === "sandbox_unavailable") {
+      // E2B Free tier: sandbox is busy/rate-limited. Requeue with backoff instead
+      // of failing immediately, up to MAX_INFRA_ATTEMPTS.
+      const infraAttempt = (execution.infra_attempt_count ?? 0) + 1;
+      if (infraAttempt <= MAX_INFRA_ATTEMPTS) {
+        await updateExecutionByLease(admin, execution, leaseToken, {
+          infra_attempt_count: infraAttempt,
+        });
+        await scheduleNextPoll(admin, { ...execution, infra_attempt_count: infraAttempt }, leaseToken, INFRA_RETRY_DELAY_SECONDS, baseUrl);
+        return { status: 202, body: { ok: true, queued: "sandbox_busy_retry" } };
+      }
       await finalizeExecution(admin, execution, leaseToken, "failed", "Sandbox unavailable", null)
         .catch(() => undefined);
       return { status: 200, body: { ok: true, terminal: "failed" } };
@@ -421,10 +436,42 @@ async function startExecution(
         });
       });
     }
+    // If sandbox creation failed before `started` was set, check for E2B rate
+    // limit / transient errors and requeue instead of marking failed.
+    if (!started && isSandboxBusyError(error)) {
+      const infraAttempt = (execution.infra_attempt_count ?? 0) + 1;
+      if (infraAttempt <= MAX_INFRA_ATTEMPTS) {
+        await updateExecutionByLease(admin, execution, leaseToken, {
+          infra_attempt_count: infraAttempt,
+        }).catch(() => undefined);
+        await scheduleNextPoll(
+          admin,
+          { ...execution, infra_attempt_count: infraAttempt },
+          leaseToken,
+          INFRA_RETRY_DELAY_SECONDS,
+          baseUrl
+        ).catch(() => undefined);
+        return { status: 202, body: { ok: true, queued: "sandbox_busy_retry" } };
+      }
+    }
     await finalizeExecution(admin, execution, leaseToken, "failed", "App execution failed", null)
       .catch(() => undefined);
     return { status: 200, body: { ok: true, terminal: "failed" } };
   }
+}
+
+/**
+ * Returns true for E2B errors that indicate the sandbox is temporarily busy
+ * or rate-limited (transient infra conditions on E2B Free tier).
+ * These should be retried via the queue, not treated as permanent failures.
+ */
+function isSandboxBusyError(error: unknown): boolean {
+  const statusCode = (error as Record<string, unknown>)?.statusCode ?? (error as Record<string, unknown>)?.status;
+  const message = String((error as Error)?.message ?? error ?? "");
+  return (
+    statusCode === 429 ||
+    /rate.?limit|too many|sandbox.+(unavailable|busy|failed|boot)|429/i.test(message)
+  );
 }
 
 async function pollExecution(

@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import Ajv from "ajv";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { callerHasScope, getBearerToken, resolveAuthCaller } from "@/lib/supabase/auth";
@@ -14,7 +14,9 @@ import { reconcileQuotaReservation, reserveDailyQuota } from "@/lib/floom/quota"
 import {
   appendExecutionEvent,
   appQueueMax,
+  generateViewToken,
   isAsyncRuntimeEnabled,
+  sanitizePublicError,
   syncWaitBudgetMs,
 } from "@/lib/floom/executions";
 import {
@@ -31,12 +33,16 @@ import {
   redactSecretOutput,
 } from "@/lib/floom/schema";
 import { executionSnapshotAfterWait } from "@/lib/floom/execution-worker";
+import { sendEmail } from "@/lib/email/send";
+import { renderQuotaWarningEmail } from "@/lib/email/templates";
 
 export const maxDuration = 300;
 
 const ajv = new Ajv({ strict: false });
 const DEFAULT_PUBLIC_RUN_RATE_LIMIT_MAX = 20;
-const DEFAULT_PUBLIC_RUN_APP_RATE_LIMIT_MAX = 100;
+// Authenticated non-owner callers: higher limit since they have verified identity.
+const DEFAULT_AUTHED_RUN_RATE_LIMIT_MAX = 60;
+const DEFAULT_PUBLIC_RUN_APP_RATE_LIMIT_MAX = 500;
 const DEFAULT_PUBLIC_RUN_RATE_LIMIT_WINDOW_SECONDS = 60;
 
 type LatestVersion = {
@@ -153,10 +159,13 @@ export async function POST(
   }
 
   if (!isOwner) {
+    // Authenticated non-owners get a higher per-caller limit (60/60s vs 20/60s).
+    const isAuthedCaller = caller?.kind === "user" || caller?.kind === "agent_token";
     const rateLimit = await checkPublicRunRateLimit(
       admin,
       app.id,
-      getRunCallerKey(caller, req.headers)
+      getRunCallerKey(caller, req.headers),
+      isAuthedCaller
     );
     if (!rateLimit.allowed) {
       const retryAfterSeconds = String(
@@ -197,12 +206,16 @@ export async function POST(
     ? redactSecretInput(inputSchema, inputs)
     : redactExactSecretValues(inputs ?? null, Object.values(runtimeSecrets.envs));
 
+  // Gate concurrent runs for both sync and async paths. Without this, a burst
+  // of anon callers can saturate all sandbox slots before the rate limiter fires.
+  const queueDepth = await checkAppQueueDepth(admin, app.id);
+  if (!queueDepth.allowed) {
+    const queueHeaders = queueDepth.status === 429 ? { "Retry-After": "5" } : undefined;
+    return NextResponse.json({ error: queueDepth.error }, { status: queueDepth.status, headers: queueHeaders });
+  }
+
   if (isAsyncRuntimeEnabled()) {
-    const queueDepth = await checkAppQueueDepth(admin, app.id);
-    if (!queueDepth.allowed) {
-      const queueHeaders = queueDepth.status === 429 ? { "Retry-After": "30" } : undefined;
-      return NextResponse.json({ error: queueDepth.error }, { status: queueDepth.status, headers: queueHeaders });
-    }
+    const { token: viewToken, hash: viewTokenHash } = generateViewToken();
 
     const { data: execution, error: execError } = await admin
       .from("executions")
@@ -213,6 +226,7 @@ export async function POST(
         caller_agent_token_id: caller?.kind === "agent_token" ? caller.agentTokenId : null,
         input: redactedInputs,
         status: "queued",
+        view_token_hash: viewTokenHash,
       })
       .select()
       .single();
@@ -255,16 +269,19 @@ export async function POST(
     if (req.nextUrl.searchParams.get("wait") === "true") {
       const waited = await executionSnapshotAfterWait(admin, execution.id, syncWaitBudgetMs());
       if (waited?.terminal) {
-        return NextResponse.json(waited.snapshot);
+        return NextResponse.json({ ...waited.snapshot, view_token: viewToken });
       }
-      return NextResponse.json(waited?.snapshot ?? {
-        execution_id: execution.id,
-        status: "queued",
-        output: null,
-        error: null,
-        started_at: null,
-        completed_at: null,
-        progress: null,
+      return NextResponse.json({
+        ...(waited?.snapshot ?? {
+          execution_id: execution.id,
+          status: "queued",
+          output: null,
+          error: null,
+          started_at: null,
+          completed_at: null,
+          progress: null,
+        }),
+        view_token: viewToken,
       }, { status: 202 });
     }
 
@@ -272,6 +289,7 @@ export async function POST(
       {
         execution_id: execution.id,
         status: "queued",
+        view_token: viewToken,
       },
       { status: 202 }
     );
@@ -289,6 +307,7 @@ export async function POST(
     );
   }
 
+  const { token: viewToken, hash: viewTokenHash } = generateViewToken();
   const syncStartedAt = new Date().toISOString();
   const { data: execution, error: execError } = await admin
     .from("executions")
@@ -300,6 +319,7 @@ export async function POST(
       input: redactedInputs ?? {},
       status: "running",
       started_at: syncStartedAt,
+      view_token_hash: viewTokenHash,
     })
     .select()
     .single();
@@ -314,6 +334,11 @@ export async function POST(
     app.owner_id,
     Math.ceil(SANDBOX_TIMEOUT_MS / 1000)
   );
+  // Fire a soft-cap warning email (once per day) when the owner crosses 80%.
+  if (quota.allowed && quota.warningPercent !== undefined && quota.warningPercent >= 80) {
+    after(maybeFireQuotaWarningEmail(admin, app.owner_id, quota.warningPercent));
+  }
+
   if (!quota.allowed) {
     await admin
       .from("executions")
@@ -401,12 +426,17 @@ export async function POST(
   }
 
   if (runnerResult.kind === "failed" || runnerResult.kind === "timed_out") {
+    const safeError = sanitizePublicError(
+      runnerResult.error.detail ?? runnerResult.error.phase,
+      "App execution failed",
+      Object.values(runtimeSecrets.envs ?? {})
+    );
     await admin
       .from("executions")
       .update({
         status: runnerResult.kind === "timed_out" ? "timed_out" : "failed",
         output: null,
-        error: runnerResult.error.detail ?? runnerResult.error.phase,
+        error: safeError,
         error_detail: runnerResult.error,
         completed_at: new Date().toISOString(),
       })
@@ -417,6 +447,7 @@ export async function POST(
       status: runnerResult.kind === "timed_out" ? "timed_out" : "failed",
       output: null,
       error: runnerResult.error,
+      view_token: viewToken,
     });
   }
 
@@ -444,6 +475,7 @@ export async function POST(
       status: "failed",
       output: null,
       error: errorDetail,
+      view_token: viewToken,
     });
   }
 
@@ -468,7 +500,56 @@ export async function POST(
     status: "succeeded",
     output: redactedOutput,
     error: null,
+    view_token: viewToken,
   });
+}
+
+// Fire a quota warning email once per day per owner (idempotency guard via
+// user_metadata.quota_warning_sent_date). Never throws.
+async function maybeFireQuotaWarningEmail(
+  admin: ReturnType<typeof createAdminClient>,
+  ownerId: string,
+  percentUsed: number
+): Promise<void> {
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    const { data: userRecord } = await admin.auth.admin.getUserById(ownerId);
+    if (!userRecord?.user) return;
+
+    const meta = (userRecord.user.user_metadata ?? {}) as Record<string, unknown>;
+    if (meta.quota_warning_sent_date === today) return;
+    if (!userRecord.user.email) return;
+
+    const name =
+      (meta.full_name as string | undefined) ??
+      (meta.name as string | undefined) ??
+      null;
+
+    const resetDate = new Date();
+    resetDate.setUTCHours(24, 0, 0, 0);
+    const resetAtUtc = resetDate.toISOString().slice(0, 10);
+
+    const publicUrl =
+      process.env.FLOOM_ORIGIN ??
+      process.env.NEXT_PUBLIC_FLOOM_ORIGIN ??
+      process.env.NEXT_PUBLIC_APP_URL ??
+      "https://floom.dev";
+
+    const { subject, html, text } = renderQuotaWarningEmail({
+      name,
+      publicUrl,
+      percentUsed,
+      resetAtUtc,
+    });
+
+    await sendEmail({ to: userRecord.user.email, subject, html, text });
+
+    await admin.auth.admin.updateUserById(ownerId, {
+      user_metadata: { ...meta, quota_warning_sent_date: today },
+    });
+  } catch (err) {
+    console.error("[quota-warning] email error:", err);
+  }
 }
 
 async function checkAppQueueDepth(
@@ -502,7 +583,8 @@ async function checkAppQueueDepth(
 async function checkPublicRunRateLimit(
   admin: ReturnType<typeof createAdminClient>,
   appId: string,
-  callerKey: string
+  callerKey: string,
+  isAuthedCaller = false
 ): Promise<
   | { allowed: true }
   | {
@@ -515,13 +597,13 @@ async function checkPublicRunRateLimit(
     "FLOOM_PUBLIC_RUN_RATE_LIMIT_WINDOW_SECONDS",
     DEFAULT_PUBLIC_RUN_RATE_LIMIT_WINDOW_SECONDS
   );
+  const callerLimit = isAuthedCaller
+    ? readPositiveIntegerEnv("FLOOM_AUTHED_RUN_RATE_LIMIT_MAX", DEFAULT_AUTHED_RUN_RATE_LIMIT_MAX)
+    : readPositiveIntegerEnv("FLOOM_PUBLIC_RUN_RATE_LIMIT_MAX", DEFAULT_PUBLIC_RUN_RATE_LIMIT_MAX);
   const checks = [
     {
       key: getPublicRunRateLimitKey(appId, callerKey),
-      limit: readPositiveIntegerEnv(
-        "FLOOM_PUBLIC_RUN_RATE_LIMIT_MAX",
-        DEFAULT_PUBLIC_RUN_RATE_LIMIT_MAX
-      ),
+      limit: callerLimit,
     },
     {
       key: getPublicRunAppRateLimitKey(appId),

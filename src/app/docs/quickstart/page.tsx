@@ -3,8 +3,19 @@ import { IC, CodeBlock, Section } from "@/components/docs/DocsPrimitives";
 
 export const metadata: Metadata = {
   title: "Quick start",
-  description: "From zero to a running Floom app in 60 seconds: CLI setup, scaffold, deploy, run.",
+  description: "Ship a Floom app in under 60 seconds. Create a manifest, write your handler, deploy with one command.",
   alternates: { canonical: "https://floom.dev/docs/quickstart" },
+  openGraph: {
+    title: "Quick start · Floom",
+    description: "Ship a Floom app in under 60 seconds. Create a manifest, write your handler, deploy with one command.",
+    url: "https://floom.dev/docs/quickstart",
+    type: "article",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Quick start · Floom",
+    description: "Ship a Floom app in under 60 seconds. Create a manifest, write your handler, deploy with one command.",
+  },
 };
 
 const launchCommand = `# 1. Authenticate (once per machine)

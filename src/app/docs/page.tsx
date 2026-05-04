@@ -28,6 +28,7 @@ export const metadata: Metadata = {
     "Build, publish, and run Floom apps: manifest reference, schemas, secrets, API, CLI, MCP, and examples.",
   alternates: { canonical: `${SITE_URL}/docs` },
   openGraph: {
+    type: "website",
     title: "Floom Docs",
     description:
       "Everything you need to build and ship a Floom app: from CLI setup to MCP integration.",
@@ -85,6 +86,11 @@ const TOPIC_CARDS = [
   },
   { href: "/docs/limits", title: "Limits", desc: "Sandbox timeout, rate limits, bundle caps." },
   { href: "/docs/faq", title: "FAQ", desc: "Common questions and troubleshooting." },
+  {
+    href: "/docs/troubleshooting",
+    title: "Troubleshooting",
+    desc: "Common confusing states: missing apps, slow runs, consent screens, lost output.",
+  },
 ] as const;
 
 const QUICKSTART_STEPS = [

@@ -45,8 +45,9 @@ function makeHeaders(overrides: Record<string, string> = {}): Headers {
 
 describe("McpToolContext.callerIp → forwardedHeaders passes real IP", () => {
   it("two contexts with different IPs produce different rate-limit keys", () => {
-    const h1 = makeHeaders({ "x-forwarded-for": "1.2.3.4" });
-    const h2 = makeHeaders({ "x-forwarded-for": "5.6.7.8" });
+    // x-vercel-forwarded-for is the Vercel-authoritative header (not client-spoofable)
+    const h1 = makeHeaders({ "x-vercel-forwarded-for": "1.2.3.4" });
+    const h2 = makeHeaders({ "x-vercel-forwarded-for": "5.6.7.8" });
     const key1 = getRunCallerKey(null, h1);
     const key2 = getRunCallerKey(null, h2);
     expect(key1).not.toBe(key2);
@@ -62,8 +63,8 @@ describe("McpToolContext.callerIp → forwardedHeaders passes real IP", () => {
   });
 
   it("getPublicRunCallerKey is deterministic for the same IP+UA", () => {
-    const h1 = makeHeaders({ "x-forwarded-for": "1.2.3.4", "user-agent": "test-agent" });
-    const h2 = makeHeaders({ "x-forwarded-for": "1.2.3.4", "user-agent": "test-agent" });
+    const h1 = makeHeaders({ "x-vercel-forwarded-for": "1.2.3.4", "user-agent": "test-agent" });
+    const h2 = makeHeaders({ "x-vercel-forwarded-for": "1.2.3.4", "user-agent": "test-agent" });
     expect(getPublicRunCallerKey(h1)).toBe(getPublicRunCallerKey(h2));
   });
 
@@ -99,7 +100,7 @@ describe("forwardedHeaders populates IP headers from McpToolContext", () => {
     vi.restoreAllMocks();
   });
 
-  it("forwards callerIp as X-Forwarded-For and X-Real-IP", async () => {
+  it("forwards callerIp as X-Vercel-Forwarded-For, X-Forwarded-For and X-Real-IP", async () => {
     const ctx: McpToolContext = {
       baseUrl: "http://localhost:3000",
       callerIp: "203.0.113.42",
@@ -109,6 +110,8 @@ describe("forwardedHeaders populates IP headers from McpToolContext", () => {
 
     expect(fetchCalls.length).toBeGreaterThan(0);
     const sentHeaders = new Headers(fetchCalls[0].init.headers as HeadersInit);
+    // x-vercel-forwarded-for is the authoritative rate-limit key header
+    expect(sentHeaders.get("x-vercel-forwarded-for")).toBe("203.0.113.42");
     expect(sentHeaders.get("x-forwarded-for")).toBe("203.0.113.42");
     expect(sentHeaders.get("x-real-ip")).toBe("203.0.113.42");
     expect(sentHeaders.get("user-agent")).toBe("test-ua/1.0");

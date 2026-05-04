@@ -113,6 +113,31 @@ export async function GET() {
   // while the canonical origin is the user-facing surface we launch.
   checks.push(await probe("floom-mcp", `${FLOOM_ORIGIN}/mcp`, { timeoutMs: 2000 }));
 
+  // QStash — upstash message queue used by every async run path.
+  // A 401 means the key is present but we're on a restricted endpoint; that's fine —
+  // it proves the service is reachable. Only skip the probe if the env var is missing.
+  if (process.env.QSTASH_TOKEN) {
+    checks.push(
+      await probe("qstash", "https://qstash.upstash.io/v2/keys", {
+        headers: { Authorization: `Bearer ${process.env.QSTASH_TOKEN}` },
+        timeoutMs: 2500,
+        okStatuses: [200, 401, 403],
+      }),
+    );
+  }
+
+  // Resend — transactional email for quota warnings and notifications.
+  // Same logic: 401/403 means reachable.
+  if (process.env.RESEND_API_KEY) {
+    checks.push(
+      await probe("resend", "https://api.resend.com/domains", {
+        headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}` },
+        timeoutMs: 2500,
+        okStatuses: [200, 401, 403],
+      }),
+    );
+  }
+
   const downCount = checks.filter((c) => c.status === "down").length;
   const degradedCount = checks.filter((c) => c.status === "degraded").length;
   const overall: "ok" | "degraded" | "down" =

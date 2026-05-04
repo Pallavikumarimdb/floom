@@ -215,7 +215,7 @@ export default function ConnectionsPage() {
             Loading connections...
           </div>
         </main>
-        <FloomFooter />
+        <FloomFooter hideTagline />
       </div>
     );
   }
@@ -520,7 +520,7 @@ Authorization: Bearer <agent-token>
         </div>
 
       </main>
-      <FloomFooter />
+      <FloomFooter hideTagline />
     </div>
   );
 }

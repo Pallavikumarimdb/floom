@@ -29,7 +29,11 @@ const ICON_LINK: CSSProperties = {
   transition: 'color 0.15s',
 };
 
-export function FloomFooter() {
+interface FloomFooterProps {
+  hideTagline?: boolean;
+}
+
+export function FloomFooter({ hideTagline = false }: FloomFooterProps) {
   return (
     <footer
       data-testid="public-footer"
@@ -83,9 +87,11 @@ export function FloomFooter() {
               floom<span aria-hidden="true" style={{ color: '#10b981' }}>.</span>
             </span>
           </Link>
-          <span style={{ fontSize: 12.5, color: 'var(--muted)' }}>
-            Localhost to live in 60 seconds.
-          </span>
+          {!hideTagline && (
+            <span style={{ fontSize: 12.5, color: 'var(--muted)' }}>
+              Localhost to live in 60 seconds.
+            </span>
+          )}
         </div>
 
         <div style={{ display: 'inline-flex', flexWrap: 'wrap', alignItems: 'center', gap: 16, minWidth: 0 }}>

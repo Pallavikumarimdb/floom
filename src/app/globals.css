@@ -406,7 +406,8 @@ input { font-family: inherit; }
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 0 12px;
-  font-size: 14px;
+  /* 16px: prevents iOS Safari auto-zoom on focus (triggers for <16px) */
+  font-size: 16px;
   color: var(--ink);
   background: var(--card);
   outline: none;

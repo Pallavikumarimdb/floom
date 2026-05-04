@@ -1,3 +1,4 @@
+import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import type { NextRequest } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { SANDBOX_TIMEOUT_MS } from "@/lib/floom/limits";
@@ -61,6 +62,7 @@ export type ExecutionRow = {
   queue_message_id?: string | null;
   stdout_offset: number;
   stderr_offset: number;
+  view_token_hash?: string | null;
 };
 
 export type AppVisibilityRow = {
@@ -72,7 +74,7 @@ export type AppVisibilityRow = {
 };
 
 export type ExecutionAuthResult =
-  | { ok: true; caller: AuthCaller | null; app: AppVisibilityRow; execution: ExecutionRow }
+  | { ok: true; caller: AuthCaller | null; app: AppVisibilityRow; execution: ExecutionRow; isRunner: boolean; isOwner: boolean; canAccess: boolean }
   | { ok: false; status: number; body: { error: string } };
 
 export function isAsyncRuntimeEnabled() {
@@ -186,7 +188,7 @@ export function appConcurrencySoftLimit(app: AppVisibilityRow | null | undefined
 }
 
 export function appQueueMax() {
-  return readPositiveIntegerEnv("FLOOM_APP_QUEUE_MAX", 100);
+  return readPositiveIntegerEnv("FLOOM_APP_QUEUE_MAX", 500);
 }
 
 export function syncWaitBudgetMs() {
@@ -208,6 +210,55 @@ export function nextPollDelaySeconds(row: Pick<ExecutionRow, "started_at" | "cre
   }
   return Math.ceil(readPositiveIntegerEnv("FLOOM_EXECUTION_POLL_VERY_SLOW_MS", 30_000) / 1000);
 }
+
+// ── View-token helpers ────────────────────────────────────────────────────────
+
+/**
+ * Generate a 32-byte random hex token and its SHA-256 hash.
+ * The raw token is returned once to the original submitter.
+ * Only the hash is stored on the execution row.
+ */
+export function generateViewToken(): { token: string; hash: string } {
+  const token = randomBytes(32).toString("hex");
+  const hash = createHash("sha256").update(token).digest("hex");
+  return { token, hash };
+}
+
+/**
+ * Constant-time comparison of two hex strings. Returns true only if both
+ * strings are equal in length and content — prevents timing side-channels.
+ */
+function verifyViewToken(provided: string, storedHash: string): boolean {
+  const providedHash = createHash("sha256").update(provided).digest("hex");
+  if (providedHash.length !== storedHash.length) return false;
+  try {
+    return timingSafeEqual(
+      Buffer.from(providedHash, "hex"),
+      Buffer.from(storedHash, "hex"),
+    );
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Extract a view_token from the request.
+ * Accepted sources (in priority order):
+ *   1. Authorization: ViewToken <token>  (preferred)
+ *   2. ?view_token=<token>               (share-by-URL fallback)
+ */
+export function extractViewToken(req: NextRequest): string | undefined {
+  const authHeader = req.headers.get("authorization") ?? "";
+  if (authHeader.toLowerCase().startsWith("viewtoken ")) {
+    const token = authHeader.slice("viewtoken ".length).trim();
+    if (token) return token;
+  }
+  const qp = req.nextUrl.searchParams.get("view_token");
+  if (qp) return qp;
+  return undefined;
+}
+
+// ── Authorization ─────────────────────────────────────────────────────────────
 
 export async function authorizeExecutionRead(
   req: NextRequest,
@@ -265,20 +316,42 @@ async function authorizeExecutionAccess(
     return { ok: false, status: 404, body: { error: "Execution not found" } };
   }
 
-  if (mode === "read" && app.public) {
-    return { ok: true, caller, app, execution };
-  }
+  const ownerCaller = caller?.userId != null && caller.userId === app.owner_id;
+  // Authed runner: caller's user_id matches the execution's submitter.
+  const isAuthedRunner =
+    callerHasScope(caller, "read") &&
+    caller?.userId != null &&
+    caller.userId === execution.caller_user_id;
 
-  const ownerCaller = caller?.userId === app.owner_id;
-  const hasOwnerReadOrRun =
-    ownerCaller && (callerHasScope(caller, "read") || callerHasScope(caller, "run"));
+  // Anon-runner via view_token: caller holds the raw secret issued at submit time.
+  const providedViewToken = mode === "read" ? extractViewToken(req) : undefined;
+  const isViewTokenRunner =
+    mode === "read" &&
+    typeof providedViewToken === "string" &&
+    typeof execution.view_token_hash === "string" &&
+    execution.view_token_hash.length > 0
+      ? verifyViewToken(providedViewToken, execution.view_token_hash)
+      : false;
 
-  if (mode === "read" && hasOwnerReadOrRun) {
-    return { ok: true, caller, app, execution };
+  const isRunner = isAuthedRunner || isViewTokenRunner;
+
+  // isOwner: identifies the app owner. Owners see analytics-only (status,
+  // timestamps, error code) — NEVER inputs/outputs/error_detail.
+  const isOwner = ownerCaller && (callerHasScope(caller, "read") || callerHasScope(caller, "run"));
+
+  // canAccess: grants the right to see this execution at all (not necessarily
+  // full body). Runners always canAccess. Owners can access their apps.
+  // Public-app strangers can reach the endpoint but get 404 in the read handler.
+  const canAccess = isRunner || isOwner;
+
+  // Public apps: anyone can call the read endpoint; the handler decides what
+  // shape to return (404 for strangers, analytics for owner, full for runner).
+  if (mode === "read" && (app.public || isOwner)) {
+    return { ok: true, caller, app, execution, isRunner, isOwner, canAccess };
   }
 
   if (mode === "cancel" && ownerCaller && callerHasScope(caller, "run")) {
-    return { ok: true, caller, app, execution };
+    return { ok: true, caller, app, execution, isRunner, isOwner, canAccess };
   }
 
   return { ok: false, status: 404, body: { error: "Execution not found" } };

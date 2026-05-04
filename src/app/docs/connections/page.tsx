@@ -16,8 +16,7 @@ import os
 from composio import ComposioToolSet
 
 toolset = ComposioToolSet(entity_id=os.environ["COMPOSIO_CONNECTION_ID"])
-tools = toolset.get_tools(actions=["GMAIL_SEND_EMAIL"])
-# TODO: auto-injection from active connection is on the roadmap`;
+tools = toolset.get_tools(actions=["GMAIL_SEND_EMAIL"])`;
 
 const PROVIDERS = [
   "Gmail", "Slack", "GitHub", "Notion", "Linear", "Google Calendar",
@@ -41,6 +40,9 @@ export default function ConnectionsPage() {
 
       <Section id="usage" title="Usage in Python">
         <CodeBlock label="Python app using Gmail">{composioExample}</CodeBlock>
+        <p className="text-sm text-neutral-600 mt-3">
+          Today you set your connection ID manually as an app secret. Auto-injection — where Floom reads your active connection at run time so apps don't need a manual copy step — is on the roadmap for v0.5.
+        </p>
       </Section>
 
       <Section id="providers" title="Available providers">

@@ -501,6 +501,10 @@ async function getExecution(args: JsonObject, context: McpToolContext): Promise<
     return errorResult("execution_id must be a string");
   }
 
+  if (executionId.length > 64) {
+    return errorResult("execution_id is too long");
+  }
+
   const headers = forwardedHeaders(context);
 
   // Try the async-runtime executions endpoint first. When async runtime is
@@ -2124,7 +2128,11 @@ function forwardedHeaders(context: McpToolContext): HeadersInit {
   }
   // Forward the original caller's IP so the REST rate-limit check uses the
   // real client identity, not the MCP server's internal address.
+  // x-vercel-forwarded-for is now the authoritative header for rate-limiting;
+  // X-Forwarded-For and X-Real-IP are kept for compatibility with any other
+  // consumers (logs, analytics) but are intentionally excluded from rate-limit key derivation.
   if (context.callerIp) {
+    headers["X-Vercel-Forwarded-For"] = context.callerIp;
     headers["X-Forwarded-For"] = context.callerIp;
     headers["X-Real-IP"] = context.callerIp;
   }

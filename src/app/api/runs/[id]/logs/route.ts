@@ -59,7 +59,13 @@ export async function GET(
     return NextResponse.json(auth.body, { status: auth.status });
   }
 
-  const { execution } = auth;
+  const { execution, isRunner, isOwner } = auth;
+
+  // Stranger check: neither runner nor owner → 404 on logs too.
+  if (!isRunner && !isOwner) {
+    return NextResponse.json({ error: "Run not found" }, { status: 404 });
+  }
+
   const sinceParam = req.nextUrl.searchParams.get("since");
   const since = sinceParam !== null ? Math.max(0, parseInt(sinceParam, 10)) : 0;
 
@@ -84,13 +90,18 @@ export async function GET(
     return NextResponse.json({ error: "Failed to load logs" }, { status: 500 });
   }
 
-  const eventsData = events ?? [];
+  const rawEvents = events ?? [];
+  // Runners see all events (stdout/stderr included).
+  // Owners see only status/progress/system events — never stdout/stderr (runner output).
+  const eventsData = isRunner
+    ? rawEvents
+    : rawEvents.filter((e) => !["stdout", "stderr"].includes(e.kind));
   const status = normalizeExecutionStatus(execution.status);
   const terminal = isTerminalExecutionStatus(status);
 
   const response: LogsResponse = {
     events: eventsData,
-    next_offset: since + eventsData.length,
+    next_offset: since + rawEvents.length,
     status,
     terminal,
   };
