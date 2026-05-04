@@ -116,8 +116,9 @@ describe("auth-configs.ts — getAvailableToolkitsWithReadiness exported", () =>
       resolve("src/lib/composio/auth-configs.ts"),
       "utf-8"
     );
-    // Should have a bulk fetch (no toolkit_slug= in the bulk call)
-    expect(src).toContain("auth_configs?limit=100");
+    // Should have a bulk fetch (no toolkit_slug= in the bulk call).
+    // Limit was bumped from 100 → 200 to accommodate larger Composio workspaces.
+    expect(src).toContain("auth_configs?limit=200");
   });
 });
 

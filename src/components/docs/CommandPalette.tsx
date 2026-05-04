@@ -1,13 +1,12 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import type { DocsIndexEntry } from "@/lib/docs/buildDocsIndex";
 
 export function CommandPalette() {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<DocsIndexEntry[]>([]);
   const [selected, setSelected] = useState(0);
   const [index, setIndex] = useState<DocsIndexEntry[]>([]);
   const router = useRouter();
@@ -35,22 +34,19 @@ export function CommandPalette() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  // Filter index on query change
-  useEffect(() => {
-    if (!query.trim()) {
-      setResults(index.slice(0, 8));
-      setSelected(0);
-      return;
-    }
+  // Derive filtered results from query + index — pure derivation, no effect needed.
+  const results = useMemo(() => {
+    if (!query.trim()) return index.slice(0, 8);
     const q = query.toLowerCase();
-    const filtered = index.filter(
-      (item) =>
-        item.title.toLowerCase().includes(q) ||
-        item.description?.toLowerCase().includes(q)
-    );
-    setResults(filtered.slice(0, 10));
-    setSelected(0);
+    return index
+      .filter(
+        (item) =>
+          item.title.toLowerCase().includes(q) ||
+          item.description?.toLowerCase().includes(q)
+      )
+      .slice(0, 10);
   }, [query, index]);
+
 
   const navigate = useCallback(
     (url: string) => {
@@ -119,7 +115,7 @@ export function CommandPalette() {
             type="search"
             placeholder="Search docs..."
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => { setQuery(e.target.value); setSelected(0); }}
             onKeyDown={onKeyDown}
             className="flex-1 bg-transparent text-sm text-[#11110f] placeholder:text-neutral-400 outline-none"
           />

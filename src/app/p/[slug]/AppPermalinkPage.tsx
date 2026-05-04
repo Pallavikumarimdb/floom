@@ -456,6 +456,7 @@ export default function AppPermalinkPage({ initialApp }: { initialApp?: Permalin
     if (sourceFetchedRef.current) return;
     if (!app?.slug) return;
     sourceFetchedRef.current = true;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSourceFetching(true);
     fetch(`/api/apps/${app.slug}/source`)
       .then(async (res) => {

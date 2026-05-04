@@ -38,7 +38,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   // query wrapped in unstable_cache keeps the page in the ISR window.
   const app = await getPublicAppMeta(slug);
 
-  let appName = app?.name ?? slug;
+  const appName = app?.name ?? slug;
   let appDescription = "";
   const appFound = app !== null;
 
