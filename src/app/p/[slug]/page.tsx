@@ -16,13 +16,18 @@ import { SITE_URL } from "@/lib/config/origin";
 //   - The client component shows the "not found" state in that case
 // This ensures Vercel treats this route as ISR-cacheable (s-maxage=300, swr=86400).
 //
-// force-static: even though Supabase fetch calls are uncached at the Next.js
-// fetch level (they go through the admin client, not fetch() with revalidate),
-// force-static tells Next.js to prerender this page and emit ISR headers
-// (public, s-maxage=300) instead of defaulting to private, no-cache.
-// The data is still correct: unstable_cache handles cross-request dedup and
-// revalidation; force-static just unlocks the ISR rendering path.
-export const dynamic = "force-static";
+// IMPORTANT: do NOT use force-static here.
+// force-static prerenders every slug at build time. Apps created AFTER the last
+// deploy don't exist in the DB at build time → getPublicAppMeta returns null →
+// metadata is baked as "Not found · Floom" into the static HTML → every shared
+// link for newly-created apps shows the wrong OG card forever (until next deploy).
+//
+// dynamic = "auto" + revalidate = 300 gives us ISR without the build-time trap:
+// - First request for a new slug: server renders fresh → Vercel caches for 300s
+// - Subsequent requests within 300s: CDN serves the cached response
+// - After 300s: background revalidation fetches fresh data
+// The Supabase admin client has no cookies/headers so Next.js auto-classifies
+// this route as cacheable (Cache-Control: public, s-maxage=300, stale-while-revalidate=86400).
 export const revalidate = 300;
 
 interface Props {
