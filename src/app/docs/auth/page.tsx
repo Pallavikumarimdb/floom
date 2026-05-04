@@ -11,9 +11,9 @@ export const metadata: Metadata = {
 const setupExample = `# Opens a browser page to authorise your CLI. Run once per machine.
 npx @floomhq/cli@latest setup
 
-# Token is saved to ~/.config/floom/token
+# Token is saved to ~/.floom/config.json
 # Or export it manually:
-export FLOOM_TOKEN=<your-agent-token>`;
+export FLOOM_API_KEY=<your-agent-token>`;
 
 export default function AuthPage() {
   return (
@@ -36,14 +36,14 @@ export default function AuthPage() {
 
       <Section id="device-flow" title="2. CLI device flow">
         <p>
-          Runs when you execute <IC>floom setup</IC>. Opens a browser confirmation page; the CLI polls until you approve. The resulting token is saved to <IC>~/.config/floom/token</IC>.
+          Runs when you execute <IC>floom setup</IC>. Opens a browser confirmation page; the CLI polls until you approve. The resulting token is saved to <IC>~/.floom/config.json</IC>.
         </p>
         <CodeBlock>{setupExample}</CodeBlock>
       </Section>
 
       <Section id="agent-tokens" title="3. Agent tokens">
         <p>
-          Create at <Link href="/tokens" className="underline">floom.dev/tokens</Link>. Use in the <IC>Authorization: Bearer</IC> header for REST calls, or as the <IC>FLOOM_TOKEN</IC> env var for the CLI.
+          Create at <Link href="/tokens" className="underline">floom.dev/tokens</Link>. Use in the <IC>Authorization: Bearer</IC> header for REST calls, or as the <IC>FLOOM_API_KEY</IC> env var for the CLI.
         </p>
         <div className="overflow-x-auto mt-4">
           <table className="w-full text-sm border-collapse">

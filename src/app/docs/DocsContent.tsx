@@ -166,9 +166,9 @@ curl -X PUT https://floom.dev/api/apps/my-app/secrets \\
 const setupExample = `# Opens a browser page to authorise your CLI. Run once per machine.
 npx @floomhq/cli@latest setup
 
-# Token is saved to ~/.config/floom/token
+# Token is saved to ~/.floom/config.json
 # Or export it manually:
-export FLOOM_TOKEN=<your-agent-token>`;
+export FLOOM_API_KEY=<your-agent-token>`;
 
 const apiPublicExample = `# Public app — no auth needed
 curl -X POST https://floom.dev/api/apps/meeting-action-items/run \\
@@ -273,7 +273,7 @@ curl -X POST 'https://floom.dev/api/apps/my-app/run?wait=true' \\
 const ciExample = `# GitHub Actions
 - name: Deploy Floom app
   env:
-    FLOOM_TOKEN: \${{ secrets.FLOOM_TOKEN }}
+    FLOOM_API_KEY: \${{ secrets.FLOOM_API_KEY }}
   run: |
     npx @floomhq/cli@latest deploy
 
@@ -480,7 +480,7 @@ export default function DocsContent() {
               </p>
               <CodeBlock label="Terminal">{launchCommand}</CodeBlock>
               <ol className="list-decimal space-y-2 pl-5">
-                <li><strong>Setup</strong>: opens a browser page to link your account. Token saved to <IC>~/.config/floom/token</IC>.</li>
+                <li><strong>Setup</strong>: opens a browser page to link your account. Token saved to <IC>~/.floom/config.json</IC>.</li>
                 <li><strong>Init</strong>: scaffolds <IC>floom.yaml</IC>, <IC>app.py</IC>, and <IC>requirements.txt</IC> in the current directory.</li>
                 <li><strong>Deploy</strong>: bundles the directory, uploads it, and registers the app under your account.</li>
                 <li><strong>Run</strong>: fires a synchronous run, waits for output, prints JSON.</li>
@@ -614,7 +614,7 @@ export default function DocsContent() {
                 <div>
                   <p className="font-semibold text-[#11110f]">3. Agent tokens</p>
                   <p className="mt-1">
-                    Create at <a href="/tokens" className="underline">floom.dev/tokens</a>. Use in the <IC>Authorization: Bearer</IC> header for REST calls, or as the <IC>FLOOM_TOKEN</IC> env var for the CLI. Scopes: <IC>read</IC>, <IC>run</IC>, <IC>publish</IC>.
+                    Create at <a href="/tokens" className="underline">floom.dev/tokens</a>. Use in the <IC>Authorization: Bearer</IC> header for REST calls, or as the <IC>FLOOM_API_KEY</IC> env var for the CLI. Scopes: <IC>read</IC>, <IC>run</IC>, <IC>publish</IC>.
                   </p>
                 </div>
               </div>
@@ -746,7 +746,7 @@ export default function DocsContent() {
 
             <Section id="ci-automation" title="CI / automation">
               <p>
-                Set <IC>FLOOM_TOKEN</IC> as a repository secret and reference it in your workflow. The CLI reads it automatically, no <IC>floom setup</IC> needed in CI.
+                Set <IC>FLOOM_API_KEY</IC> as a repository secret and reference it in your workflow. The CLI reads it automatically, no <IC>floom setup</IC> needed in CI.
               </p>
               <CodeBlock label="GitHub Actions">{ciExample}</CodeBlock>
               <p>

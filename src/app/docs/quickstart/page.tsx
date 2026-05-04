@@ -46,10 +46,10 @@ export default function QuickstartPage() {
 
       <Section id="setup" title="1. Authenticate">
         <p>
-          Run <IC>npx @floomhq/cli@latest setup</IC> once per machine. It opens a browser page to link your Floom account. The token is saved to <IC>~/.config/floom/token</IC>.
+          Run <IC>npx @floomhq/cli@latest setup</IC> once per machine. It opens a browser page to link your Floom account. The token is saved to <IC>~/.floom/config.json</IC>.
         </p>
         <p>
-          In CI, set the <IC>FLOOM_TOKEN</IC> env var instead; no setup command needed.
+          In CI, set the <IC>FLOOM_API_KEY</IC> env var instead; no setup command needed.
         </p>
       </Section>
 
