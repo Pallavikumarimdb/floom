@@ -26,7 +26,7 @@ import {
 } from "@/lib/floom/rate-limit";
 import { publishExecutionProcessMessage } from "@/lib/floom/queue";
 import { readRuntimeDependencies } from "@/lib/floom/requirements";
-import { resolveRuntimeSecrets } from "@/lib/floom/runtime-secrets";
+import { resolveRuntimeSecrets, isAnonPerRunnerError } from "@/lib/floom/runtime-secrets";
 import {
   redactExactSecretValues,
   redactSecretInput,
@@ -78,7 +78,11 @@ export async function POST(
   } catch {
     return NextResponse.json({ error: "Request body must be valid JSON" }, { status: 400 });
   }
-  const inputs = (body as { inputs?: unknown }).inputs;
+  const rawInputs = (body as { inputs?: unknown }).inputs;
+  // Strip null bytes before any validation or DB write.
+  // Postgres jsonb rejects \x00 (SQLSTATE 22P05) and produces a 500
+  // without this guard.
+  const inputs = rawInputs === undefined ? undefined : stripNullBytes(rawInputs);
 
   const inputBytes = inputs === undefined ? 0 : Buffer.byteLength(JSON.stringify(inputs), "utf8");
   if (inputBytes > MAX_INPUT_BYTES) {
@@ -187,8 +191,19 @@ export async function POST(
     admin,
     latestVersion.secrets ?? [],
     app.id,
-    app.owner_id
+    app.owner_id,
+    userId
   );
+  if (isAnonPerRunnerError(runtimeSecrets)) {
+    return NextResponse.json(
+      {
+        error: "This app requires you to sign in and connect your own credentials.",
+        requires_sign_in: true,
+        missing_secrets: runtimeSecrets.requiresSignIn,
+      },
+      { status: 401 }
+    );
+  }
   if (!runtimeSecrets.ok) {
     return NextResponse.json({ error: runtimeSecrets.error }, { status: 503 });
   }
@@ -197,6 +212,7 @@ export async function POST(
     return NextResponse.json(
       {
         error: `Missing configured app secret(s): ${runtimeSecrets.missing.join(", ")}`,
+        missing_secrets: runtimeSecrets.missing,
       },
       { status: 400 }
     );

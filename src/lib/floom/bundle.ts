@@ -18,6 +18,7 @@ import {
   resolveManifestDisplayName,
   resolvePythonDependencyConfig,
   validatePythonSourceForManifest,
+  secretNames,
 } from "./manifest";
 import {
   parseAndValidateJsonSchemaText,
@@ -44,6 +45,11 @@ export const DEFAULT_BUNDLE_EXCLUDES = [
   ".env.local",
   ".env.*.local",
 ] as const;
+
+// Maximum YAML manifest size to parse. js-yaml has no built-in anchor-depth
+// or alias-count limits, but bounding the raw bytes before parsing limits the
+// blast radius of any anchor-bomb or deeply-nested alias attack.
+const MAX_MANIFEST_YAML_BYTES = 64_000; // 64 KB
 
 const STOCK_E2B_BASE_HAS_GO = false;
 const ALLOWED_PUBLIC_ENV_NAMES = new Set([
@@ -203,6 +209,16 @@ export async function validateUploadedTarball(
     });
 
     const manifestText = await fs.readFile(path.join(extractedDir, "floom.yaml"), "utf8");
+
+    // Anchor-bomb / alias-bomb defense: refuse to parse manifests larger than
+    // MAX_MANIFEST_YAML_BYTES. js-yaml 4.x has no built-in alias-count guard.
+    if (Buffer.byteLength(manifestText, "utf8") > MAX_MANIFEST_YAML_BYTES) {
+      throw new BundleValidationError(
+        "invalid_manifest",
+        `floom.yaml exceeds the ${MAX_MANIFEST_YAML_BYTES / 1000} KB manifest size limit`
+      );
+    }
+
     if (
       uploadedManifestText &&
       JSON.stringify(yaml.load(uploadedManifestText)) !== JSON.stringify(yaml.load(manifestText))
@@ -533,7 +549,7 @@ async function hasPackageJsonStartScript(packageJsonPath: string) {
 }
 
 async function findSecretCoverageWarnings(extractedDir: string, manifest: FloomManifest) {
-  const declaredSecrets = new Set(manifest.secrets ?? []);
+  const declaredSecrets = new Set(secretNames(manifest.secrets));
   const warnings: string[] = [];
   const envReferences = new Map<string, Set<string>>();
 
