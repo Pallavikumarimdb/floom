@@ -78,11 +78,19 @@ describe("S2: pollInFlightSandboxes exported from execution-worker", () => {
     expect(src).toContain("cancel_requested_at");
   });
 
-  it("enforces sandbox timeout in poller", () => {
+  it("enforces execution TTL (not short sandbox timeout) in poller hard-kill check", () => {
     const src = readFileSync(resolve("src/lib/floom/execution-worker.ts"), "utf-8");
-    expect(src).toContain("sandboxTimeoutMs()");
-    // The poller-specific finalize checks for timed_out with started_at check
+    // Poller must use executionTtlMs() (default 850 s) as the backstop, not
+    // the old sandboxTimeoutMs() (250 s) which was killing long jobs too early.
+    expect(src).toContain("executionTtlMs()");
     expect(src).toContain("pollOneInFlightSandbox");
+  });
+
+  it("passes executionTtlMs() as timeoutMs to startSandboxExecution (sandbox lifetime fix)", () => {
+    const src = readFileSync(resolve("src/lib/floom/execution-worker.ts"), "utf-8");
+    // The E2B sandbox must be created with the full TTL budget so it is not
+    // killed by E2B before the poller can finalize it.
+    expect(src).toContain("timeoutMs: executionTtlMs()");
   });
 });
 
@@ -369,6 +377,67 @@ describe("Case 1: happy path — sandbox completes, output persisted", () => {
     expect(result.polled).toBe(1);
     expect(result.finalized).toBe(1);
     expect(result.errors).toBe(0);
+  });
+});
+
+describe("Case 2b: regression — job at 300 s NOT killed (old 250 s threshold was wrong)", () => {
+  it("does NOT finalize as timed_out when elapsed is 300 s (below executionTtlMs default of 850 s)", async () => {
+    // 300 s elapsed: above old SANDBOX_TIMEOUT_MS (250 s) but below executionTtlMs (850 s).
+    // Before the fix, this execution would be killed at ~350 s wall-time.
+    const execution300s = makeExecution({
+      started_at: new Date(Date.now() - 300_000).toISOString(),
+      last_polled_at: null,
+    });
+
+    const { Sandbox } = await import("e2b");
+    const mockSbx = {
+      files: {
+        read: vi.fn().mockImplementation(async (path: string) => {
+          if (path === "/home/user/result.json") {
+            return "";  // still running, no result yet
+          }
+          return "";
+        }),
+      },
+      commands: {
+        list: vi.fn().mockResolvedValue([{ pid: 42 }]),  // pid 42 still alive
+      },
+    };
+    (Sandbox.connect as ReturnType<typeof vi.fn>).mockResolvedValue(mockSbx);
+
+    const updateCalls: unknown[] = [];
+    const admin = makeFakeAdmin({ executions: [execution300s] });
+    const fromSpy = vi.spyOn(admin, "from");
+    fromSpy.mockImplementation((table: string) => {
+      const base = makeFakeAdmin({ executions: [execution300s] }).from(table);
+      if (table === "executions") {
+        return {
+          ...base,
+          update: vi.fn().mockImplementation((values: unknown) => {
+            updateCalls.push(values);
+            return {
+              eq: vi.fn().mockReturnThis(),
+              gt: vi.fn().mockReturnThis(),
+              in: vi.fn().mockReturnThis(),
+              select: vi.fn().mockReturnThis(),
+              maybeSingle: vi.fn().mockResolvedValue({ data: { id: "exec-1" }, error: null }),
+            };
+          }),
+        };
+      }
+      return base;
+    });
+
+    const { pollInFlightSandboxes } = await import("@/lib/floom/execution-worker");
+    const result = await pollInFlightSandboxes(admin as never);
+
+    // Must still be running — not finalized as timed_out
+    const timedOutCall = updateCalls.find(
+      (c) => typeof c === "object" && c !== null && (c as Record<string, unknown>).status === "timed_out"
+    );
+    expect(timedOutCall).toBeUndefined();
+    // finalized should be 0 (still_running) or at most 0
+    expect(result.finalized).toBe(0);
   });
 });
 

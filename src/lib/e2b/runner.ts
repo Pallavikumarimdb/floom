@@ -91,6 +91,8 @@ type StartSandboxExecutionArgs = {
   handler: string;
   dependencies?: RuntimeDependencies;
   secrets?: RuntimeSecrets;
+  /** Override the E2B sandbox lifetime. Defaults to SANDBOX_TIMEOUT_MS (250 s). */
+  timeoutMs?: number;
 };
 
 type PollSandboxExecutionArgs = {
@@ -108,6 +110,7 @@ export async function startSandboxExecution({
   handler,
   dependencies = {},
   secrets = {},
+  timeoutMs = SANDBOX_TIMEOUT_MS,
 }: StartSandboxExecutionArgs): Promise<SandboxStartResult> {
   if (!process.env.E2B_API_KEY) {
     if (!isExplicitFakeMode()) {
@@ -156,7 +159,7 @@ export async function startSandboxExecution({
       });
     }
 
-    runSbx = await Sandbox.create("base", sandboxOptions({ allowInternetAccess: true }));
+    runSbx = await Sandbox.create("base", sandboxOptions({ allowInternetAccess: true, deadlineAt: Date.now() + timeoutMs }));
     await prepareSandboxFiles(runSbx, source, inputs, entrypoint, handler, dependencies, dependencyArchive);
 
     const handle = await runSbx.commands.run(

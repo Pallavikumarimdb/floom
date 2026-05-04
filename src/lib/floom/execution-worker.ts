@@ -15,7 +15,6 @@ import {
   nextPollDelaySeconds,
   normalizeExecutionStatus,
   queueTtlMs,
-  sandboxTimeoutMs,
   sanitizePublicError,
   staleRunningMs,
   type ExecutionRow,
@@ -439,6 +438,10 @@ async function startExecution(
       handler: app.handler,
       dependencies: readRuntimeDependencies(version.dependencies),
       secrets: mergedEnvs,
+      // Give the E2B sandbox the full execution TTL budget so jobs that run
+      // longer than the old 250 s default are not killed by E2B before the
+      // poller can finalize them.
+      timeoutMs: executionTtlMs(),
     });
 
     const now = new Date().toISOString();
@@ -572,13 +575,13 @@ async function pollExecution(
 ) {
   if (execution.started_at) {
     const elapsedMs = Date.now() - Date.parse(execution.started_at);
-    if (Number.isFinite(elapsedMs) && elapsedMs >= sandboxTimeoutMs()) {
+    if (Number.isFinite(elapsedMs) && elapsedMs >= executionTtlMs()) {
       await finalizeExecution(
         admin,
         execution,
         leaseToken,
         "timed_out",
-        "Execution exceeded SANDBOX_TIMEOUT_MS",
+        "Execution exceeded maximum execution time",
         null,
         { timed_out_at: new Date().toISOString() }
       );
@@ -1213,16 +1216,20 @@ async function pollOneInFlightSandbox(
     return "finalized";
   }
 
-  // Enforce sandbox timeout.
+  // Enforce execution TTL as the hard-kill backstop in the poller.
+  // We use executionTtlMs() (default 850 s) rather than sandboxTimeoutMs()
+  // (250 s) because the E2B sandbox is now created with the full TTL budget.
+  // Using the shorter sandboxTimeoutMs() here would kill jobs at 250 s even
+  // though the sandbox itself is alive and running.
   if (claimed.started_at) {
     const elapsedMs = Date.now() - Date.parse(claimed.started_at);
-    if (Number.isFinite(elapsedMs) && elapsedMs >= sandboxTimeoutMs()) {
+    if (Number.isFinite(elapsedMs) && elapsedMs >= executionTtlMs()) {
       await finalizeExecutionInPoller(
         admin,
         claimed,
         leaseToken,
         "timed_out",
-        "Execution exceeded SANDBOX_TIMEOUT_MS",
+        "Execution exceeded maximum execution time",
         null,
         { timed_out_at: new Date().toISOString() }
       );
