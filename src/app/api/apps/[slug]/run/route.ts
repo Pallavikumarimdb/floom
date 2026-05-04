@@ -206,32 +206,38 @@ export async function POST(
     ? redactSecretInput(inputSchema, inputs)
     : redactExactSecretValues(inputs ?? null, Object.values(runtimeSecrets.envs));
 
-  // Gate concurrent runs for both sync and async paths. Without this, a burst
-  // of anon callers can saturate all sandbox slots before the rate limiter fires.
-  const queueDepth = await checkAppQueueDepth(admin, app.id);
-  if (!queueDepth.allowed) {
-    const queueHeaders = queueDepth.status === 429 ? { "Retry-After": "5" } : undefined;
-    return NextResponse.json({ error: queueDepth.error }, { status: queueDepth.status, headers: queueHeaders });
-  }
-
   if (isAsyncRuntimeEnabled()) {
     const { token: viewToken, hash: viewTokenHash } = generateViewToken();
 
-    const { data: execution, error: execError } = await admin
-      .from("executions")
-      .insert({
-        app_id: app.id,
-        version_id: latestVersion.id,
-        caller_user_id: caller?.kind === "user" ? caller.userId : null,
-        caller_agent_token_id: caller?.kind === "agent_token" ? caller.agentTokenId : null,
-        input: redactedInputs,
-        status: "queued",
-        view_token_hash: viewTokenHash,
-      })
-      .select()
-      .single();
+    // P0-1: atomic queue-slot claim via Postgres advisory lock.
+    // claim_app_queue_slot takes pg_advisory_xact_lock(app_id), checks the
+    // in-flight count, and inserts the execution row in one transaction.
+    // Two concurrent requests can no longer both pass the count check.
+    const { data: execution, error: execError } = await admin.rpc(
+      "claim_app_queue_slot",
+      {
+        p_app_id: app.id,
+        p_queue_max: appQueueMax(),
+        p_version_id: latestVersion.id,
+        p_caller_user_id: caller?.kind === "user" ? caller.userId : null,
+        p_caller_agent_token_id: caller?.kind === "agent_token" ? caller.agentTokenId : null,
+        p_input: redactedInputs,
+        p_status: "queued",
+        p_view_token_hash: viewTokenHash,
+      }
+    );
 
-    if (execError || !execution) {
+    if (execError) {
+      // SQLSTATE P0001 = queue_full raised by claim_app_queue_slot.
+      if (execError.code === "P0001") {
+        return NextResponse.json(
+          { error: "Run queue is full" },
+          { status: 429, headers: { "Retry-After": "5" } }
+        );
+      }
+      return NextResponse.json({ error: "Failed to create execution" }, { status: 500 });
+    }
+    if (!execution) {
       return NextResponse.json({ error: "Failed to create execution" }, { status: 500 });
     }
 
@@ -307,27 +313,10 @@ export async function POST(
     );
   }
 
-  const { token: viewToken, hash: viewTokenHash } = generateViewToken();
-  const syncStartedAt = new Date().toISOString();
-  const { data: execution, error: execError } = await admin
-    .from("executions")
-    .insert({
-      app_id: app.id,
-      version_id: latestVersion.id,
-      caller_user_id: caller?.kind === "user" ? caller.userId : null,
-      caller_agent_token_id: caller?.kind === "agent_token" ? caller.agentTokenId : null,
-      input: redactedInputs ?? {},
-      status: "running",
-      started_at: syncStartedAt,
-      view_token_hash: viewTokenHash,
-    })
-    .select()
-    .single();
-
-  if (execError || !execution) {
-    return NextResponse.json({ error: "Failed to create execution" }, { status: 500 });
-  }
-
+  // P0-2: reserve quota BEFORE inserting the execution row (sync path).
+  // If the process is killed after insert but before reservation, reconcile
+  // never fires and quota is not consumed. Reserving first ensures every
+  // execution row has a matching reservation that the sweep can account for.
   const quota = await reserveDailyQuota(
     admin,
     app.id,
@@ -340,16 +329,6 @@ export async function POST(
   }
 
   if (!quota.allowed) {
-    await admin
-      .from("executions")
-      .update({
-        status: "error",
-        error: quota.reason === "unavailable" ? "quota_check_unavailable" : "app_quota_exhausted",
-        error_detail: null,
-        completed_at: new Date().toISOString(),
-      })
-      .eq("id", execution.id);
-
     if (quota.reason === "unavailable") {
       return NextResponse.json(
         { error: "quota_check_unavailable", retry_after: quota.retryAfterUnix },
@@ -365,6 +344,47 @@ export async function POST(
       { status: 429, headers: { "Retry-After": quotaRetryAfter } }
     );
   }
+
+  // P0-1 (sync path): atomic queue-slot claim via Postgres advisory lock.
+  const { token: viewToken, hash: viewTokenHash } = generateViewToken();
+  const syncStartedAt = new Date().toISOString();
+  const { data: claimedSync, error: claimSyncError } = await admin.rpc(
+    "claim_app_queue_slot",
+    {
+      p_app_id: app.id,
+      p_queue_max: appQueueMax(),
+      p_version_id: latestVersion.id,
+      p_caller_user_id: caller?.kind === "user" ? caller.userId : null,
+      p_caller_agent_token_id: caller?.kind === "agent_token" ? caller.agentTokenId : null,
+      p_input: redactedInputs ?? {},
+      p_status: "running",
+      p_view_token_hash: viewTokenHash,
+    }
+  );
+
+  if (claimSyncError) {
+    // Release the quota reservation we just made before returning.
+    await reconcileQuotaReservation(admin, app.id, quota.reservedSeconds, 0).catch(() => undefined);
+    if (claimSyncError.code === "P0001") {
+      return NextResponse.json(
+        { error: "Run queue is full" },
+        { status: 429, headers: { "Retry-After": "5" } }
+      );
+    }
+    return NextResponse.json({ error: "Failed to create execution" }, { status: 500 });
+  }
+  if (!claimedSync) {
+    await reconcileQuotaReservation(admin, app.id, quota.reservedSeconds, 0).catch(() => undefined);
+    return NextResponse.json({ error: "Failed to create execution" }, { status: 500 });
+  }
+
+  // Backfill started_at which claim_app_queue_slot doesn't set (status was
+  // inserted as "running" but started_at must be set separately).
+  const execution = { ...claimedSync, started_at: syncStartedAt } as typeof claimedSync;
+  await admin
+    .from("executions")
+    .update({ started_at: syncStartedAt })
+    .eq("id", claimedSync.id);
 
   const bundleBuffer = Buffer.from(await bundleData.arrayBuffer());
   const outputSchema = latestVersion.output_schema ?? null;
@@ -504,8 +524,11 @@ export async function POST(
   });
 }
 
-// Fire a quota warning email once per day per owner (idempotency guard via
-// user_metadata.quota_warning_sent_date). Never throws.
+// P1-3: Fire a quota warning email once per day per owner.
+// Idempotency guard: INSERT into quota_warning_log (unique on user_id +
+// warned_date). The winning INSERT fires the email; duplicate inserts
+// (SQLSTATE 23505) are silently ignored. Replaces the read-modify-write
+// on user_metadata which had a TOCTOU race. Never throws.
 async function maybeFireQuotaWarningEmail(
   admin: ReturnType<typeof createAdminClient>,
   ownerId: string,
@@ -513,13 +536,22 @@ async function maybeFireQuotaWarningEmail(
 ): Promise<void> {
   try {
     const today = new Date().toISOString().slice(0, 10);
+
+    // Attempt to claim the "send slot" for today atomically.
+    const { error: logError } = await admin
+      .from("quota_warning_log")
+      .insert({ user_id: ownerId, warned_date: today });
+
+    if (logError) {
+      // 23505 = unique_violation: already sent today. Any other error: skip silently.
+      return;
+    }
+
+    // We won the race — fetch user details and send.
     const { data: userRecord } = await admin.auth.admin.getUserById(ownerId);
-    if (!userRecord?.user) return;
+    if (!userRecord?.user?.email) return;
 
     const meta = (userRecord.user.user_metadata ?? {}) as Record<string, unknown>;
-    if (meta.quota_warning_sent_date === today) return;
-    if (!userRecord.user.email) return;
-
     const name =
       (meta.full_name as string | undefined) ??
       (meta.name as string | undefined) ??
@@ -543,41 +575,9 @@ async function maybeFireQuotaWarningEmail(
     });
 
     await sendEmail({ to: userRecord.user.email, subject, html, text });
-
-    await admin.auth.admin.updateUserById(ownerId, {
-      user_metadata: { ...meta, quota_warning_sent_date: today },
-    });
   } catch (err) {
     console.error("[quota-warning] email error:", err);
   }
-}
-
-async function checkAppQueueDepth(
-  admin: ReturnType<typeof createAdminClient>,
-  appId: string
-): Promise<
-  | { allowed: true }
-  | {
-      allowed: false;
-      status: number;
-      error: string;
-    }
-> {
-  const { count, error } = await admin
-    .from("executions")
-    .select("id", { count: "exact", head: true })
-    .eq("app_id", appId)
-    .in("status", ["queued", "running"]);
-
-  if (error) {
-    return { allowed: false, status: 503, error: "Run queue check failed" };
-  }
-
-  if ((count ?? 0) >= appQueueMax()) {
-    return { allowed: false, status: 429, error: "Run queue is full" };
-  }
-
-  return { allowed: true };
 }
 
 async function checkPublicRunRateLimit(
