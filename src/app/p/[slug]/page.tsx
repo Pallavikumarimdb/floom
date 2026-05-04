@@ -1,14 +1,18 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
 import AppPermalinkPage, { type PermalinkInitialApp } from "./AppPermalinkPage";
-import { demoApp, hasBrowserAuthConfig, hasSupabaseConfig } from "@/lib/demo-app";
+import { demoApp, hasSupabaseConfig } from "@/lib/demo-app";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { safeJsonLd } from "@/lib/seo/json-ld";
 import { SITE_URL } from "@/lib/config/origin";
 
-// ISR: public app pages are cached at the CDN for 5 minutes.
-// Private app pages still opt into dynamic rendering (cookies() is called
-// only for the owner-check path, so public slugs get the cache benefit).
+// ISR: public app pages are CDN-cached for 5 minutes.
+// No server-side auth or cookies() anywhere in this file — every code path
+// uses the admin (service-role) client with no cookie/header access.
+// Auth and private-app gating are handled entirely client-side:
+//   - AppPermalinkPage fetches /api/apps/[slug] with the user's bearer token
+//   - The API returns 404 for private apps the caller cannot access
+//   - The client component shows the "not found" state in that case
+// This ensures Vercel treats this route as ISR-cacheable (s-maxage=300, swr=86400).
 export const revalidate = 300;
 
 interface Props {
@@ -90,13 +94,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function Page({ params }: Props) {
   const { slug } = await params;
-  if (await isUnavailablePermalink(slug)) {
-    notFound();
-  }
 
-  // Pre-fetch the app data server-side so the first paint renders the form
-  // rather than a loading skeleton.
-  const initialApp = await fetchInitialApp(slug);
+  // Pre-fetch only PUBLIC app metadata server-side so the first paint renders
+  // the form rather than a loading skeleton. Private apps return null here and
+  // the client component handles them via the authenticated API fetch.
+  const initialApp = await fetchPublicInitialApp(slug);
 
   // JSON-LD: describe each public app as a WebApplication hosted on the Floom
   // platform. Helps LLMs understand "this is a deployable app on Floom" when
@@ -140,9 +142,12 @@ export default async function Page({ params }: Props) {
   );
 }
 
-async function fetchInitialApp(slug: string): Promise<PermalinkInitialApp | null> {
+// Fetch public-only app metadata for server-side pre-rendering.
+// Only returns data for apps with public=true; private apps return null so
+// the client component handles auth and renders after hydration.
+// No cookies(), no headers(), no server auth — this keeps the route ISR-cacheable.
+async function fetchPublicInitialApp(slug: string): Promise<PermalinkInitialApp | null> {
   if (!hasSupabaseConfig()) {
-    const { demoApp } = await import("@/lib/demo-app");
     if (slug === demoApp.slug) {
       return {
         id: demoApp.id,
@@ -163,6 +168,7 @@ async function fetchInitialApp(slug: string): Promise<PermalinkInitialApp | null
       .from("apps")
       .select("id, slug, name, handler, public, app_versions(input_schema)")
       .eq("slug", slug)
+      .eq("public", true) // Only pre-render public apps server-side
       .order("version", { foreignTable: "app_versions", ascending: false })
       .limit(1, { foreignTable: "app_versions" })
       .maybeSingle();
@@ -179,51 +185,9 @@ async function fetchInitialApp(slug: string): Promise<PermalinkInitialApp | null
       name: app.name,
       handler: (app.handler as string | null) ?? null,
       input_schema: latestVersion?.input_schema ?? null,
-      public: app.public as boolean,
+      public: true,
     };
   } catch {
     return null;
-  }
-}
-
-async function isUnavailablePermalink(slug: string) {
-  if (!hasSupabaseConfig()) {
-    return slug !== demoApp.slug;
-  }
-
-  try {
-    const admin = createAdminClient();
-    const { data, error } = await admin
-      .from("apps")
-      .select("id, owner_id, public")
-      .eq("slug", slug)
-      .maybeSingle();
-
-    if (error || !data) {
-      return true;
-    }
-
-    if (data.public === true) {
-      return false;
-    }
-
-    if (!hasBrowserAuthConfig()) {
-      return true;
-    }
-
-    // Dynamic import keeps `cookies()` out of the static module graph so
-    // public app pages can be ISR-cached. The import only executes for
-    // private-app ownership checks (data.public !== true branch above).
-    const { createClient: createServerSupabaseClient } = await import("@/lib/supabase/server");
-    const supabase = await createServerSupabaseClient();
-    const { data: userData, error: userError } = await supabase.auth.getUser();
-
-    if (userError || !userData.user) {
-      return true;
-    }
-
-    return userData.user.id !== data.owner_id;
-  } catch {
-    return true;
   }
 }
