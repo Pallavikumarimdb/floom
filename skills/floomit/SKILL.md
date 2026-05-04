@@ -43,7 +43,7 @@ Install CLI, scaffold, deploy, run — the full flow.
 
 ### Write or fix the manifest (floom.yaml)
 **Read:** https://floom.dev/docs/manifest
-All fields: slug, command, runtime, entrypoint, public, input_schema, output_schema, dependencies, secrets, composio, bundle_exclude. Both legacy and modern forms.
+All fields: slug, command, runtime, entrypoint, public, input_schema, output_schema, dependencies, secrets, integrations, bundle_exclude. Both legacy and modern forms. (The old `composio:` field is deprecated but still accepted.)
 
 **Single-file default:** input_schema and output_schema can be inline YAML objects — no separate .json files needed. Example:
 
@@ -66,9 +66,9 @@ Path-reference form (`input_schema: ./input.schema.json`) still works as an esca
 **Read:** https://floom.dev/docs/secrets
 Creator-subsidized shared keys vs per-runner user-provided keys. Manifest schema and CLI commands.
 
-### Use Gmail, Slack, or other Composio integrations
-**Read:** https://floom.dev/docs/connections
-Manifest field (composio: gmail), runtime auto-injection of COMPOSIO_CONNECTION_ID, missing-connection HTTP 412 handling.
+### Use Gmail, Slack, or other integrations
+**Read:** https://floom.dev/docs/integrations
+Manifest field (integrations: gmail), runtime auto-injection of COMPOSIO_CONNECTION_ID, missing-connection HTTP 412 handling.
 
 ### Call the REST API directly
 **Read:** https://floom.dev/docs/api
